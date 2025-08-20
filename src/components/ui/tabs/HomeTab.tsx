@@ -83,7 +83,7 @@ export function HomeTab() {
       step: 4,
       title: "Track Progress",
       description: "Monitor your automated investments",
-      action: "View History",
+      action: "Got it",
       icon: "📱",
     },
   ];
@@ -148,25 +148,25 @@ export function HomeTab() {
     ((currentStepIndex + 1) / onboardingSteps.length) * 100;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-200px)] px-6 py-4 space-y-6">
+    <div className="flex flex-col h-[calc(100vh-200px)] px-4 py-3 space-y-4 overflow-y-auto">
       {showOnboarding && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-black/50"
             onClick={closeOnboarding}
           />
-          <div className="relative z-10 w-full max-w-lg mx-auto bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800">
-            <div className="p-6">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="text-3xl" aria-hidden>
+          <div className="relative z-10 w-full max-w-sm mx-auto bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-200 dark:border-gray-800 max-h-[90vh] overflow-y-auto">
+            <div className="p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="text-2xl" aria-hidden>
                     {step.icon}
                   </div>
                   <div>
-                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                       {step.title}
                     </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
                       {step.description}
                     </p>
                   </div>
@@ -177,7 +177,7 @@ export function HomeTab() {
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
+                    className="h-4 w-4"
                     viewBox="0 0 20 20"
                     fill="currentColor"
                   >
@@ -190,10 +190,10 @@ export function HomeTab() {
                 </button>
               </div>
 
-              <div className="mt-4">
-                <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2">
+              <div className="mb-3">
+                <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-1.5">
                   <div
-                    className="bg-blue-600 h-2 rounded-full"
+                    className="bg-blue-600 h-1.5 rounded-full"
                     style={{ width: `${progressPercent}%` }}
                   />
                 </div>
@@ -205,35 +205,31 @@ export function HomeTab() {
                 </div>
               </div>
 
-              <div className="mt-5 space-y-4">
-                <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-gray-50 dark:bg-gray-950">
-                  <p className="text-sm text-gray-700 dark:text-gray-300">
+              <div className="space-y-3">
+                <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-3 bg-gray-50 dark:bg-gray-950">
+                  <p className="text-xs text-gray-700 dark:text-gray-300">
                     Connect your wallet and tell us:
                   </p>
-                  <pre className="mt-2 text-sm whitespace-pre-wrap text-gray-900 dark:text-gray-100">
-                    "I want to invest [amount] in [token] every [frequency] for
-                    [duration]" Example: "I want to invest $100 in ETH every
-                    week for 3 months"
+                  <pre className="mt-1 text-xs whitespace-pre-wrap text-gray-900 dark:text-gray-100">
+                   I want to invest [amount] in [token] every [frequency]
+                    for [duration] 
                   </pre>
-                  <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">
-                    Let's build your crypto portfolio automatically! 🚀
-                  </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2">
                   {onboardingSteps.map((s, idx) => (
                     <div
                       key={s.step}
-                      className={`rounded-lg border p-3 ${
+                      className={`rounded-lg border p-2 ${
                         idx === currentStepIndex
                           ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-400"
                           : "border-gray-200 dark:border-gray-800"
                       }`}
                     >
-                      <div className="text-lg" aria-hidden>
+                      <div className="text-sm" aria-hidden>
                         {s.icon}
                       </div>
-                      <div className="text-sm font-medium text-gray-900 dark:text-white mt-1">
+                      <div className="text-xs font-medium text-gray-900 dark:text-white mt-1">
                         {s.title}
                       </div>
                       <div className="text-xs text-gray-600 dark:text-gray-400">
@@ -244,7 +240,7 @@ export function HomeTab() {
                 </div>
               </div>
 
-              <div className="mt-5 flex items-center justify-between">
+              <div className="mt-4 flex items-center justify-between">
                 <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                   <input
                     type="checkbox"
@@ -252,19 +248,19 @@ export function HomeTab() {
                     onChange={(e) => setDontShowAgain(e.target.checked)}
                     className="rounded border-gray-300 dark:border-gray-600"
                   />
-                  Don't show again
+                  Don&apos;t show again
                 </label>
                 <div className="flex gap-2">
                   <button
                     onClick={goPrev}
                     disabled={currentStepIndex === 0}
-                    className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50"
+                    className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50 text-sm"
                   >
                     Back
                   </button>
                   <button
                     onClick={goNext}
-                    className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm"
                   >
                     {currentStepIndex === onboardingSteps.length - 1
                       ? "Got it"
@@ -279,7 +275,7 @@ export function HomeTab() {
 
       {/* User Greeting */}
       <div className="text-left">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white">
           {userGreeting}
         </h1>
         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
@@ -293,15 +289,15 @@ export function HomeTab() {
       </div>
 
       {/* USDC Balance Card */}
-      <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-6 text-white">
+      <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-4 text-white">
         <div className="flex justify-between items-center">
           <div>
             <p className="text-sm opacity-90">Available Balance</p>
-            <p className="text-3xl font-bold mt-1">{usdcBalance}</p>
+            <p className="text-2xl font-bold mt-1">{usdcBalance}</p>
             <p className="text-xs opacity-75 mt-1">USDC</p>
           </div>
-          <div className="bg-white/20 rounded-full p-3">
-            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+          <div className="bg-white/20 rounded-full p-2">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
               <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
               <path
                 fillRule="evenodd"
@@ -314,60 +310,60 @@ export function HomeTab() {
       </div>
 
       {/* Active Investment Plan Card */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-        <div className="flex justify-between items-start mb-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+        <div className="flex justify-between items-start mb-3">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">
               Active Investment Plan
             </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-xs text-gray-600 dark:text-gray-400">
               Your automated investment strategy
             </p>
           </div>
-          <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full dark:bg-green-900 dark:text-green-300">
+          <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded-full dark:bg-green-900 dark:text-green-300">
             {activePlan.status}
           </span>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600 dark:text-gray-400">
+            <span className="text-xs text-gray-600 dark:text-gray-400">
               Plan Name
             </span>
-            <span className="text-sm font-medium text-gray-900 dark:text-white">
+            <span className="text-xs font-medium text-gray-900 dark:text-white">
               {activePlan.name}
             </span>
           </div>
 
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600 dark:text-gray-400">
+            <span className="text-xs text-gray-600 dark:text-gray-400">
               Strategy
             </span>
-            <span className="text-sm font-medium text-gray-900 dark:text-white">
+            <span className="text-xs font-medium text-gray-900 dark:text-white">
               {activePlan.strategy}
             </span>
           </div>
 
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600 dark:text-gray-400">
+            <span className="text-xs text-gray-600 dark:text-gray-400">
               Total Invested
             </span>
-            <span className="text-sm font-medium text-green-600 dark:text-green-400">
+            <span className="text-xs font-medium text-green-600 dark:text-green-400">
               {activePlan.totalInvested}
             </span>
           </div>
 
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600 dark:text-gray-400">
+            <span className="text-xs text-gray-600 dark:text-gray-400">
               Next Investment
             </span>
-            <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+            <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
               {activePlan.nextInvestment}
             </span>
           </div>
         </div>
 
-        <button className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+        <button className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors text-sm">
           View Plan Details
         </button>
       </div>

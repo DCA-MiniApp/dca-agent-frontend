@@ -25,7 +25,7 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
           activeTab === Tab.Actions ? 'text-primary dark:text-primary-light' : 'text-gray-500 dark:text-gray-400'
         }`}
       >
-        <span className="text-xl">⚡</span>
+        <span className="text-xl">💬</span>
         <span className="text-xs mt-1">Chat</span>
       </button>
       <button
@@ -34,7 +34,7 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
           activeTab === Tab.Context ? 'text-primary dark:text-primary-light' : 'text-gray-500 dark:text-gray-400'
         }`}
       >
-        <span className="text-xl">📋</span>
+        <span className="text-xl">📊</span>
         <span className="text-xs mt-1">History</span>
       </button>
       {showWallet && (
@@ -44,8 +44,8 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
             activeTab === Tab.Wallet ? 'text-primary dark:text-primary-light' : 'text-gray-500 dark:text-gray-400'
           }`}
         >
-          <span className="text-xl">👛</span>
-          <span className="text-xs mt-1">Wallet</span>
+          <span className="text-xl">👤</span>
+          <span className="text-xs mt-1">Profile</span>
         </button>
       )}
     </div>
