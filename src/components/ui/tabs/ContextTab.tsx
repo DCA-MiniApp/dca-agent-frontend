@@ -275,7 +275,6 @@ export function ContextTab() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12z" />
                         <circle cx="12" cy="12" r="3" />
                       </svg>
-                      View
                     </button>
                   </td>
                 </tr>
@@ -357,21 +356,6 @@ export function ContextTab() {
                   <div className="text-xs text-gray-500 dark:text-gray-400">Next execution</div>
                   <div className="text-gray-900 dark:text-gray-100">{new Date(selectedTx.nextExecutionISO).toLocaleString()}</div>
                 </div>
-                <div className="p-2 rounded-md border border-gray-200 dark:border-gray-800 col-span-2">
-                  <div className="text-xs text-gray-500 dark:text-gray-400">Status</div>
-                  <div className="flex items-center justify-between">
-                    {statusPill(selectedTx.status)}
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => togglePauseResume(selectedTx)}
-                        disabled={selectedTx.status === 'success' || selectedTx.status === 'failed'}
-                        className="px-3 py-1 rounded-md text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white"
-                      >
-                        {selectedTx.status === 'active' ? 'Pause' : selectedTx.status === 'disable' ? 'Resume' : 'N/A'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
               </div>
 
               <div className="p-2 rounded-md border border-gray-200 dark:border-gray-800 text-sm">
@@ -385,9 +369,9 @@ export function ContextTab() {
                 </div>
               </div>
 
-              <div className="flex justify-end">
+              {/* <div className="flex justify-end">
                 <button onClick={closeModal} className="px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200">Close</button>
-              </div>
+              </div> */}
             </div>
           </div>
         </div>
