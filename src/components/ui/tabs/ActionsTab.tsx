@@ -66,12 +66,13 @@ export function ActionsTab() {
     {
       id: '1',
       role: 'assistant',
-      content: "Hello! I'm your DCA (Dollar Cost Averaging) investment assistant. I can help you create investment strategies, analyze your portfolio, and manage your automated investments. What would you like to do today?",
+      content: `Hello! I'm your DCA (Dollar Cost Averaging) investment assistant powered by AI. I can help you:\n\n🎯 Create automated investment strategies\n📊 Analyze your portfolio performance\n⚙️ Manage your DCA plans\n💡 Get personalized investment advice\n\n${isConnected ? `I see your wallet is connected (${formatAddress(address || '')}) - we're ready to get started!` : 'Please connect your wallet to access all features.'}\n\nWhat would you like to do today?`,
       timestamp: new Date()
     }
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'error' | null>(null);
 
   // --- Layout/Refs for better UX ---
   const endOfMessagesRef = useRef<HTMLDivElement | null>(null);
@@ -104,6 +105,39 @@ export function ActionsTab() {
     scrollToBottom(true);
   }, [messages, isLoading]);
 
+  useEffect(() => {
+    // Update chat context when wallet connection changes
+    if (isConnected && address) {
+      setConnectionStatus('connected');
+      // Add a system message about wallet connection
+      const connectionMessage: ChatMessage = {
+        id: `wallet-${Date.now()}`,
+        role: 'assistant',
+        content: `✅ Great! Your wallet (${formatAddress(address)}) is now connected. I can now help you with:\n\n• Creating DCA investment plans\n• Viewing your existing strategies\n• Managing plan status (pause/resume)\n• Tracking your portfolio performance\n\nWhat would you like to do first?`,
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => {
+        // Only add if not already added for this address
+        const hasConnectionMessage = prev.some(msg => msg.content.includes(formatAddress(address)));
+        if (!hasConnectionMessage) {
+          return [...prev, connectionMessage];
+        }
+        return prev;
+      });
+    } else if (!isConnected && connectionStatus === 'connected') {
+      // Wallet was disconnected
+      setConnectionStatus(null);
+      const disconnectionMessage: ChatMessage = {
+        id: `wallet-disconnect-${Date.now()}`,
+        role: 'assistant',
+        content: `⚠️ Your wallet has been disconnected. Some features like creating DCA plans and viewing your portfolio will be limited. Please reconnect your wallet to access all features.`,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, disconnectionMessage]);
+    }
+  }, [isConnected, address, connectionStatus]);
+
   // --- Chat Handlers ---
   const handleSendMessage = useCallback(async () => {
     if (!inputMessage.trim() || isLoading) return;
@@ -118,24 +152,115 @@ export function ActionsTab() {
     console.log('userMessage', userMessage);
 
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputMessage;
     setInputMessage('');
     setIsLoading(true);
     scrollToBottom(false);
 
-    // Simulate AI response (replace with actual API call later)
-    setTimeout(() => {
-      const assistantResponse = generateAssistantResponse(userMessage.content);
+    try {
+      // Set connecting status
+      setConnectionStatus('connecting');
+      
+      // Call our DCA chat API endpoint
+      const response = await fetch('/api/dca-chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: currentInput,
+          userAddress: address,
+          conversationHistory: messages.slice(-6) // Include last 6 messages for context
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('DCA Chat API response:', result);
+
+      if (result.success) {
+        // Set connected status on successful response
+        setConnectionStatus('connected');
+        
+        const assistantMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: result.response || 'I received your message but had trouble generating a response.',
+          timestamp: new Date()
+        };
+
+        setMessages(prev => [...prev, assistantMessage]);
+
+        // Handle specific actions if provided
+        if (result.action) {
+          handleChatAction(result.action, result.data);
+        }
+      } else {
+        setConnectionStatus('error');
+        throw new Error(result.error || 'Unknown API error');
+      }
+    } catch (error) {
+      setConnectionStatus('error');
+      console.error('Error sending message to DCA backend:', error);
+      
+      // Fallback to local response generation on error
+      const fallbackResponse = generateAssistantResponse(currentInput);
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: assistantResponse,
+        content: `⚠️ I'm having trouble connecting to the DCA backend right now. Here's a basic response:\n\n${fallbackResponse}`,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, assistantMessage]);
+    } finally {
       setIsLoading(false);
       scrollToBottom(true);
-    }, 800);
-  }, [inputMessage, isLoading]);
+    }
+  }, [inputMessage, isLoading, address, messages]);
+
+  // --- Chat Action Handlers ---
+  const handleChatAction = useCallback((action: string, data?: any) => {
+    console.log('Handling chat action:', action, data);
+    
+    switch (action) {
+      case 'request_wallet_connection':
+        // Could trigger wallet connection modal or guide user
+        console.log('Action: Request wallet connection');
+        break;
+        
+      case 'plan_created':
+        // Could show success animation or redirect to plans view
+        console.log('Action: Plan created successfully');
+        break;
+        
+      case 'show_plans':
+        // Could display plans in a structured format or table
+        console.log('Action: Show user plans', data);
+        break;
+        
+      case 'show_stats':
+        // Could display stats in a chart or structured format
+        console.log('Action: Show platform stats', data);
+        break;
+        
+      case 'execution_triggered':
+        // Could show transaction status or redirect to transaction view
+        console.log('Action: DCA execution triggered');
+        break;
+        
+      case 'plan_paused':
+      case 'plan_resumed':
+        // Could show confirmation message
+        console.log('Action: Plan status changed');
+        break;
+        
+      default:
+        console.log('Unknown action:', action);
+    }
+  }, []);
 
   const generateAssistantResponse = (userInput: string): string => {
     const lowerInput = userInput.toLowerCase();
@@ -323,6 +448,50 @@ export function ActionsTab() {
           className="border-t border-gray-200 dark:border-gray-700 p-4 sticky bottom-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur"
           style={{ paddingBottom: Math.max(12, 12 + safeBottom) }}
         >
+          {/* Quick Action Buttons */}
+          <div className="flex flex-wrap gap-2 mb-3">
+            <button
+              onClick={() => setInputMessage('Show my DCA plans')}
+              className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              📊 My Plans
+            </button>
+            <button
+              onClick={() => setInputMessage('Create a new DCA strategy')}
+              className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              🎯 Create Plan
+            </button>
+            <button
+              onClick={() => setInputMessage('Platform statistics')}
+              className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              📈 Stats
+            </button>
+            <button
+              onClick={() => setInputMessage('Help me understand DCA')}
+              className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              ❓ Help
+            </button>
+          </div>
+
+          {/* Connection Status Indicator */}
+          {connectionStatus && (
+            <div className="flex items-center gap-2 mb-3 text-xs">
+              <div className={`w-2 h-2 rounded-full ${
+                connectionStatus === 'connected' ? 'bg-green-500' : 
+                connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' : 
+                'bg-red-500'
+              }`} />
+              <span className="text-gray-600 dark:text-gray-400">
+                {connectionStatus === 'connected' && 'Connected to DCA Backend'}
+                {connectionStatus === 'connecting' && 'Connecting...'}
+                {connectionStatus === 'error' && 'Connection Error'}
+              </span>
+            </div>
+          )}
+
           <div className="flex items-center space-x-2">
             <div className="flex-1 relative">
               <textarea
@@ -330,7 +499,7 @@ export function ActionsTab() {
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyDown={handleKeyDown}
                 onFocus={handleInputFocus}
-                placeholder="Send a message to the DCA agent"
+                placeholder={isConnected ? "Ask me anything about DCA investing..." : "Connect wallet first, then ask about DCA strategies"}
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-2xl bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 rows={1}
                 style={{ minHeight: 44, maxHeight: 120 }}
@@ -342,9 +511,13 @@ export function ActionsTab() {
               className="h-11 w-11 p-0 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-full transition-colors flex items-center justify-center"
               aria-label="Send message"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19V5m0 0l-7 7m7-7l7 7" />
-              </svg>
+              {isLoading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19V5m0 0l-7 7m7-7l7 7" />
+                </svg>
+              )}
             </button>
           </div>
         </div>
