@@ -5,7 +5,6 @@ import { useMiniApp } from "@neynar/react";
 import { Header } from "~/components/ui/Header";
 import { Footer } from "~/components/ui/Footer";
 import { HomeTab, ActionsTab, ContextTab, WalletTab } from "~/components/ui/tabs";
-import { DCATestPanel } from "~/components/ui/DCATestPanel";
 import { USE_WALLET } from "~/lib/constants";
 import { useNeynarUser } from "../hooks/useNeynarUser";
 import { motion, AnimatePresence } from "framer-motion";
@@ -270,8 +269,6 @@ export default function App(
         />
       </div>
 
-      {/* DCA Test Panel (only in development) */}
-      {process.env.NODE_ENV === 'development' && <DCATestPanel />}
     </div>
   );
 }
