@@ -8,7 +8,7 @@ import { Suspense } from "react";
 const AppComponent = dynamic(() => import("~/components/App"), {
   ssr: false,
   loading: () => (
-    <div className="flex items-center justify-center h-screen bg-white dark:bg-gray-900">
+    <div className="flex items-center justify-center h-screen bg-[0a0a0a]">
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
         <p className="text-gray-600 dark:text-gray-300">Loading DCA Agent...</p>
@@ -22,7 +22,7 @@ export default function App(
 ) {
   return (
     <Suspense fallback={
-      <div className="flex items-center justify-center h-screen bg-white dark:bg-gray-900">
+      <div className="flex items-center justify-center h-screen bg-[0a0a0a]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-300">Loading DCA Agent...</p>

@@ -45,6 +45,9 @@ export default {
   			'18': '4.5rem',
   			'88': '22rem',
   		},
+		fontFamily: {
+			titillium: ['var(--font-titillium-web)'],
+		},
   		// Custom container sizes
   		maxWidth: {
   			'xs': '20rem',

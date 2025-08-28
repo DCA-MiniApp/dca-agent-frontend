@@ -4,6 +4,7 @@ import { useState } from "react";
 import { APP_NAME } from "~/lib/constants";
 import sdk from "@farcaster/miniapp-sdk";
 import { useMiniApp } from "@neynar/react";
+import { IoLayers } from "react-icons/io5";
 
 type HeaderProps = {
   neynarUser?: {
@@ -18,13 +19,26 @@ export function Header({ neynarUser }: HeaderProps) {
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
 
   return (
-    <div className="relative">
+    <div className="relative font-titillium">
       <div 
-        className="mt-4 mb-4 mx-4 px-3 py-3 bg-white/90 dark:bg-gray-900/90 backdrop-blur-lg border border-gray-200 dark:border-gray-700 rounded-2xl flex items-center justify-between"
+        className="mt-4 mb-4 mx-4 px-3 py-3 flex items-center justify-between"
       >
         
-        <div className="text-lg font-light">
-          Welcome to {APP_NAME}
+        <div className="flex items-center gap-3 ml-auto">
+          {/* Logo Icon */}
+          <div className="w-8 h-8 bg-gradient-to-br from-[#c199e4] to-[#341e64] rounded-lg flex items-center justify-center shadow-lg">
+          <IoLayers className="size-5"/>
+          </div>
+          
+          {/* Logo Text */}
+          <div className="flex flex-col">
+            <span className="text-lg font-bold text-white tracking-wide">
+              DCA
+            </span>
+            <span className="text-xs text-white/70 font-medium -mt-1">
+              AGENT
+            </span>
+          </div>
         </div>
         {context?.user && (
           <div 
@@ -46,7 +60,7 @@ export function Header({ neynarUser }: HeaderProps) {
       {context?.user && (
         <>      
           {isUserDropdownOpen && (
-            <div className="absolute top-full right-0 z-50 w-fit mt-1 mx-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+            <div className="absolute top-full right-0 z-50 w-fit mt-1 mx-4 bg-gray-800 rounded-lg shadow-lg border border-gray-700">
               <div className="p-3 space-y-2">
                 <div className="text-right">
                   <h3 
@@ -55,19 +69,12 @@ export function Header({ neynarUser }: HeaderProps) {
                   >
                     {context.user.displayName || context.user.username}
                   </h3>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                  <p className="text-xs text-gray-400">
                     @{context.user.username}
                   </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-500">
+                  <p className="text-xs text-gray-500">
                     FID: {context.user.fid}
                   </p>
-                  {/* {neynarUser && (
-                    <>
-                      <p className="text-xs text-gray-500 dark:text-gray-500">
-                        Neynar Score: {neynarUser.score}
-                      </p>
-                    </>
-                  )} */}
                 </div>
               </div>
             </div>
