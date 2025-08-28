@@ -200,57 +200,100 @@ async function sendToVibeKitAgent(
   data?: any;
 }> {
   try {
-    // Format the message for the VibeKit agent with context
-    const contextualMessage = formatMessageWithContext(message, userAddress, conversationHistory);
+    console.log('[VibeKit Agent] Sending instruction:', message);
+    console.log('[VibeKit Agent] User address:', userAddress);
     
-    // // Send to VibeKit agent (MCP endpoint)
-    // const controller = new AbortController();
-    // const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    // Use static ID for testing (matches working curl command)
+    const requestId = 2;
+    const requestBody = {
+      jsonrpc: '2.0',
+      id: requestId,
+      method: 'tools/call',
+      params: {
+        name: 'dca-swapping',
+        arguments: {
+          instruction: message,
+          userAddress: userAddress
+        }
+      }
+    };
     
+    console.log('[VibeKit Agent] Request body:', JSON.stringify(requestBody, null, 2));
+    console.log('[VibeKit Agent] Using request ID:', requestId);
+    
+    // Send to DCA skill via MCP tool call format using fetch
     const response = await fetch(`${DCA_BACKEND_URL}/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: contextualMessage
-          }
-        ]
-      }),
-      // signal: controller.signal,
+      body: JSON.stringify(requestBody),
     });
-    
-    // clearTimeout(timeoutId);
 
     if (!response.ok) {
-      throw new Error(`VibeKit agent responded with ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`VibeKit agent responded with ${response.status}: ${errorText}`);
     }
 
-    const agentResponse = await response.json();
+    const initialResponse = await response.text();
+    console.log('[VibeKit Agent] Initial response:', initialResponse);
     
-    // Extract the response text from the agent's response
-    let responseText = 'I understand your request, but I encountered an issue processing it. Could you please try again?';
-    
-    if (agentResponse.content && Array.isArray(agentResponse.content)) {
-      const textContent = agentResponse.content.find((item: any) => item.type === 'text');
-      if (textContent && textContent.text) {
-        responseText = textContent.text;
+    // The /messages endpoint returns "Accepted" and the real response comes via SSE
+    if (initialResponse === 'Accepted' || initialResponse.includes('Accepted')) {
+      console.log('[VibeKit Agent] Request accepted, waiting for SSE response...');
+      
+      // Wait for the actual response via SSE
+      try {
+        const sseResponse = await waitForSSEResponse(requestId);
+        
+        // Parse the SSE response format
+        let responseText = 'I understand your request, but I encountered an issue processing it. Could you please try again?';
+        
+        if (sseResponse.error) {
+          responseText = `Error: ${sseResponse.error.message || 'Unknown MCP error'}`;
+        } else if (sseResponse.result && sseResponse.result.content) {
+          // Look for resource content with task result
+          const resourceContent = sseResponse.result.content.find((item: any) => item.type === 'resource');
+          if (resourceContent && resourceContent.resource && resourceContent.resource.text) {
+            try {
+              const taskData = JSON.parse(resourceContent.resource.text);
+              if (taskData.status && taskData.status.message && taskData.status.message.parts) {
+                const textPart = taskData.status.message.parts.find((part: any) => part.kind === 'text');
+                if (textPart && textPart.text) {
+                  responseText = textPart.text;
+                }
+              }
+            } catch (parseError) {
+              console.warn('[Response Parser] Failed to parse resource text:', parseError);
+            }
+          }
+        }
+        
+        console.log('[VibeKit Agent] Extracted response text:', responseText);
+        
+        // Analyze response to determine if any action was taken
+        const action = analyzeResponseForActions(responseText);
+
+        return {
+          response: responseText,
+          action: action?.type,
+          data: action?.data
+        };
+      } catch (sseError) {
+        console.error('[VibeKit Agent] SSE Error:', sseError);
+        return {
+          response: `⚠️ Your request was accepted but we encountered an issue getting the response. Please try again or check the agent logs.`,
+          action: 'sse_error',
+          data: { requestId, error: sseError instanceof Error ? sseError.message : String(sseError) }
+        };
       }
-    } else if (typeof agentResponse === 'string') {
-      responseText = agentResponse;
     }
-
-    // Analyze response to determine if any action was taken
-    const action = analyzeResponseForActions(responseText);
-
+    
+    // Handle case where we got a direct response (shouldn't happen but just in case)
     return {
-      response: responseText,
-      action: action?.type,
-      data: action?.data
+      response: initialResponse,
+      action: undefined,
+      data: undefined
     };
 
   } catch (error) {
@@ -262,29 +305,103 @@ async function sendToVibeKitAgent(
 }
 
 /**
- * Format message with user context for the VibeKit agent
+ * Wait for SSE response using fetch streaming (Node.js compatible)
  */
-function formatMessageWithContext(message: string, userAddress?: string, conversationHistory: any[] = []): string {
-  let contextualMessage = '';
-  
-  // Add user context if available
-  if (userAddress) {
-    contextualMessage += `User Address: ${userAddress}\n`;
-  }
-  
-  // Add recent conversation context (last 3 messages)
-  if (conversationHistory.length > 0) {
-    const recentHistory = conversationHistory.slice(-3);
-    contextualMessage += `Recent conversation:\n`;
-    recentHistory.forEach(msg => {
-      contextualMessage += `${msg.role}: ${msg.content}\n`;
-    });
-    contextualMessage += '\n';
-  }
-  
-  contextualMessage += `Current request: ${message}`;
-  
-  return contextualMessage;
+async function waitForSSEResponse(requestId: number): Promise<any> {
+  return new Promise(async (resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error('SSE response timeout after 30 seconds'));
+    }, 30000);
+
+    try {
+      console.log('[SSE] Opening SSE connection...');
+      const response = await fetch(`${DCA_BACKEND_URL}/sse`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+        },
+      });
+
+      if (!response.ok) {
+        clearTimeout(timeout);
+        reject(new Error(`SSE connection failed: ${response.status}`));
+        return;
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        clearTimeout(timeout);
+        reject(new Error('Failed to get SSE stream reader'));
+        return;
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let sessionId = null;
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+          for (const line of lines) {
+            // Handle endpoint event (session ID)
+            if (line.startsWith('event: endpoint')) {
+              continue;
+            }
+            
+            // Handle session ID from endpoint data
+            if (line.startsWith('data: /messages?sessionId=')) {
+              sessionId = line.split('sessionId=')[1];
+              console.log('[SSE] Session established:', sessionId);
+              continue;
+            }
+
+            // Handle message data (actual responses)
+            if (line.startsWith('data: ') && !line.includes('keepalive') && !line.includes('sessionId')) {
+              try {
+                const eventData = line.slice(6).trim(); // Remove 'data: ' prefix
+                if (eventData) {
+                  const data = JSON.parse(eventData);
+                  console.log('[SSE] Received message data:', {
+                    responseId: data.id,
+                    expectedId: requestId,
+                    hasResult: !!data.result,
+                    hasError: !!data.error
+                  });
+                  
+                  // Check if this is the response to our request
+                  if (data.id === requestId) {
+                    console.log('[SSE] Found matching response for request ID:', requestId);
+                    clearTimeout(timeout);
+                    reader.cancel();
+                    resolve(data);
+                    return;
+                  }
+                }
+              } catch (parseError) {
+                console.warn('[SSE] Failed to parse message data:', line);
+              }
+            }
+          }
+        }
+
+        clearTimeout(timeout);
+        reject(new Error('SSE stream ended without finding response'));
+      } finally {
+        reader.cancel().catch(() => {/* ignore cleanup errors */});
+      }
+    } catch (error) {
+      clearTimeout(timeout);
+      console.error('[SSE] Connection error:', error);
+      reject(error);
+    }
+  });
 }
 
 /**
