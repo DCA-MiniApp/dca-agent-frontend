@@ -412,7 +412,7 @@ export function WalletTab() {
   // --- Computed Values ---
   // Detect wallet type based on active connector
   console.log("connector", connector?.id);
-  const isFarcasterWallet = connector?.id === "farcasterFrame";
+  const isFarcasterWallet = connector?.id === "farcaster";
   const isCustodyWallet = isFarcasterWallet; // Farcaster Frame connector is always custody wallet
 
   // Debug logging

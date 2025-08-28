@@ -97,7 +97,7 @@ async function startDev() {
     process.exit(1);
   }
 
-  const useTunnel = process.env.USE_TUNNEL === 'true';
+  const useTunnel = false;
   let miniAppUrl;
 
   if (useTunnel) {
