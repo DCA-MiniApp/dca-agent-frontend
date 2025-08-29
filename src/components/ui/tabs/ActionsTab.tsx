@@ -6,8 +6,11 @@ import { ShareButton } from "../Share";
 
 import { type Haptics } from "@farcaster/miniapp-sdk";
 import { APP_URL } from "~/lib/constants";
-import { useAccount } from "wagmi";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { maxUint256, parseUnits } from "viem";
+import { arbitrum } from "wagmi/chains";
 import { truncateAddress } from "../../../lib/truncateAddress";
+import { ARBITRUM_TOKENS, ERC20_ABI, getTokenInfo, EXECUATOR_ADDRESS } from "../../../lib/tokenContracts";
 
 /**
  * ActionsTab component handles mini app actions like sharing, notifications, and haptic feedback.
@@ -38,6 +41,12 @@ interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  // Confirmation flow fields
+  requiresConfirmation?: boolean;
+  confirmationId?: string;
+  confirmationData?: any;
+  // Transaction hash for copy functionality
+  transactionHash?: string;
 }
 
 // Helper to format addresses nicely (e.g., 0x1234...ABCD)
@@ -90,6 +99,17 @@ export function ActionsTab() {
   const endOfMessagesRef = useRef<HTMLDivElement | null>(null);
   const inputContainerRef = useRef<HTMLDivElement | null>(null);
   const [inputContainerHeight, setInputContainerHeight] = useState<number>(72);
+
+  // Token approval state
+  const [approvalStatus, setApprovalStatus] = useState<'idle' | 'approving' | 'approved' | 'error'>('idle');
+  const [pendingConfirmationId, setPendingConfirmationId] = useState<string | null>(null);
+  const [confirmationStep, setConfirmationStep] = useState<'summary' | 'approval' | 'completed'>('summary');
+
+  // Contract interactions for token approval
+  const { writeContract, data: approvalTxHash, error: approvalError, isPending: isApprovePending } = useWriteContract();
+  const { isLoading: isApprovalConfirming, isSuccess: isApprovalConfirmed } = useWaitForTransactionReceipt({
+    hash: approvalTxHash,
+  });
 
   // Respect miniapp safe area insets
   const safeTop = context?.client?.safeAreaInsets?.top ?? 0;
@@ -177,6 +197,7 @@ export function ActionsTab() {
     setIsLoading(true);
     scrollToBottom(false);
 
+
     try {
       // Set connecting status
       setConnectionStatus("connecting");
@@ -205,8 +226,9 @@ export function ActionsTab() {
         // Set connected status on successful response
         setConnectionStatus("connected");
 
+        const assistantMessageId = (Date.now() + 1).toString();
         const assistantMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
+          id: assistantMessageId,
           role: "assistant",
           content:
             result.response ||
@@ -218,7 +240,7 @@ export function ActionsTab() {
 
         // Handle specific actions if provided
         if (result.action) {
-          handleChatAction(result.action, result.data);
+          handleChatAction(result.action, result.data, assistantMessageId);
         }
       } else {
         setConnectionStatus("error");
@@ -244,8 +266,8 @@ export function ActionsTab() {
   }, [inputMessage, isLoading, address, messages]);
 
   // --- Chat Action Handlers ---
-  const handleChatAction = useCallback((action: string, data?: any) => {
-    console.log("Handling chat action:", action, data);
+  const handleChatAction = useCallback((action: string, data?: any, messageId?: string) => {
+    console.log("Handling chat action:", action, data, messageId);
 
     switch (action) {
       case "request_wallet_connection":
@@ -253,9 +275,38 @@ export function ActionsTab() {
         console.log("Action: Request wallet connection");
         break;
 
+      case "plan_confirmation_required":
+        // Show confirmation UI for DCA plan creation
+        console.log("Action: Plan confirmation required", data);
+        if (data?.confirmationId && messageId) {
+          // Update the message to show confirmation state
+          setMessages(prev => prev.map(msg => 
+            msg.id === messageId 
+              ? { 
+                  ...msg, 
+                  requiresConfirmation: true, 
+                  confirmationId: data.confirmationId, 
+                  confirmationData: data.planData 
+                }
+              : msg
+          ));
+        }
+        break;
+
       case "plan_created":
-        // Could show success animation or redirect to plans view
-        console.log("Action: Plan created successfully");
+      case "plan_confirmed":
+        // Plan was successfully created
+        console.log("Action: Plan created/confirmed successfully");
+        break;
+
+      case "action_cancelled":
+        // User cancelled the action
+        console.log("Action: Action cancelled by user");
+        break;
+
+      case "approval_required":
+        // Token approval required
+        console.log("Action: Token approval required", data);
         break;
 
       case "show_plans":
@@ -283,6 +334,300 @@ export function ActionsTab() {
         console.log("Unknown action:", action);
     }
   }, []);
+
+  // Handle approval transaction success
+  useEffect(() => {
+    if (isApprovalConfirmed && approvalTxHash && pendingConfirmationId) {
+      setApprovalStatus('approved');
+      
+      // Add success message with transaction hash and copy functionality
+      const approvalMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: "assistant", 
+        content: `✅ Token approval confirmed!\n\n**Transaction Hash:** ${approvalTxHash.slice(0, 10)}...${approvalTxHash.slice(-8)}\n\nNow creating your DCA plan...`,
+        timestamp: new Date(),
+        // Add transaction hash data for copy functionality
+        transactionHash: approvalTxHash,
+      };
+      setMessages((prev) => [...prev, approvalMessage]);
+
+      // Proceed with plan creation after approval
+      proceedWithPlanCreation(pendingConfirmationId);
+      setPendingConfirmationId(null);
+    }
+  }, [isApprovalConfirmed, approvalTxHash, pendingConfirmationId]);
+
+  // Handle approval error
+  useEffect(() => {
+    if (approvalError) {
+      setApprovalStatus('error');
+      setPendingConfirmationId(null);
+      
+      const errorMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: "assistant",
+        content: `❌ Token approval failed: ${approvalError.message}\n\nYou need to approve token spending to create the DCA plan. Please try again.`,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+      setIsLoading(false);
+    }
+  }, [approvalError]);
+
+  // Proceed with plan creation after approval
+  const proceedWithPlanCreation = useCallback(async (confirmationId: string) => {
+    try {
+      console.log('[Confirmation] Creating plan after approval:', confirmationId);
+      
+      // Call the API with confirmation
+      const response = await fetch("/api/dca-chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: "", // Empty message for confirmation actions
+          userAddress: address,
+          confirmationId: confirmationId,
+          action: "confirm",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log("Plan confirmation response:", result);
+      console.log("Actual response content:", result.response);
+
+      if (result.success) {
+        // Show the actual response from the backend/SSE
+        const confirmationMessage: ChatMessage = {
+          id: Date.now().toString(),
+          role: "assistant",
+          content: result.response || "DCA plan created successfully! 🎉",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, confirmationMessage]);
+
+        // Handle action response
+        if (result.action) {
+          handleChatAction(result.action, result.data);
+        }
+      } else {
+        throw new Error(result.error || "Failed to create plan");
+      }
+    } catch (error) {
+      console.error("Error creating plan:", error);
+      
+      const errorMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: "assistant",
+        content: "❌ Sorry, I encountered an error while creating your plan. Please try again.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+      setApprovalStatus('idle');
+    }
+  }, [address, handleChatAction]);
+
+  // Start approval process after user confirms the plan summary
+  const startApprovalProcess = useCallback(async (confirmationId: string, planData: any) => {
+    const tokenInfo = getTokenInfo(planData.fromToken);
+    if (!tokenInfo) {
+      console.error('Unsupported token:', planData.fromToken);
+      return;
+    }
+
+    try {
+      const totalExecutions = Math.floor((planData.durationWeeks * 7 * 24 * 60) / planData.intervalMinutes);
+      const totalAmount = parseFloat(planData.amount) * totalExecutions;
+
+      // Show approval request message
+      const approvalMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: "assistant",
+        content: `🔐 **Requesting Token Approval**\n\nPlease check your wallet and approve spending of ${totalAmount.toFixed(6)} ${planData.fromToken} tokens. This allows our contract to execute your DCA plan automatically.\n\n*Check your wallet popup...*`,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, approvalMessage]);
+
+      setConfirmationStep('approval');
+      setApprovalStatus('approving');
+      setPendingConfirmationId(confirmationId);
+
+      console.log('[Approval] Starting token approval process:', {
+        token: tokenInfo.symbol,
+        amount: totalAmount,
+        totalExecutions,
+      });
+
+      // Trigger wallet approval popup  
+      writeContract({
+        address: tokenInfo.address as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [EXECUATOR_ADDRESS as `0x${string}`, maxUint256],
+        chainId: arbitrum.id,
+      });
+
+    } catch (error) {
+      console.error("Error starting approval process:", error);
+      
+      const errorMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: "assistant",
+        content: "❌ Failed to start token approval process. Please try again.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+      setApprovalStatus('idle');
+    }
+  }, [writeContract]);
+
+  // --- Confirmation Handlers ---
+  const handleConfirmPlan = useCallback(async (confirmationId: string) => {
+    if (!confirmationId || !address) return;
+    
+    setIsLoading(true);
+    
+    // First, get the confirmation data to show plan summary
+    const confirmationMessage = messages.find(msg => msg.confirmationId === confirmationId);
+    const planData = confirmationMessage?.confirmationData;
+    
+    if (!planData) {
+      console.error('No plan data found for confirmation');
+      setIsLoading(false);
+      return;
+    }
+
+    const tokenInfo = getTokenInfo(planData.fromToken);
+    if (!tokenInfo) {
+      console.error('Unsupported token:', planData.fromToken);
+      const errorMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: "assistant",
+        content: `❌ Unsupported token: ${planData.fromToken}. Please choose a different token.`,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+      setIsLoading(false);
+      return;
+    }
+
+    // Calculate total investment details for summary
+    const totalExecutions = Math.floor((planData.durationWeeks * 7 * 24 * 60) / planData.intervalMinutes);
+    const totalAmount = parseFloat(planData.amount) * totalExecutions;
+    
+    const frequencyText = planData.intervalMinutes === 60 ? 'hourly' :
+                         planData.intervalMinutes === 1440 ? 'daily' :
+                         planData.intervalMinutes === 10080 ? 'weekly' :
+                         planData.intervalMinutes === 43200 ? 'monthly' :
+                         `every ${planData.intervalMinutes} minutes`;
+    
+    const durationText = planData.durationWeeks === 1 ? '1 week' :
+                        planData.durationWeeks === 4 ? '1 month' :
+                        planData.durationWeeks === 52 ? '1 year' :
+                        `${planData.durationWeeks} weeks`;
+
+    // Step 1: Show plan summary and ask for final confirmation
+    const summaryMessage: ChatMessage = {
+      id: `summary-${Date.now()}`,
+      role: "assistant",
+      content: `📊 **Investment Plan Summary**\n\n` +
+              `• **Investment Amount:** ${planData.amount} ${planData.fromToken} per execution\n` +
+              `• **Target Token:** ${planData.toToken}\n` +
+              `• **Frequency:** ${frequencyText}\n` +
+              `• **Duration:** ${durationText}\n` +
+              `• **Total Executions:** ${totalExecutions}\n` +
+              `• **Total Investment:** ${totalAmount.toFixed(6)} ${planData.fromToken}\n` +
+              `• **Slippage:** ${planData.slippage}%\n\n` +
+              `⚠️ **Important:** This will create an automated investment plan that will execute transactions from your wallet. Please review the details carefully.\n\n` +
+              `Ready to proceed with token approval?`,
+      timestamp: new Date(),
+      requiresConfirmation: true,
+      confirmationId: `approve-${confirmationId}`,
+      confirmationData: planData,
+    };
+    
+    setMessages((prev) => [...prev, summaryMessage]);
+    setConfirmationStep('summary');
+    setIsLoading(false);
+  }, [address, messages]);
+
+  // Handle the approve confirmation (after summary)
+  const handleApproveConfirm = useCallback(async (confirmationId: string) => {
+    const originalConfirmationId = confirmationId.replace('approve-', '');
+    const confirmationMessage = messages.find(msg => msg.confirmationId === originalConfirmationId);
+    const planData = confirmationMessage?.confirmationData;
+    
+    if (planData) {
+      await startApprovalProcess(originalConfirmationId, planData);
+    }
+  }, [messages, startApprovalProcess]);
+
+  const handleCancelPlan = useCallback(async (confirmationId: string) => {
+    if (!confirmationId) return;
+    
+    setIsLoading(true);
+    
+    try {
+      console.log('[Confirmation] Cancelling plan creation:', confirmationId);
+      
+      // Call the API with cancellation
+      const response = await fetch("/api/dca-chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: "", // Empty message for confirmation actions
+          userAddress: address,
+          confirmationId: confirmationId,
+          action: "cancel",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log("Plan cancellation response:", result);
+
+      if (result.success) {
+        const cancellationMessage: ChatMessage = {
+          id: Date.now().toString(),
+          role: "assistant",
+          content: result.response || "Action cancelled successfully.",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, cancellationMessage]);
+
+        // Handle action response
+        if (result.action) {
+          handleChatAction(result.action, result.data);
+        }
+      } else {
+        throw new Error(result.error || "Failed to cancel");
+      }
+    } catch (error) {
+      console.error("Error cancelling plan:", error);
+      
+      const errorMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: "assistant",
+        content: "✅ Action cancelled locally. No DCA plan was created.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [address, handleChatAction]);
 
   const generateAssistantResponse = (userInput: string): string => {
     const lowerInput = userInput.toLowerCase();
@@ -452,6 +797,73 @@ export function ActionsTab() {
                 <div className="whitespace-pre-wrap text-sm">
                   {message.content}
                 </div>
+                
+                {/* Copy Transaction Hash Button */}
+                {message.transactionHash && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(message.transactionHash!);
+                        // Could add a toast notification here
+                      }}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                      </svg>
+                      Copy Full Hash
+                    </button>
+                  </div>
+                )}
+                
+                {/* Confirmation Buttons */}
+                {message.requiresConfirmation && message.confirmationId && (
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        onClick={() => {
+                          if (message.confirmationId?.startsWith('approve-')) {
+                            handleApproveConfirm(message.confirmationId);
+                          } else {
+                            handleConfirmPlan(message.confirmationId as string);
+                          }
+                        }}
+                        disabled={isLoading || isApprovePending || isApprovalConfirming}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                      >
+                        {(isApprovePending || isApprovalConfirming) ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            {isApprovePending ? "Wallet Approval..." : "Confirming Approval..."}
+                          </>
+                        ) : isLoading ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            {message.confirmationId?.startsWith('approve-') ? 'Starting Approval...' : 'Creating Plan...'}
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            {message.confirmationId?.startsWith('approve-') ? 'Proceed with Approval' : 'Review Plan Details'}
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleCancelPlan(message.confirmationId!)}
+                        disabled={isLoading || isApprovePending || isApprovalConfirming}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
                 <div
                   className={`text-xs mt-1 ${
                     message.role === "user"
@@ -589,6 +1001,7 @@ export function ActionsTab() {
           </div>
         </div>
       </div>
+
 
       {/* Original Actions (Commented out for now) */}
       {/*
