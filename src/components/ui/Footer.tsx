@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { Tab } from "~/components/App";
 import { IconType } from "react-icons";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import { IoChatbubbleEllipses } from "react-icons/io5";
 
 interface FooterProps {
   activeTab: Tab;
@@ -13,6 +15,19 @@ interface FooterProps {
 
 export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWallet = false }) => {
   const router = useRouter();
+  const [isAnimating, setIsAnimating] = useState(false);
+  
+  const handleChatClick = () => {
+    if (isAnimating) return;
+    
+    setIsAnimating(true);
+    
+    // After animation delay, navigate to chat
+    setTimeout(() => {
+      router.push('/chat');
+      setIsAnimating(false);
+    }, 1200); // Same duration as other tab animations
+  };
   const getTabPosition = (tab: Tab) => {
     switch (tab) {
       case Tab.Home: return { top: "-20px", left: "50%", transform: "translateX(-50%)" }; // Top
@@ -56,7 +71,7 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
 
         {/* Actions Tab - Right */}
         <button
-          onClick={() => router.push('/chat')}
+          onClick={handleChatClick}
           className="absolute text-white text-[11px] font-medium hover:text-white/80 transition-all duration-200"
           style={getTabPosition(Tab.Actions)}
         >
@@ -83,6 +98,79 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
           </button>
         )}
       </div>
+      
+      {/* Chat Animation Overlay */}
+      <AnimatePresence>
+        {isAnimating && (
+          <motion.div
+            className="fixed inset-0 z-100 flex items-center justify-center pointer-events-none backdrop-blur-2xl"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <motion.div
+              className="bg-gradient-to-br from-[#c199e4]/40 to-[#c199e4]/90 rounded-3xl border border-white/30 shadow-2xl"
+              initial={{ 
+                scale: 0.5,
+                y: 300, // Start from footer position
+                x: 0,
+                rotate: 0
+              }}
+              animate={{ 
+                scale: [0.5, 1.2, 1],
+                y: [300, 0, 0],
+                x: [0, 0, 0],
+                rotate: [0, 360, 360]
+              }}
+              exit={{ 
+                scale: 0,
+                opacity: 0
+              }}
+              transition={{ 
+                duration: 1.2,
+                times: [0, 0.7, 1],
+                ease: [0.25, 0.46, 0.45, 0.94],
+                rotate: { duration: 0.8, ease: "easeInOut" }
+              }}
+              style={{
+                width: 120,
+                height: 120,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.3, duration: 0.4 }}
+              >
+                <IoChatbubbleEllipses size={64} color="white" />
+              </motion.div>
+            </motion.div>
+            
+            {/* Ripple effect */}
+            <motion.div
+              className="absolute rounded-full border-2 border-white/30"
+              initial={{ 
+                width: 120,
+                height: 120,
+                scale: 0,
+                opacity: 0.8
+              }}
+              animate={{ 
+                scale: [1, 2.5, 4],
+                opacity: [0.8, 0.3, 0]
+              }}
+              transition={{ 
+                duration: 1.2,
+                ease: "easeOut"
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
