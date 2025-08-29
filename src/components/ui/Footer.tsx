@@ -1,6 +1,7 @@
 import React from "react";
 import { Tab } from "~/components/App";
 import { IconType } from "react-icons";
+import { useRouter } from "next/navigation";
 
 interface FooterProps {
   activeTab: Tab;
@@ -11,6 +12,7 @@ interface FooterProps {
 }
 
 export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWallet = false }) => {
+  const router = useRouter();
   const getTabPosition = (tab: Tab) => {
     switch (tab) {
       case Tab.Home: return { top: "-20px", left: "50%", transform: "translateX(-50%)" }; // Top
@@ -54,7 +56,7 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
 
         {/* Actions Tab - Right */}
         <button
-          onClick={() => setActiveTab(Tab.Actions)}
+          onClick={() => router.push('/chat')}
           className="absolute text-white text-[11px] font-medium hover:text-white/80 transition-all duration-200"
           style={getTabPosition(Tab.Actions)}
         >

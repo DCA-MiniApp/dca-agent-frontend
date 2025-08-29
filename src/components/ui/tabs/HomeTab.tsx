@@ -12,6 +12,9 @@ import { HiOutlineChartBar } from "react-icons/hi";
 import { PiStrategyBold } from "react-icons/pi";
 import { FaArrowTrendUp } from "react-icons/fa6";
 import { HiOutlineWallet, HiOutlineDocumentChartBar, HiOutlineCheckCircle, HiOutlineDevicePhoneMobile, HiOutlineXMark } from "react-icons/hi2";
+// import { MdArrowRightAlt } from "react-icons/md";
+import { HiOutlineArrowNarrowRight } from "react-icons/hi";
+import {FaChevronLeft , FaChevronRight } from "react-icons/fa";
 
 // Investment Plan Interface
 interface InvestmentPlan {
@@ -450,8 +453,8 @@ export function HomeTab() {
           {userGreeting}
         </h1>
         {address && (
-          <div className="flex items-center gap-2 text-white/70 mt-2">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+          <div className="flex items-center gap-1.5 text-white/70 mt-2">
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse aspect-square"></div>
             <span className="text-sm">Connected:</span>
             <code className="text-xs bg-white/20 px-2 py-1 rounded-md">{truncateAddress(address)}</code>
           </div>
@@ -565,9 +568,7 @@ export function HomeTab() {
                       <span className="text-sm text-white/90 font-medium">
                         {investmentPlans[currentPlanIndex].fromToken}
                       </span>
-                      <svg className="w-4 h-4 text-[#c199e4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                      </svg>
+                      <HiOutlineArrowNarrowRight />
                       <span className="text-sm text-white/90 font-medium">
                         {investmentPlans[currentPlanIndex].toToken}
                       </span>
@@ -630,9 +631,7 @@ export function HomeTab() {
               >
                 <div className="flex items-center justify-center gap-2">
                   <span>View Strategy Details</span>
-                  <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                  </svg>
+                  <HiOutlineArrowNarrowRight className="size-5"/>
                 </div>
               </button>
             </div>
@@ -646,9 +645,7 @@ export function HomeTab() {
                 className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-xl border border-white/20 text-white/80 hover:text-white transition-all duration-300 flex items-center justify-center backdrop-blur-lg"
                 aria-label="Previous plan"
               >
-                <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
+                <FaChevronLeft />
               </button>
               
               <button
@@ -656,9 +653,7 @@ export function HomeTab() {
                 className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-xl border border-white/20 text-white/80 hover:text-white transition-all duration-300 flex items-center justify-center backdrop-blur-lg"
                 aria-label="Next plan"
               >
-                <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
+                <FaChevronRight />
               </button>
             </div>
           )}
