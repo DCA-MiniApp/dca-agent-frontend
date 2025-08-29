@@ -380,11 +380,9 @@ export function ContextTab() {
         </div>
 
         {/* Pagination */}
-        <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-[#4a2b7a]/20 to-[#341e64]/10 backdrop-blur-lg border-t border-[#c199e4]/20">
-          <div className="text-sm text-[#c199e4]/90 font-medium">
-            Page {currentPage} of {totalPages} ({filtered.length} transactions)
-          </div>
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col items-center justify-between px-6 py-4 bg-gradient-to-r from-[#4a2b7a]/20 to-[#341e64]/10 backdrop-blur-lg border-t border-[#c199e4]/20">
+          
+          <div className="flex items-center gap-2 mb-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
@@ -418,6 +416,9 @@ export function ContextTab() {
               Next
             </button>
           </div>
+          <div className="text-sm text-[#c199e4]/90 font-medium">
+            Page {currentPage} of {totalPages} ({filtered.length} transactions)
+          </div>
         </div>
       </div>
 
@@ -433,9 +434,9 @@ export function ContextTab() {
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="relative z-10 w-full max-w-md mx-auto bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl shadow-2xl border border-[#c199e4]/20 max-h-[65vh] overflow-y-auto"
+            className="relative z-10 w-full max-w-md mx-auto bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl shadow-2xl border border-[#c199e4]/20 max-h-[65vh] overflow-y-auto -top-[40px]"
           >
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-4">
               {/* Header */}
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
@@ -472,7 +473,7 @@ export function ContextTab() {
               </div>
 
               {/* Status and Actions */}
-              <div className="flex items-center justify-between p-4 backdrop-blur-lg rounded-2xl border border-[#c199e4]/20">
+              <div className="flex items-center justify-between p-3 backdrop-blur-lg rounded-2xl border border-[#c199e4]/20">
                 <div className="flex items-center gap-3">
                   <span
                     className={`text-xs font-bold px-4 py-2 rounded-full transition-all duration-300 ${
@@ -491,7 +492,7 @@ export function ContextTab() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => openTxExternal(selectedTx.txHash)}
-                    className="bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-2 px-4 rounded-xl transition-all duration-300 text-xs border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg"
+                    className="bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-3 px-5 rounded-xl transition-all duration-300 text-xs border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg"
                   >
                     View Explorer
                   </button>
@@ -500,7 +501,7 @@ export function ContextTab() {
 
               {/* Transaction Details Grid */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20 transition-all duration-300 group">
+                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
                   <p className="text-sm text-gray-400 mb-2 font-medium">
                     From Amount
                   </p>
@@ -508,7 +509,7 @@ export function ContextTab() {
                     {selectedTx.fromAmount}
                   </p>
                 </div>
-                <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20 transition-all duration-300 group">
+                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
                   <p className="text-sm text-gray-400 mb-2 font-medium">
                     To Amount
                   </p>
@@ -516,7 +517,7 @@ export function ContextTab() {
                     {selectedTx.toAmount}
                   </p>
                 </div>
-                <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20 transition-all duration-300 group">
+                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
                   <p className="text-sm text-gray-400 mb-2 font-medium">
                     Slippage
                   </p>
@@ -524,7 +525,7 @@ export function ContextTab() {
                     {selectedTx.slippage.toFixed(2)}%
                   </p>
                 </div>
-                <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20 transition-all duration-300 group">
+                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
                   <p className="text-sm text-gray-400 mb-2 font-medium">
                     From Token
                   </p>
@@ -532,7 +533,7 @@ export function ContextTab() {
                     {selectedTx.fromToken}
                   </p>
                 </div>
-                <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">
+                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">
                   <p className="text-sm text-gray-400 mb-2 font-medium">
                     Exchange Rate
                   </p>
@@ -547,7 +548,7 @@ export function ContextTab() {
               </div>
 
               {/* Transaction Hash */}
-              <div className="rounded-2xl p-4 border border-[#c199e4]/20">
+              <div className="rounded-2xl p-3 border border-[#c199e4]/20">
                 <p className="text-sm text-gray-300 font-medium mb-2">
                   Transaction Hash
                 </p>
@@ -560,7 +561,7 @@ export function ContextTab() {
 
               {/* Timeline Details */}
               <div className="space-y-3">
-                <div className="rounded-2xl p-4 border border-[#c199e4]/20">
+                <div className="rounded-2xl p-3 border border-[#c199e4]/20">
                   <p className="text-sm text-gray-400 mb-2 font-medium">
                     Created
                   </p>
@@ -575,7 +576,7 @@ export function ContextTab() {
                     )}
                   </p>
                 </div>
-                <div className="rounded-2xl p-4 border border-[#c199e4]/20">
+                <div className="rounded-2xl p-3 border border-[#c199e4]/20">
                   <p className="text-sm text-gray-300 font-medium mb-2">
                     Executed At
                   </p>
@@ -594,7 +595,7 @@ export function ContextTab() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-3 ">
                 <button
                   onClick={closeModal}
                   className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg group-hover:scale-[1.02]"

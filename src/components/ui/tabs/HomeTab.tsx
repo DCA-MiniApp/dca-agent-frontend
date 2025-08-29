@@ -11,6 +11,7 @@ import { HiCurrencyDollar } from "react-icons/hi2";
 import { HiOutlineChartBar } from "react-icons/hi";
 import { PiStrategyBold } from "react-icons/pi";
 import { FaArrowTrendUp } from "react-icons/fa6";
+import { HiOutlineWallet, HiOutlineDocumentChartBar, HiOutlineCheckCircle, HiOutlineDevicePhoneMobile, HiOutlineXMark } from "react-icons/hi2";
 
 // Investment Plan Interface
 interface InvestmentPlan {
@@ -111,28 +112,28 @@ export function HomeTab() {
       title: "Connect Wallet",
       description: "Link your wallet to get started",
       action: "Next",
-      icon: "🔗",
+      icon: <HiOutlineWallet className="w-6 h-6 text-[#c199e4]" />,
     },
     {
       step: 2,
       title: "Create DCA Plan",
       description: "Tell us what you want to invest",
       action: "Next",
-      icon: "📊",
+      icon: <HiOutlineDocumentChartBar className="w-6 h-6 text-[#c199e4]" />,
     },
     {
       step: 3,
       title: "Review & Approve",
       description: "Confirm your investment strategy",
       action: "Next",
-      icon: "✅",
+      icon: <HiOutlineCheckCircle className="w-6 h-6 text-[#c199e4]" />,
     },
     {
       step: 4,
       title: "Track Progress",
       description: "Monitor your automated investments",
       action: "Got it",
-      icon: "📱",
+      icon: <HiOutlineDevicePhoneMobile className="w-6 h-6 text-[#c199e4]" />,
     },
   ];
 
@@ -315,127 +316,132 @@ export function HomeTab() {
     <div className="flex flex-col h-full py-3 px-2 space-y-6 overflow-y-auto">
       {/* Onboarding Modal */}
       {showOnboarding && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={closeOnboarding}
           />
-          <div className="relative z-10 w-full max-w-sm mx-auto bg-[#341e64] rounded-2xl shadow-2xl border border-white/20 max-h-[90vh] overflow-y-auto">
-            <div className="p-4">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="text-2xl" aria-hidden>
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="relative z-10 w-full max-w-md mx-auto bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl shadow-2xl border border-[#c199e4]/20 max-h-[65vh] overflow-y-auto -top-[40px]"
+          >
+            <div className="p-6 space-y-4">
+              {/* Header */}
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center group-hover:from-[#c199e4]/30 group-hover:to-[#c199e4]/20 transition-all duration-300 border border-[#c199e4]/20 group-hover:scale-110" aria-hidden>
                     {step.icon}
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    <h3 className="text-xl font-bold text-[#c199e4] transition-colors duration-300">
                       {step.title}
                     </h3>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-white/70">
                       {step.description}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={closeOnboarding}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  className="text-white/70 hover:text-white transition-colors duration-200 p-2 hover:bg-white/10 rounded-xl"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+                  <HiOutlineXMark className="h-5 w-5" />
                 </button>
               </div>
 
-              <div className="mb-3">
-                <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-1.5">
+              {/* Progress Bar */}
+              <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm text-gray-300 font-medium">Onboarding Progress</p>
+                  <p className="text-sm text-gray-200 font-medium">
+                    {currentStepIndex + 1}/{onboardingSteps.length}
+                  </p>
+                </div>
+                <div className="w-full bg-white/20 rounded-full h-3 mb-2">
                   <div
-                    className="bg-blue-600 h-1.5 rounded-full"
+                    className="bg-gradient-to-r from-[#c199e4]/40 to-[#c199e4]/30 h-3 rounded-full transition-all duration-700 shadow-sm"
                     style={{ width: `${progressPercent}%` }}
                   />
                 </div>
-                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  <span>
-                    Step {currentStepIndex + 1} of {onboardingSteps.length}
-                  </span>
-                  <span>{Math.round(progressPercent)}%</span>
-                </div>
+                <p className="text-xs text-gray-400">
+                  {Math.round(progressPercent)}% Complete
+                </p>
               </div>
 
-              <div className="space-y-3">
-                <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-3 bg-gray-50 dark:bg-gray-950">
-                  <p className="text-xs text-gray-700 dark:text-gray-300">
-                    Connect your wallet and tell us:
+              {/* Quick Start Guide */}
+              <div className="rounded-2xl p-4 border border-[#c199e4]/20">
+                <p className="text-sm text-gray-300 font-medium mb-2">
+                  Quick Start Guide
+                </p>
+                <div className="backdrop-blur-lg rounded-xl p-3 border border-[#c199e4]/20">
+                  <p className="text-sm text-gray-100 font-medium">Connect your wallet and tell us:</p>
+                  <p className="text-sm text-gray-200 mt-1 italic">
+                    &ldquo;I want to invest [amount] in [token] every [frequency] for [duration]&rdquo;
                   </p>
-                  <pre className="mt-1 text-xs whitespace-pre-wrap text-gray-900 dark:text-gray-100">
-                   I want to invest [amount] in [token] every [frequency]
-                    for [duration] 
-                  </pre>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  {onboardingSteps.map((s, idx) => (
-                    <div
-                      key={s.step}
-                      className={`rounded-lg border p-2 ${
-                        idx === currentStepIndex
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-400"
-                          : "border-gray-200 dark:border-gray-800"
-                      }`}
-                    >
-                      <div className="text-sm" aria-hidden>
-                        {s.icon}
-                      </div>
-                      <div className="text-xs font-medium text-gray-900 dark:text-white mt-1">
-                        {s.title}
-                      </div>
-                      <div className="text-xs text-gray-600 dark:text-gray-400">
-                        {s.description}
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </div>
 
-              <div className="mt-4 flex items-center justify-between">
-                <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+              {/* Steps Grid */}
+              <div className="grid grid-cols-2 gap-2">
+                {onboardingSteps.map((s, idx) => (
+                  <div
+                    key={s.step}
+                    className={`backdrop-blur-lg rounded-2xl p-3 border transition-all duration-300 group ${
+                      idx === currentStepIndex
+                        ? "border-[#c199e4]/50 shadow-lg"
+                        : "border-[#c199e4]/20 hover:border-[#c199e4]/30"
+                    }`}
+                  >
+                    <div className="mb-2" aria-hidden>
+                      {s.icon}
+                    </div>
+                    <div className="text-sm font-bold text-white group-hover:text-gray-200 transition-colors duration-300 mb-1">
+                      {s.title}
+                    </div>
+                    <div className="text-xs text-gray-400 leading-relaxed">
+                      {s.description}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Controls */}
+              <div className="space-y-3">
+                <label className="flex items-center gap-2 text-sm text-gray-400">
                   <input
                     type="checkbox"
                     checked={dontShowAgain}
                     onChange={(e) => setDontShowAgain(e.target.checked)}
-                    className="rounded border-gray-300 dark:border-gray-600"
+                    className="w-4 h-4 rounded border-2 border-gray-400 bg-white/10 text-[#c199e4] focus:ring-[#c199e4] focus:ring-2"
                   />
-                  Don&apos;t show again
+                  Don&apos;t show this again
                 </label>
-                <div className="flex gap-2">
+                
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-2">
                   <button
                     onClick={goPrev}
                     disabled={currentStepIndex === 0}
-                    className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50 text-sm"
+                    className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg group-hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                   >
                     Back
                   </button>
                   <button
                     onClick={goNext}
-                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm"
+                    className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg group-hover:scale-[1.02]"
                   >
                     {currentStepIndex === onboardingSteps.length - 1
-                      ? "Got it"
+                      ? "Got it!"
                       : step.action}
                   </button>
                 </div>
               </div>
             </div>
+            </motion.div>
           </div>
-        </div>
       )}
 
       {/* User Greeting */}
@@ -692,9 +698,9 @@ export function HomeTab() {
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="relative z-10 w-full max-w-md mx-auto bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl shadow-2xl border border-[#c199e4]/20 max-h-[65vh] overflow-y-auto"
+            className="relative z-10 w-full max-w-md mx-auto bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl shadow-2xl border border-[#c199e4]/20 max-h-[65vh] overflow-y-auto -top-[40px]"
           >
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-4">
               {/* Header */}
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
@@ -721,7 +727,7 @@ export function HomeTab() {
               </div>
 
               {/* Status and Actions */}
-              <div className="flex items-center justify-between p-4  backdrop-blur-lg rounded-2xl border border-[#c199e4]/20">
+              <div className="flex items-center justify-between p-3  backdrop-blur-lg rounded-2xl border border-[#c199e4]/20">
                 <div className="flex items-center gap-3">
                   <span className={`text-xs font-bold px-4 py-2 rounded-full transition-all duration-300 ${
                     selectedPlan.status === 'active' 
@@ -737,7 +743,7 @@ export function HomeTab() {
                   {selectedPlan.status === "active" && (
                     <button
                       onClick={() => handlePausePlan(selectedPlan.id)}
-                      className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg group-hover:scale-[1.02]"
+                      className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-3 px-5 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg group-hover:scale-[1.02]"
                     >
                       Pause
                     </button>
@@ -755,23 +761,23 @@ export function HomeTab() {
 
               {/* Plan Details Grid */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20 transition-all duration-300 group">
+                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
                   <p className="text-sm text-gray-400 mb-2 font-medium">From Token</p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">{selectedPlan.fromToken}</p>
                 </div>
-                <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20 transition-all duration-300 group">
+                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
                   <p className="text-sm text-gray-400 mb-2 font-medium">To Token</p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">{selectedPlan.toToken}</p>
                 </div>
-                <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20 transition-all duration-300 group">
+                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
                   <p className="text-sm text-gray-400 mb-2 font-medium">Amount</p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">{selectedPlan.amount}</p>
                 </div>
-                <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20 transition-all duration-300 group">
+                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
                   <p className="text-sm text-gray-400 mb-2 font-medium">Interval</p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">{selectedPlan.interval}</p>
                 </div>
-                <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">
+                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">
                   <p className="text-sm text-gray-400 mb-2 font-medium">Duration</p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">{selectedPlan.duration}</p>
                 </div>

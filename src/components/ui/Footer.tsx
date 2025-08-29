@@ -35,7 +35,7 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
     <div className="h-full flex items-center justify-center relative bg-transparent ">
       <div className="relative">
         {/* Central Circle */}
-        <div className="w-20 h-20 rounded-full border-2 border-white/40 bg-transparent relative">
+        <div className="size-[70px] rounded-full border-2 border-white/40 bg-transparent relative">
           {/* Animated White Dot Indicator */}
           <div 
             className="absolute w-2 h-2 bg-white rounded-full transition-all duration-300 ease-in-out"
@@ -46,7 +46,7 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
         {/* Home Tab - Top */}
         <button
           onClick={() => setActiveTab(Tab.Home)}
-          className="absolute text-white text-xs font-medium hover:text-white/80 transition-all duration-200"
+          className="absolute text-white text-[11px] font-medium hover:text-white/80 transition-all duration-200"
           style={getTabPosition(Tab.Home)}
         >
           HOME
@@ -55,7 +55,7 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
         {/* Actions Tab - Right */}
         <button
           onClick={() => setActiveTab(Tab.Actions)}
-          className="absolute text-white text-xs font-medium hover:text-white/80 transition-all duration-200"
+          className="absolute text-white text-[11px] font-medium hover:text-white/80 transition-all duration-200"
           style={getTabPosition(Tab.Actions)}
         >
           CHAT
@@ -64,7 +64,7 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
         {/* Context Tab - Bottom */}
         <button
           onClick={() => setActiveTab(Tab.Context)}
-          className="absolute text-white text-xs font-medium hover:text-white/80 transition-all duration-200"
+          className="absolute text-white text-[11px] font-medium hover:text-white/80 transition-all duration-200"
           style={getTabPosition(Tab.Context)}
         >
           HISTORY
@@ -74,7 +74,7 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
         {showWallet && (
           <button
             onClick={() => setActiveTab(Tab.Wallet)}
-            className="absolute text-white text-xs font-medium hover:text-white/80 transition-all duration-200"
+            className="absolute text-white text-[11px] font-medium hover:text-white/80 transition-all duration-200"
             style={getTabPosition(Tab.Wallet)}
           >
             WALLET

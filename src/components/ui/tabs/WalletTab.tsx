@@ -80,72 +80,72 @@ function WalletStatus({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6 mb-6">
       {/* Profile Section */}
-      <div className="p-5 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 text-center">
-        <div className="mx-auto w-20 h-20 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-gray-700">
+      <div className="p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 text-center">
+        <div className="mx-auto w-20 h-20 rounded-full overflow-hidden ring-2 ring-[#c199e4]/30 shadow-lg">
           <img
-            src={pfpUrl || "https://placehold.co/80x80/6366f1/ffffff?text=?"}
+            src={pfpUrl || "https://placehold.co/80x80/c199e4/ffffff?text=?"}
             alt="Profile"
             className="w-full h-full object-cover"
             onError={(e) => {
               e.currentTarget.src =
-                "https://placehold.co/80x80/6366f1/ffffff?text=?";
+                "https://placehold.co/80x80/c199e4/ffffff?text=?";
             }}
           />
         </div>
 
         {/* Connection Status Badge */}
-        <div className="mt-2 inline-flex items-center gap-2 px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
+        <div className="mt-3 mr-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 border border-[#c199e4]/30">
           <span
             className={`inline-block w-2 h-2 rounded-full ${
-              isConnected ? "bg-green-500" : "bg-gray-400"
+              isConnected ? "bg-green-400" : "bg-white/60"
             }`}
           />
-          <span className="text-xs text-gray-700 dark:text-gray-300">
+          <span className="text-xs text-white/90 font-medium">
             {isConnected ? "Connected" : "Not Connected"}
           </span>
         </div>
 
         {/* Chain badge */}
         {chainId && (
-          <div className="mt-2 inline-flex items-center gap-2 px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
+          <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-br from-white/20 to-white/5 border border-white/30">
             <span
               className={`inline-block w-2 h-2 rounded-full ${getChainColor(
                 chainId
               )}`}
             />
-            <span className="text-xs text-gray-700 dark:text-gray-300">
+            <span className="text-xs text-white/90 font-medium">
               {getChainName(chainId)}
             </span>
           </div>
         )}
 
-        <div className="mt-4 space-y-2 text-left">
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500 dark:text-gray-400">Username:</span>
-            <span className="text-gray-900 dark:text-gray-100 font-medium">
+        <div className="mt-6 space-y-3 text-left">
+          <div className="flex justify-between text-sm bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-xl p-3 border border-white/20">
+            <span className="text-white/70">Username:</span>
+            <span className="text-white font-medium">
               {username || "Anonymous"}
             </span>
           </div>
           {typeof fid === "number" && (
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500 dark:text-gray-400">FID:</span>
-              <span className="text-gray-900 dark:text-gray-100 font-medium">
+            <div className="flex justify-between text-sm bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-xl p-3 border border-white/20">
+              <span className="text-white/70">FID:</span>
+              <span className="text-white font-medium">
                 {fid}
               </span>
             </div>
           )}
           {address && (
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500 dark:text-gray-400">Wallet:</span>
+            <div className="flex justify-between text-sm bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-xl p-3 border border-white/20">
+              <span className="text-white/70">Wallet:</span>
               <div className="flex items-center gap-2">
-                <span className="text-gray-900 dark:text-gray-100 font-mono">
+                <span className="text-white font-mono">
                   {address.slice(0, 6)}...{address.slice(-4)}
                 </span>
                 <button
                   onClick={handleCopyAddress}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                  className="text-white/60 hover:text-[#c199e4] transition-all duration-300 hover:scale-110"
                   aria-label="Copy address"
                 >
                   <svg
@@ -195,13 +195,18 @@ function ConnectionControls({
 }: ConnectionControlsProps) {
   if (isConnected) {
     return (
-      <div className="p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-        <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
+      <div className="p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 mb-6">
+        <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+          <div className="w-8 h-8 bg-gradient-to-br from-green-400/20 to-green-400/10 rounded-xl flex items-center justify-center border border-green-400/30">
+            <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
           Wallet Connected
         </h4>
         <Button
           onClick={() => disconnect()}
-          className="w-full bg-red-600 hover:bg-red-700"
+          className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#b380db]/10 hover:from-[#c199e4]/30 hover:to-[#b380db]/20 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg"
         >
           Disconnect Wallet
         </Button>
@@ -210,22 +215,27 @@ function ConnectionControls({
   }
 
   return (
-    <div className="p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-      <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
+    <div className="p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500">
+      <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+        <div className="w-8 h-8 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-xl flex items-center justify-center border border-[#c199e4]/30">
+          <svg className="w-5 h-5 text-[#c199e4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
         Connect your wallet
       </h4>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {context ? (
           <>
             <Button
               onClick={() => connect({ connector: connectors[0] })}
-              className="w-full"
+              className="w-full bg-gradient-to-br from-[#c199e4]/40 to-[#b380db]/40 hover:from-[#c199e4]/60 hover:to-[#b380db]/60 border border-[#c199e4]/30 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 hover:scale-105"
             >
               Connect Farcaster Wallet
             </Button>
             <Button
               onClick={() => connect({ connector: connectors[2] })}
-              className="w-full"
+              className="w-full bg-gradient-to-br from-white/20 to-white/5 hover:from-white/30 hover:to-white/10 border border-white/30 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 hover:scale-105"
             >
               Connect MetaMask
             </Button>
@@ -234,13 +244,13 @@ function ConnectionControls({
           <>
             <Button
               onClick={() => connect({ connector: connectors[1] })}
-              className="w-full"
+              className="w-full bg-gradient-to-br from-[#c199e4]/40 to-[#b380db]/40 hover:from-[#c199e4]/60 hover:to-[#b380db]/60 border border-[#c199e4]/30 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 hover:scale-105"
             >
               Connect Coinbase Wallet
             </Button>
             <Button
               onClick={() => connect({ connector: connectors[2] })}
-              className="w-full"
+              className="w-full bg-gradient-to-br from-white/20 to-white/5 hover:from-white/30 hover:to-white/10 border border-white/30 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 hover:scale-105"
             >
               Connect MetaMask
             </Button>
@@ -287,40 +297,40 @@ function WalletControls({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       {/* Network Status */}
-      <div
-        className="p-4 rounded-xl border text-sm"
-        style={{
-          backgroundColor: isOnArbitrum
-            ? "rgb(240 253 244)"
-            : "rgb(254 242 242)",
-          borderColor: isOnArbitrum ? "rgb(34 197 94)" : "rgb(239 68 68)",
-        }}
-      >
+      <div className={`p-6 backdrop-blur-lg rounded-3xl border transition-all duration-500 text-sm ${
+        isOnArbitrum 
+          ? "bg-gradient-to-br from-green-400/20 to-green-400/10 border-green-400/30 hover:border-green-400/50" 
+          : "bg-gradient-to-br from-red-400/20 to-red-400/10 border-red-400/30 hover:border-red-400/50"
+      }`}>
         {isOnArbitrum ? (
           <div className="flex items-start gap-3">
-            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500 text-white">
-              ✓
-            </span>
+            <div className="w-8 h-8 bg-gradient-to-br from-green-400/40 to-green-400/30 rounded-xl flex items-center justify-center border border-green-400/40">
+              <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
             <div>
-              <div className="font-medium text-green-700">
+              <div className="font-bold text-green-300 text-base">
                 Connected to Arbitrum
               </div>
-              <div className="text-green-700/80">
+              <div className="text-green-200/80">
                 You&apos;re on the correct network.
               </div>
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-6">
             <div className="flex items-start gap-3">
-              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-500 text-white">
-                !
-              </span>
+              <div className="w-8 h-8 bg-gradient-to-br from-red-400/40 to-red-400/30 rounded-xl flex items-center justify-center border border-red-400/40">
+                <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
               <div>
-                <div className="font-medium text-red-700">Wrong Network</div>
-                <div className="text-red-700/80">
+                <div className="font-bold text-red-300 text-base">Wrong Network</div>
+                <div className="text-red-200/80">
                   Please switch to Arbitrum mainnet to continue.
                 </div>
               </div>
@@ -329,7 +339,7 @@ function WalletControls({
               onClick={onSwitchToArbitrum}
               disabled={isChainSwitchPending}
               isLoading={isChainSwitchPending}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+              className="w-full bg-gradient-to-br from-[#c199e4]/40 to-[#b380db]/40 hover:from-[#c199e4]/60 hover:to-[#b380db]/60 border border-[#c199e4]/30 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 hover:scale-105"
             >
               Switch to Arbitrum
             </Button>
@@ -339,24 +349,29 @@ function WalletControls({
       </div>
 
       {/* Wallet Info */}
-      <div className="p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-        <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
+      <div className="p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500">
+        <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+          <div className="w-8 h-8 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-xl flex items-center justify-center border border-[#c199e4]/30">
+            <svg className="w-5 h-5 text-[#c199e4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
           Wallet Information
         </h4>
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-500 dark:text-gray-400">Status:</span>
-            <span className="text-green-600 dark:text-green-400 font-medium">
+        <div className="space-y-3 text-sm">
+          <div className="flex justify-between bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-xl p-3 border border-white/20">
+            <span className="text-white/70">Status:</span>
+            <span className="text-green-400 font-bold">
               Connected
             </span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-gray-500 dark:text-gray-400">Type:</span>
-            <span className="text-gray-900 dark:text-gray-100">
+          <div className="flex justify-between bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-xl p-3 border border-white/20">
+            <span className="text-white/70">Type:</span>
+            <span className="text-white font-medium">
               {isFarcasterWallet ? "Farcaster Wallet" : "External Wallet"}
             </span>
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+          <div className="text-xs text-white/60 mt-3 p-3 bg-gradient-to-br from-[#c199e4]/10 to-[#c199e4]/5 rounded-xl border border-[#c199e4]/20">
             You can switch between custody wallet and EOA using the Farcaster
             interface.
           </div>
@@ -439,38 +454,58 @@ export function WalletTab() {
 
   // --- Render ---
   return (
-    <div className="flex flex-col h-[calc(100vh-200px)] px-4 py-3 space-y-4 overflow-y-auto">
-      {/* Profile Section */}
-      <WalletStatus
-        address={address}
-        chainId={chainId}
-        pfpUrl={context?.user?.pfpUrl}
-        username={context?.user?.username}
-        fid={context?.user?.fid}
-        isConnected={isConnected}
-      />
+    <div className="flex flex-col h-full py-3 overflow-y-auto">
+      {/* Header */}
+      <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center border border-[#c199e4]/20">
+            <svg className="w-6 h-6 text-[#c199e4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-white">
+              Wallet Management
+            </h2>
+            <p className="text-sm text-white/70">
+              Connect and manage your crypto wallet
+            </p>
+          </div>
+        </div>
+      </div>
 
-      {/* Connection Controls */}
-      <ConnectionControls
-        isConnected={isConnected}
-        context={context}
-        connect={connect}
-        connectors={connectors}
-        disconnect={disconnect}
-      />
+        {/* Profile Section */}
+        <WalletStatus
+          address={address}
+          chainId={chainId}
+          pfpUrl={context?.user?.pfpUrl}
+          username={context?.user?.username}
+          fid={context?.user?.fid}
+          isConnected={isConnected}
+        />
 
-      {/* Wallet Controls (only when connected) */}
-      <WalletControls
-        isConnected={isConnected}
-        context={context}
-        chainId={chainId}
-        onSwitchToArbitrum={handleSwitchToArbitrum}
-        isChainSwitchPending={isChainSwitchPending}
-        isChainSwitchError={isChainSwitchError}
-        chainSwitchError={chainSwitchError}
-        isFarcasterWallet={isFarcasterWallet}
-        isCustodyWallet={isCustodyWallet}
-      />
-    </div>
+        {/* Connection Controls */}
+        <ConnectionControls
+          isConnected={isConnected}
+          context={context}
+          connect={connect}
+          connectors={connectors}
+          disconnect={disconnect}
+        />
+
+        {/* Wallet Controls (only when connected) */}
+        <WalletControls
+          isConnected={isConnected}
+          context={context}
+          chainId={chainId}
+          onSwitchToArbitrum={handleSwitchToArbitrum}
+          isChainSwitchPending={isChainSwitchPending}
+          isChainSwitchError={isChainSwitchError}
+          chainSwitchError={chainSwitchError}
+          isFarcasterWallet={isFarcasterWallet}
+          isCustodyWallet={isCustodyWallet}
+        />
+      </div>
+    // </div>
   );
 }

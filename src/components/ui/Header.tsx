@@ -20,7 +20,7 @@ export function Header({ neynarUser }: HeaderProps) {
   return (
     <div className="relative font-titillium">
       <div 
-        className="mt-4 mb-4 mx-4 px-3 py-3 flex items-center justify-between"
+        className="mx-4 px-3 py-3 flex items-center justify-between gap-2"
       >
         
         <div className="flex items-center gap-3 ml-auto">
