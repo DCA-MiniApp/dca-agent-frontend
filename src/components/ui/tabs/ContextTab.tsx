@@ -192,9 +192,9 @@ export function ContextTab() {
   const closeModal = () => setSelectedTx(null);
 
   return (
-    <div className="flex flex-col h-full py-3 space-y-6 overflow-y-auto">
+    <div className="flex flex-col h-full py-3 overflow-y-auto">
       {/* Header */}
-      <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20">
+      <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20 mb-8">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center border border-[#c199e4]/20">
             <HiOutlineDocumentText className="text-[#c199e4] size-6" />
@@ -233,6 +233,26 @@ export function ContextTab() {
           </div>
           <div className="flex flex-col">
             <label className="text-sm text-[#c199e4]/90 mb-2 font-medium">
+              Status
+            </label>
+            {/* <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as any);
+                setPage(1);
+              }}
+              className="px-3 py-2 bg-gradient-to-br from-[#4a2b7a]/40 to-[#341e64]/20 backdrop-blur-lg rounded-xl border border-[#c199e4]/20 text-black focus:outline-none focus:ring-2 focus:ring-[#c199e4] focus:border-[#c199e4]/50 text-sm transition-all duration-300"
+            > */}
+            <StatusSelect
+              value={statusFilter}
+              onChange={(val) => {
+                setStatusFilter(val as any);
+                setPage(1);
+              }}
+            />
+          </div>
+          <div className="flex flex-col">
+            <label className="text-sm text-[#c199e4]/90 mb-2 font-medium">
               Start Date
             </label>
             <input
@@ -259,26 +279,7 @@ export function ContextTab() {
               className="px-3 py-2 bg-gradient-to-br from-[#4a2b7a]/80 to-[#341e64]/20 backdrop-blur-lg rounded-xl border border-[#4a2b7a]/80 text-white focus:outline-none focus:ring-2 focus:ring-[#c199e4] focus:border-[#c199e4]/50 text-sm transition-all duration-300"
             />
           </div>
-          <div className="flex flex-col">
-            <label className="text-sm text-[#c199e4]/90 mb-2 font-medium">
-              Status
-            </label>
-            {/* <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value as any);
-                setPage(1);
-              }}
-              className="px-3 py-2 bg-gradient-to-br from-[#4a2b7a]/40 to-[#341e64]/20 backdrop-blur-lg rounded-xl border border-[#c199e4]/20 text-black focus:outline-none focus:ring-2 focus:ring-[#c199e4] focus:border-[#c199e4]/50 text-sm transition-all duration-300"
-            > */}
-            <StatusSelect
-              value={statusFilter}
-              onChange={(val) => {
-                setStatusFilter(val as any);
-                setPage(1);
-              }}
-            />
-          </div>
+          
         </div>
         <div className="pt-2">
           <button
@@ -291,7 +292,7 @@ export function ContextTab() {
       </div>
 
       {/* Table */}
-      <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 overflow-hidden ">
+      <div className="mt-8 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 overflow-hidden ">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gradient-to-r from-[#4a2b7a]/30 to-[#341e64]/20 backdrop-blur-lg border-b border-[#c199e4]/20">

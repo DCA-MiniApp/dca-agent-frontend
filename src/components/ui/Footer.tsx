@@ -1,6 +1,5 @@
 import React from "react";
 import { Tab } from "~/components/App";
-import { motion } from "framer-motion";
 import { IconType } from "react-icons";
 
 interface FooterProps {

@@ -2,12 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMiniApp } from '@neynar/react';
-import { ShareButton } from '../Share';
  
 import { type Haptics } from '@farcaster/miniapp-sdk';
 import { APP_URL } from '~/lib/constants';
 import { useAccount } from 'wagmi';
-import { truncateAddress } from "../../../lib/truncateAddress";
 
 /**
  * ActionsTab component handles mini app actions like sharing, notifications, and haptic feedback.
@@ -49,7 +47,7 @@ function formatAddress(address: string, prefixLength = 6, suffixLength = 4): str
 
 export function ActionsTab() {
   // --- Hooks ---
-  const { actions, added, notificationDetails, haptics, context } =
+  const {notificationDetails, haptics, context } =
     useMiniApp();
 
     const { address, isConnected } = useAccount();

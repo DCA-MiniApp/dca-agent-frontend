@@ -144,7 +144,7 @@ export function DCATestPanel() {
               className="w-full text-left p-2 text-xs bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded border border-blue-200 dark:border-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="font-medium text-blue-800 dark:text-blue-200">{scenario.name}</div>
-              <div className="text-blue-600 dark:text-blue-400 mt-1">"{scenario.message}"</div>
+              <div className="text-blue-600 dark:text-blue-400 mt-1">&quot;{scenario.message}&quot;</div>
             </button>
           ))}
         </div>
