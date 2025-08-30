@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { APP_NAME } from "~/lib/constants";
 import sdk from "@farcaster/miniapp-sdk";
 import { useMiniApp } from "@neynar/react";
-import { IoLayers } from "react-icons/io5";
+import { IoLayers, IoArrowBack } from "react-icons/io5";
+import { useRouter, usePathname } from "next/navigation";
 
 type HeaderProps = {
   neynarUser?: {
@@ -15,16 +15,31 @@ type HeaderProps = {
 
 export function Header({ neynarUser }: HeaderProps) {
   const { context } = useMiniApp();
+  const router = useRouter();
+  const pathname = usePathname();
   console.log(context?.user.pfpUrl);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  
+  const isOnChatPage = pathname === '/chat';
 
   return (
     <div className="relative font-titillium">
       <div 
-        className="mt-4 mb-4 mx-4 px-3 py-3 flex items-center justify-between"
+        className="mx-4 px-3 py-3 flex items-center justify-between gap-2"
       >
+        {/* Back Button - Only show on chat page */}
+        {isOnChatPage && (
+          <button
+            onClick={() => router.push('/')}
+            className="flex items-center justify-center text-sm px-4 py-1 rounded-xl bg-white/10 backdrop-blur-lg border border-white/20 hover:bg-white/20 transition-all duration-300"
+          >
+            {/* <IoArrowBack className="w-5 h-5 text-white" /> */}
+            Back
+          </button>
+        )}
         
-        <div className="flex items-center gap-3 ml-auto">
+        <div className={` ${isOnChatPage ? '' : 'ml-auto'} flex gap-1.5`}>
+        <div className={`flex items-center gap-3 cursor-pointer ${isOnChatPage ? '' : 'ml-auto'}`} onClick={() => router.push('/')}>
           {/* Logo Icon */}
           <div className="w-8 h-8 bg-gradient-to-br from-[#c199e4] to-[#341e64] rounded-lg flex items-center justify-center shadow-lg">
           <IoLayers className="size-5"/>
@@ -56,6 +71,7 @@ export function Header({ neynarUser }: HeaderProps) {
             )}
           </div>
         )}
+        </div>
       </div>
       {context?.user && (
         <>      

@@ -11,10 +11,9 @@ interface StatusSelectProps {
 
 const options = [
   { value: "All", label: "All Status" },
-  { value: "active", label: "Active" },
-  { value: "disable", label: "Paused" },
-  { value: "success", label: "Completed" },
-  { value: "failed", label: "Failed" },
+  { value: "SUCCESS", label: "Success" },
+  { value: "PENDING", label: "Pending" },
+  { value: "FAILED", label: "Failed" },
 ];
 
 export function StatusSelect({ value, onChange }: StatusSelectProps) {
@@ -24,7 +23,7 @@ export function StatusSelect({ value, onChange }: StatusSelectProps) {
     options.find((opt) => opt.value === value)?.label || "Select Status";
 
   return (
-    <div className="relative w-full z-[200]">
+    <div className="relative w-full z-[1000]">
       {/* Trigger */}
       <button
         type="button"
@@ -49,11 +48,20 @@ export function StatusSelect({ value, onChange }: StatusSelectProps) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -5 }}
             transition={{ duration: 0.15 }}
-            className="absolute left-0 top-full z-[300] mt-2 w-full max-h-56 overflow-auto 
-            bg-black/85 rounded-2xl border border-white/15 hover:border-[#c199e4]/40 shadow-2xl ring-1 ring-black/50 divide-y divide-white/10"
+            className="absolute left-0 top-full z-[1001] mt-2 w-full max-h-56 overflow-auto 
+            bg-black/95 rounded-2xl border border-white/15 hover:border-[#c199e4]/40 shadow-2xl ring-1 ring-black/50 divide-y divide-white/10 backdrop-blur-lg"
           >
-            <li className="sticky top-0 z-[1] px-3 py-2 text-[11px] uppercase tracking-wide text-white/70 bg-black/90">
-              Filter status
+            <li className="sticky top-0 z-[1] px-3 py-2 text-[11px] uppercase tracking-wide text-white/70 bg-black/90 flex justify-between items-center">
+              <span>FILTER STATUS</span>
+              <button
+                onClick={() => {
+                  onChange("All");
+                  setOpen(false);
+                }}
+                className="text-[#c199e4] hover:text-[#d9b3ed] text-xs transition-colors"
+              >
+                Clear All
+              </button>
             </li>
             {options.map((opt) => (
               <li key={opt.value}>

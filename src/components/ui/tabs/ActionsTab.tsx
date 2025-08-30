@@ -6,12 +6,15 @@ import { ShareButton } from "../Share";
 
 import { type Haptics } from "@farcaster/miniapp-sdk";
 import { APP_URL } from "~/lib/constants";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from "wagmi";
 import { maxUint256, parseUnits } from "viem";
 import { arbitrum } from "wagmi/chains";
 import { truncateAddress } from "../../../lib/truncateAddress";
 import { ARBITRUM_TOKENS, ERC20_ABI, getTokenInfo, EXECUATOR_ADDRESS } from "../../../lib/tokenContracts";
-
+import { useRouter } from 'next/navigation';
+import { IoPersonCircle } from 'react-icons/io5';
+// import { TbRobot } from "react-icons/tb";
+import { RiRobot2Fill } from "react-icons/ri";
 /**
  * ActionsTab component handles mini app actions like sharing, notifications, and haptic feedback.
  *
@@ -47,6 +50,8 @@ interface ChatMessage {
   confirmationData?: any;
   // Transaction hash for copy functionality
   transactionHash?: string;
+  // Loading state for plan creation
+  isCreatingPlan?: boolean;
 }
 
 // Helper to format addresses nicely (e.g., 0x1234...ABCD)
@@ -62,10 +67,12 @@ function formatAddress(
 
 export function ActionsTab() {
   // --- Hooks ---
-  const { actions, added, notificationDetails, haptics, context } =
+  const {notificationDetails, haptics, context } =
     useMiniApp();
 
   const { address, isConnected } = useAccount();
+  const router = useRouter();
+  
   // --- State ---
   const [notificationState, setNotificationState] = useState({
     sendStatus: "",
@@ -79,13 +86,14 @@ export function ActionsTab() {
     {
       id: "1",
       role: "assistant",
-      content: `Hello! I'm your DCA (Dollar Cost Averaging) investment assistant powered by AI. I can help you:\n\n🎯 Create automated investment strategies\n📊 Analyze your portfolio performance\n⚙️ Manage your DCA plans\n💡 Get personalized investment advice\n\n${
+      content: `Hello! I'm your DCA (Dollar Cost Averaging) investment assistant powered by AI. I can help you:\n\n🎯 Create automated investment strategies\n📊 Analyze your portfolio performance\n⚙️ Manage your DCA plans\n${
         isConnected
           ? `I see your wallet is connected (${formatAddress(
               address || ""
             )}) - we're ready to get started!`
           : "Please connect your wallet to access all features."
-      }\n\nWhat would you like to do today?`,
+      }\n\nWhat would you like to do today?\n
+      For example you can say "Create a DCA plan with 0.1 USDC into WETH every week for 1 months"`,
       timestamp: new Date(),
     },
   ]);
@@ -104,6 +112,8 @@ export function ActionsTab() {
   const [approvalStatus, setApprovalStatus] = useState<'idle' | 'approving' | 'approved' | 'error'>('idle');
   const [pendingConfirmationId, setPendingConfirmationId] = useState<string | null>(null);
   const [confirmationStep, setConfirmationStep] = useState<'summary' | 'approval' | 'completed'>('summary');
+  const [currentPlanData, setCurrentPlanData] = useState<any>(null);
+  const [isInPlanCreationFlow, setIsInPlanCreationFlow] = useState(false);
 
   // Contract interactions for token approval
   const { writeContract, data: approvalTxHash, error: approvalError, isPending: isApprovePending } = useWriteContract();
@@ -111,9 +121,158 @@ export function ActionsTab() {
     hash: approvalTxHash,
   });
 
+  // Balance checking for current plan - COMMENTED OUT
+  // const [currentTokenBalance, setCurrentTokenBalance] = useState<bigint | null>(null);
+  
+  // Get token info for current plan
+  // const currentTokenInfo = currentPlanData?.fromToken ? getTokenInfo(currentPlanData.fromToken) : null;
+  
+  // const { data: tokenBalance, isLoading: isBalanceLoading } = useReadContract({
+  //   address: currentTokenInfo?.address as `0x${string}` | undefined,
+  //   abi: ERC20_ABI,
+  //   functionName: 'balanceOf',
+  //   args: address ? [address] : undefined,
+  //   query: {
+  //     enabled: !!currentTokenInfo?.address && !!address,
+  //   },
+  // });
+
   // Respect miniapp safe area insets
   const safeTop = context?.client?.safeAreaInsets?.top ?? 0;
   const safeBottom = context?.client?.safeAreaInsets?.bottom ?? 0;
+
+  // --- Utility Functions ---
+  
+  // Check if user has sufficient balance for the plan - COMMENTED OUT
+  // const checkSufficientBalance = useCallback((planData: any): { sufficient: boolean; required: bigint; available: bigint; message: string } => {
+  //   console.log("[Balance] Checking sufficiency for plan:", planData);
+  //   console.log("[Balance] Current state:", {
+  //     address: address?.slice(0, 10) + '...',
+  //     isBalanceLoading,
+  //     tokenBalance: tokenBalance?.toString(),
+  //     currentTokenInfo,
+  //     currentPlanData: currentPlanData?.fromToken
+  //   });
+    
+  //   if (!planData) {
+  //     return { sufficient: false, required: 0n, available: 0n, message: "No plan data provided" };
+  //   }
+    
+  //   if (!address) {
+  //     return { sufficient: false, required: 0n, available: 0n, message: "Wallet not connected" };
+  //   }
+    
+  //   if (isBalanceLoading) {
+  //     return { sufficient: false, required: 0n, available: 0n, message: "Checking balance..." };
+  //   }
+    
+  //   if (tokenBalance === undefined || tokenBalance === null) {
+  //     console.log("[Balance] Token balance is undefined or null", tokenBalance);
+  //     console.log("[Balance] Token info for", planData.fromToken, ":", getTokenInfo(planData.fromToken));
+  //     return { sufficient: false, required: 0n, available: 0n, message: "Unable to fetch balance" };
+  //   }
+
+  //   const tokenInfo = getTokenInfo(planData.fromToken);
+  //   if (!tokenInfo) {
+  //     return { sufficient: false, required: 0n, available: 0n, message: "Unsupported token" };
+  //   }
+
+  //   const totalExecutions = Math.floor((planData.durationWeeks * 7 * 24 * 60) / planData.intervalMinutes);
+  //   console.log("totalExecutions 152:", totalExecutions);
+  //   const amountPerExecution = parseUnits(planData.amount, tokenInfo.decimals);
+  //   console.log("amountPerExecution 154:", amountPerExecution);
+  //   const totalRequired = amountPerExecution * BigInt(totalExecutions);
+  //   console.log("totalRequired 156:", totalRequired);
+  //   const available = tokenBalance;
+  //   console.log("available 158:", available);
+  //   const sufficient = available >= totalRequired;
+  //   console.log("sufficient 160:", sufficient);
+  //   const message = sufficient 
+  //     ? `✅ Sufficient balance available`
+  //     : `❌ Insufficient balance. Required: ${formatTokenAmount(totalRequired, tokenInfo.decimals)} ${planData.fromToken}, Available: ${formatTokenAmount(available, tokenInfo.decimals)} ${planData.fromToken}`;
+
+  //   return { sufficient, required: totalRequired, available, message };
+  // }, [tokenBalance, address, isBalanceLoading, currentTokenInfo, currentPlanData]);
+
+  // Format token amount for display
+  const formatTokenAmount = useCallback((amount: bigint, decimals: number): string => {
+    const divisor = BigInt(10 ** decimals);
+    const quotient = amount / divisor;
+    const remainder = amount % divisor;
+    
+    if (remainder === 0n) {
+      return quotient.toString();
+    }
+    
+    const remainderStr = remainder.toString().padStart(decimals, '0');
+    const trimmedRemainder = remainderStr.replace(/0+$/, '');
+    
+    if (trimmedRemainder === '') {
+      return quotient.toString();
+    }
+    
+    return `${quotient}.${trimmedRemainder}`;
+  }, []);
+
+
+
+  // Render markdown text with basic formatting
+  const renderMarkdownText = useCallback((text: string): React.ReactNode => {
+    if (!text) return null;
+    
+    // Split by lines to handle line breaks
+    const lines = text.split('\n');
+    
+    return lines.map((line, lineIndex) => {
+      if (line.trim() === '') {
+        return <br key={lineIndex} />;
+      }
+      
+      // Handle bold text (**text**)
+      const parts = line.split(/(\*\*.*?\*\*)/g);
+      
+      return (
+        <span key={lineIndex}>
+          {parts.map((part, partIndex) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+              // Bold text
+              const boldText = part.slice(2, -2);
+              return (
+                <strong key={partIndex} className="font-bold">
+                  {boldText}
+                </strong>
+              );
+            }
+            return part;
+          })}
+          {lineIndex < lines.length - 1 && <br />}
+        </span>
+      );
+    });
+  }, []);
+
+  // Helper to detect if user is requesting plan creation
+  const isPlanCreationRequest = useCallback((message: string): boolean => {
+    const lowerMessage = message.toLowerCase();
+    
+    // Keywords that indicate plan creation intent
+    const planCreationKeywords = [
+      'create', 'start', 'set up', 'begin', 'initiate', 'establish',
+      'dca plan', 'investment plan', 'strategy', 'automated',
+      'buy', 'invest', 'purchase', 'dollar cost average'
+    ];
+    
+    // Check if message contains plan creation keywords
+    const hasPlanKeywords = planCreationKeywords.some(keyword => 
+      lowerMessage.includes(keyword)
+    );
+    
+    // Also check for specific tokens and amounts (indicating concrete plan)
+    const hasTokenMentions = /(usdc|usdt|dai|eth|btc|arb|link|uni)\s+\d+/.test(lowerMessage);
+    const hasAmountMentions = /\$\d+|\d+\s*(usdc|usdt|dai|eth|btc|arb|link|uni)/i.test(lowerMessage);
+    
+    return hasPlanKeywords && (hasTokenMentions || hasAmountMentions);
+  }, []);
 
   useEffect(() => {
     // Keep input height in sync (handles textarea growth and device rotations)
@@ -140,6 +299,22 @@ export function ActionsTab() {
     // Auto-scroll on new messages or while loading
     scrollToBottom(true);
   }, [messages, isLoading]);
+
+  // Update current token balance when plan data changes - COMMENTED OUT
+  // useEffect(() => {
+  //   console.log('[Balance] Token balance updated:', {
+  //     tokenBalance: tokenBalance?.toString(),
+  //     isBalanceLoading,
+  //     currentPlanData: currentPlanData?.fromToken,
+  //     currentTokenInfo: currentTokenInfo,
+  //     address: address?.slice(0, 10) + '...',
+  //     enabled: !!currentTokenInfo?.address && !!address
+  //   });
+    
+  //   if (tokenBalance !== undefined) {
+  //     setCurrentTokenBalance(tokenBalance);
+  //   }
+  // }, [tokenBalance, isBalanceLoading, currentPlanData, currentTokenInfo, address]);
 
   useEffect(() => {
     // Update chat context when wallet connection changes
@@ -202,6 +377,9 @@ export function ActionsTab() {
       // Set connecting status
       setConnectionStatus("connecting");
 
+      // Determine if this is a plan creation request
+      const isPlanRequest = isPlanCreationRequest(currentInput);
+      
       // Call our DCA chat API endpoint
       const response = await fetch("/api/dca-chat", {
         method: "POST",
@@ -212,6 +390,7 @@ export function ActionsTab() {
           message: currentInput,
           userAddress: address,
           conversationHistory: messages.slice(-6), // Include last 6 messages for context
+          isPlanCreationRequest: isPlanRequest, // Flag to help API determine response type
         }),
       });
 
@@ -276,20 +455,32 @@ export function ActionsTab() {
         break;
 
       case "plan_confirmation_required":
-        // Show confirmation UI for DCA plan creation
+        // Show confirmation UI for DCA plan creation - ONLY when we have complete plan data
         console.log("Action: Plan confirmation required", data);
-        if (data?.confirmationId && messageId) {
-          // Update the message to show confirmation state
-          setMessages(prev => prev.map(msg => 
-            msg.id === messageId 
-              ? { 
-                  ...msg, 
-                  requiresConfirmation: true, 
-                  confirmationId: data.confirmationId, 
-                  confirmationData: data.planData 
-                }
-              : msg
-          ));
+        if (data?.confirmationId && data?.planData && messageId) {
+          // Validate that we have all required plan data
+          const planData = data.planData;
+          const requiredFields = ['fromToken', 'toToken', 'amount', 'intervalMinutes', 'durationWeeks', 'slippage'];
+          const hasAllRequiredFields = requiredFields.every(field => planData[field] !== undefined && planData[field] !== null);
+          
+          if (hasAllRequiredFields) {
+            console.log("Complete plan data received, showing confirmation flow");
+            setIsInPlanCreationFlow(true);
+            // Update the message to show confirmation state
+            setMessages(prev => prev.map(msg => 
+              msg.id === messageId 
+                ? { 
+                    ...msg, 
+                    requiresConfirmation: true, 
+                    confirmationId: data.confirmationId, 
+                    confirmationData: data.planData 
+                  }
+                : msg
+            ));
+          } else {
+            console.log("Incomplete plan data, not showing confirmation yet");
+            // Don't show confirmation if data is incomplete
+          }
         }
         break;
 
@@ -363,14 +554,23 @@ export function ActionsTab() {
       setApprovalStatus('error');
       setPendingConfirmationId(null);
       
+      // Check if it's a user rejection (MetaMask cancellation)
+      const isUserRejection = approvalError.message.includes('User rejected') || 
+                             approvalError.message.includes('User denied') ||
+                             approvalError.message.includes('cancelled') ||
+                             approvalError.message.includes('rejected');
+      
       const errorMessage: ChatMessage = {
         id: Date.now().toString(),
         role: "assistant",
-        content: `❌ Token approval failed: ${approvalError.message}\n\nYou need to approve token spending to create the DCA plan. Please try again.`,
+        content: isUserRejection 
+          ? "❌ Token approval was cancelled. No plan was created.\n\nYou can try creating the plan again when you're ready."
+          : `❌ Token approval failed: ${approvalError.message}\n\nYou need to approve token spending to create the DCA plan. Please try again.`,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
       setIsLoading(false);
+      setCurrentPlanData(null);
     }
   }, [approvalError]);
 
@@ -378,6 +578,16 @@ export function ActionsTab() {
   const proceedWithPlanCreation = useCallback(async (confirmationId: string) => {
     try {
       console.log('[Confirmation] Creating plan after approval:', confirmationId);
+      
+      // Add loading message for plan creation
+      const loadingMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: "assistant",
+        content: "🔄 Creating your DCA plan...",
+        timestamp: new Date(),
+        isCreatingPlan: true,
+      };
+      setMessages((prev) => [...prev, loadingMessage]);
       
       // Call the API with confirmation
       const response = await fetch("/api/dca-chat", {
@@ -402,11 +612,14 @@ export function ActionsTab() {
       console.log("Actual response content:", result.response);
 
       if (result.success) {
+        // Remove loading message and show success
+        setMessages((prev) => prev.filter(msg => !msg.isCreatingPlan));
+        
         // Show the actual response from the backend/SSE
         const confirmationMessage: ChatMessage = {
           id: Date.now().toString(),
           role: "assistant",
-          content: result.response || "DCA plan created successfully! 🎉",
+          content: result.response || "🎉 DCA plan created successfully!\n\nYour automated investment strategy is now active and will execute according to your schedule.",
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, confirmationMessage]);
@@ -421,6 +634,9 @@ export function ActionsTab() {
     } catch (error) {
       console.error("Error creating plan:", error);
       
+      // Remove loading message
+      setMessages((prev) => prev.filter(msg => !msg.isCreatingPlan));
+      
       const errorMessage: ChatMessage = {
         id: Date.now().toString(),
         role: "assistant",
@@ -431,6 +647,8 @@ export function ActionsTab() {
     } finally {
       setIsLoading(false);
       setApprovalStatus('idle');
+      setCurrentPlanData(null);
+      setIsInPlanCreationFlow(false);
     }
   }, [address, handleChatAction]);
 
@@ -518,6 +736,66 @@ export function ActionsTab() {
       return;
     }
 
+        // Set current plan data for balance checking - COMMENTED OUT
+    // setCurrentPlanData(planData);
+
+    // Wait for balance to load, then check - COMMENTED OUT
+    // let retryCount = 0;
+    // const maxRetries = 15; // 15 seconds max wait
+    
+    // const checkBalance = () => {
+    //   console.log("[Balance] Check attempt", retryCount + 1, "of", maxRetries);
+    //   console.log("[Balance] Current state:", {
+    //     isBalanceLoading,
+    //     tokenBalance: tokenBalance?.toString(),
+    //     currentTokenInfo,
+    //     address: address?.slice(0, 10) + '...'
+    //   });
+      
+    //   if (isBalanceLoading && retryCount < maxRetries) {
+    //     // Still loading, wait a bit more
+    //     retryCount++;
+    //     setTimeout(checkBalance, 1000);
+    //     return;
+    //   }
+      
+    //   if (retryCount >= maxRetries) {
+    //     // Timeout reached
+    //     const errorMessage: ChatMessage = {
+    //       id: Date.now().toString(),
+    //       role: "assistant",
+    //       content: "❌ **Balance check timeout**\n\nUnable to fetch your token balance. Please ensure your wallet is connected and try again.",
+    //       timestamp: new Date(),
+    //     };
+    //     setMessages((prev) => [...prev, errorMessage]);
+    //     setIsLoading(false);
+    //     setCurrentPlanData(null);
+    //     return;
+    //   }
+      
+    //   const balanceCheck = checkSufficientBalance(planData);
+    //   console.log("[Balance] Balance check result:", balanceCheck);
+      
+    //   if (balanceCheck.message === "Unable to fetch balance" || balanceCheck.message === "Checking balance...") {
+    //     // Balance still not available, retry
+    //     retryCount++;
+    //     setTimeout(checkBalance, 1000);
+    //     return;
+    //   }
+        
+    //     if (!balanceCheck.sufficient) {
+    //       const errorMessage: ChatMessage = {
+    //         id: Date.now().toString(),
+    //         role: "assistant",
+    //         content: `❌ **Insufficient Balance**\n\n${balanceCheck.message}\n\nPlease ensure you have enough ${planData.fromToken} tokens before creating this plan.`,
+    //         timestamp: new Date(),
+    //       };
+    //       setMessages((prev) => [...prev, errorMessage]);
+    //       setIsLoading(false);
+    //       setCurrentPlanData(null);
+    //       return;
+    //     }
+
     // Calculate total investment details for summary
     const totalExecutions = Math.floor((planData.durationWeeks * 7 * 24 * 60) / planData.intervalMinutes);
     const totalAmount = parseFloat(planData.amount) * totalExecutions;
@@ -533,7 +811,7 @@ export function ActionsTab() {
                         planData.durationWeeks === 52 ? '1 year' :
                         `${planData.durationWeeks} weeks`;
 
-    // Step 1: Show plan summary and ask for final confirmation
+    // Show plan summary WITHOUT balance confirmation
     const summaryMessage: ChatMessage = {
       id: `summary-${Date.now()}`,
       role: "assistant",
@@ -544,7 +822,7 @@ export function ActionsTab() {
               `• **Duration:** ${durationText}\n` +
               `• **Total Executions:** ${totalExecutions}\n` +
               `• **Total Investment:** ${totalAmount.toFixed(6)} ${planData.fromToken}\n` +
-              `• **Slippage:** ${planData.slippage}%\n\n` +
+              `• **Slippage:** ${planData.slippage/100}%\n\n` +
               `⚠️ **Important:** This will create an automated investment plan that will execute transactions from your wallet. Please review the details carefully.\n\n` +
               `Ready to proceed with token approval?`,
       timestamp: new Date(),
@@ -556,6 +834,9 @@ export function ActionsTab() {
     setMessages((prev) => [...prev, summaryMessage]);
     setConfirmationStep('summary');
     setIsLoading(false);
+    
+    // Start checking balance - COMMENTED OUT
+    // checkBalance();
   }, [address, messages]);
 
   // Handle the approve confirmation (after summary)
@@ -602,7 +883,7 @@ export function ActionsTab() {
         const cancellationMessage: ChatMessage = {
           id: Date.now().toString(),
           role: "assistant",
-          content: result.response || "Action cancelled successfully.",
+          content: result.response || "✅ Action cancelled successfully. No DCA plan was created.",
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, cancellationMessage]);
@@ -626,6 +907,9 @@ export function ActionsTab() {
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      setCurrentPlanData(null);
+      setApprovalStatus('idle');
+      setIsInPlanCreationFlow(false);
     }
   }, [address, handleChatAction]);
 
@@ -754,48 +1038,81 @@ export function ActionsTab() {
 
   // --- Render ---
   return (
-    <div
-      className="flex flex-col h-[calc(100vh-200px)] min-h-0 relative"
-      style={{ paddingTop: safeTop, paddingBottom: safeBottom }}
-    >
-      {/* Chat Interface */}
-      <div className="flex-1 flex flex-col min-h-0">
-        {/* Chat Messages */}
-        <div
-          className="flex-1 overflow-y-auto px-4 pt-1 pb-4 space-y-3"
-          style={{ paddingBottom: inputContainerHeight + safeBottom + 8 }}
-        >
-          {/* Address pill above first message, right aligned */}
-          <div className="flex justify-end">
-            <div className="px-2.5 py-1.5 rounded-full border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900/90 text-xs font-mono text-gray-800 dark:text-gray-200 shadow-sm flex items-center gap-1.5">
-              <svg
-                className="w-3.5 h-3.5 text-gray-600 dark:text-gray-300"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden
-              >
-                <path d="M12 12c2.761 0 5-2.239 5-5s-2.239-5-5-5-5 2.239-5 5 2.239 5 5 5zm0 2c-3.866 0-7 3.134-7 7h2c0-2.761 2.239-5 5-5s5 2.239 5 5h2c0-3.866-3.134-7-7-7z" />
-              </svg>
-              {address && formatAddress(address)}
-            </div>
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Header */}
+      {/* <div className="flex-shrink-0 bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20 mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center border border-[#c199e4]/20">
+            <svg className="w-6 h-6 text-[#c199e4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
           </div>
+          <div>
+            <h2 className="text-xl font-bold text-white">
+              DCA Chat Assistant
+            </h2>
+            <p className="text-sm text-white/70">
+              Get help with your dollar cost averaging strategies
+            </p>
+          </div>
+        </div>
+      </div> */}
+
+      {/* Chat Container */}
+      <div className="flex-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 overflow-hidden flex flex-col">
+        {/* Address pill */}
+        <div className="flex-shrink-0 flex justify-end p-3 pb-2">
+          <div className="px-3 py-1.5 rounded-full bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 border border-[#c199e4]/30 text-xs font-mono text-white/90 shadow-sm flex items-center gap-2">
+            <svg className="w-3.5 h-3.5 text-[#c199e4]" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <path d="M12 12c2.761 0 5-2.239 5-5s-2.239-5-5-5-5 2.239-5 5 2.239 5 5 5zm0 2c-3.866 0-7 3.134-7 7h2c0-2.761 2.239-5 5-5s5 2.239 5 5h2c0-3.866-3.134-7-7-7z" />
+            </svg>
+            {address ? formatAddress(address) : 'Not Connected'}
+          </div>
+        </div>
+
+        {/* Chat Messages - Scrollable */}
+        <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-3"
+          style={{ 
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#c199e4 transparent'
+          }}
+        >
 
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`flex ${
-                message.role === "user" ? "justify-end" : "justify-start"
-              }`}
+              className={`flex items-start gap-1.5 ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
             >
+              {/* Avatar Icon */}
+              <div className={`flex-shrink-0 size-6 rounded-full flex items-center justify-center ${
+                message.role === 'user' 
+                  ? 'bg-gradient-to-br from-[#c199e4] to-[#b380db]' 
+                  : 'bg-gradient-to-br from-white/20 to-white/10 border border-white/30'
+              }`}>
+                {message.role === 'user' ? (
+                  <IoPersonCircle className="size-4 text-white" />
+                ) : (
+                  <RiRobot2Fill className="size-3.5 text-[#c199e4]" />
+                )}
+              </div>
+
+              {/* Message Content */}
               <div
-                className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                  message.role === "user"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                className={`rounded-2xl px-3 py-3 ${
+                  message.role === 'user'
+                    ? 'max-w-[75%] bg-gradient-to-br from-[#c199e4] to-[#b380db] text-white shadow-lg'
+                    : 'bg-gradient-to-br from-white/15 to-white/10 backdrop-blur-sm text-white border border-white/20'
                 }`}
               >
-                <div className="whitespace-pre-wrap text-sm">
-                  {message.content}
+                <div className="text-sm leading-relaxed">
+                  {renderMarkdownText(message.content)}
+                  {message.isCreatingPlan && (
+                    <div className="mt-2 flex space-x-1">
+                      <div className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    </div>
+                  )}
                 </div>
                 
                 {/* Copy Transaction Hash Button */}
@@ -866,9 +1183,7 @@ export function ActionsTab() {
                 
                 <div
                   className={`text-xs mt-1 ${
-                    message.role === "user"
-                      ? "text-blue-100"
-                      : "text-gray-500 dark:text-gray-400"
+                    message.role === 'user' ? 'text-white/80' : 'text-white/60'
                   }`}
                 >
                   {message.timestamp.toLocaleTimeString([], {
@@ -883,17 +1198,11 @@ export function ActionsTab() {
           {/* Loading indicator */}
           {isLoading && (
             <div className="flex justify-start">
-              <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl px-4 py-3">
+              <div className="max-w-[85%] bg-gradient-to-br from-white/15 to-white/10 backdrop-blur-sm border border-white/20 rounded-2xl px-4 py-3">
                 <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div
-                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "0.1s" }}
-                  ></div>
-                  <div
-                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "0.2s" }}
-                  ></div>
+                  <div className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                 </div>
               </div>
             </div>
@@ -903,81 +1212,94 @@ export function ActionsTab() {
           <div ref={endOfMessagesRef} />
         </div>
 
-        {/* Chat Input */}
+        {/* Chat Input - Fixed at Bottom */}
         <div
           ref={inputContainerRef}
-          className="border-t border-gray-200 dark:border-gray-700 p-4 sticky bottom-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur"
-          style={{ paddingBottom: Math.max(12, 12 + safeBottom) }}
+          className="flex-shrink-0 border-t border-white/20 px-4 py-2 bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-lg"
+          // style={{ paddingBottom: Math.max(12, 12 + safeBottom) }}
         >
           {/* Quick Action Buttons */}
-          <div className="flex flex-wrap gap-2 mb-3">
+          <div className="flex flex-wrap gap-2 mb-2">
             <button
-              onClick={() => setInputMessage("Show my DCA plans")}
-              className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              onClick={() => setInputMessage('Show my DCA plans')}
+              className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
             >
-              📊 My Plans
+              My Plans
             </button>
             <button
-              onClick={() => setInputMessage("Create a new DCA strategy")}
-              className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              onClick={() => setInputMessage('Create a new DCA strategy')}
+              className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
             >
-              🎯 Create Plan
+              Create Plan
             </button>
             <button
-              onClick={() => setInputMessage("Platform statistics")}
-              className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              onClick={() => setInputMessage('Platform statistics')}
+              className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
             >
-              📈 Stats
+              Stats
             </button>
             <button
-              onClick={() => setInputMessage("Help me understand DCA")}
-              className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              onClick={() => setInputMessage('Help me understand DCA')}
+              className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
             >
-              ❓ Help
+              Help
             </button>
           </div>
 
           {/* Connection Status Indicator */}
           {connectionStatus && (
-            <div className="flex items-center gap-2 mb-3 text-xs">
-              <div
-                className={`w-2 h-2 rounded-full ${
-                  connectionStatus === "connected"
-                    ? "bg-green-500"
-                    : connectionStatus === "connecting"
-                    ? "bg-yellow-500 animate-pulse"
-                    : "bg-red-500"
-                }`}
-              />
-              <span className="text-gray-600 dark:text-gray-400">
-                {connectionStatus === "connected" && "Connected to DCA Backend"}
-                {connectionStatus === "connecting" && "Connecting..."}
-                {connectionStatus === "error" && "Connection Error"}
+            <div className="flex items-center gap-2 mb-1 text-xs">
+              <div className={`w-2 h-2 rounded-full ${
+                connectionStatus === 'connected' ? 'bg-green-400' : 
+                connectionStatus === 'connecting' ? 'bg-yellow-400 animate-pulse' : 
+                'bg-red-400'
+              }`} />
+              <span className="text-white/70">
+                {connectionStatus === 'connected' && 'Connected to DCA Backend'}
+                {connectionStatus === 'connecting' && 'Connecting...'}
+                {connectionStatus === 'error' && 'Connection Error'}
               </span>
             </div>
           )}
 
-          <div className="flex items-center space-x-2">
+          {/* Plan Creation Mode Indicator */}
+          {isInPlanCreationFlow && (
+            <div className="flex items-center gap-2 mb-1 text-xs">
+              <div className="w-2 h-2 rounded-full bg-[#c199e4] animate-pulse" />
+              <span className="text-[#c199e4]/80">
+                Plan Creation Mode - Review your investment details
+              </span>
+            </div>
+          )}
+
+          <div className="flex items-center space-x-3">
             <div className="flex-1 relative">
-              <textarea
+              <input
+                type="text"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                onKeyDown={handleKeyDown}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
                 onFocus={handleInputFocus}
                 placeholder={
-                  isConnected
-                    ? "Ask me anything about DCA investing..."
-                    : "Connect wallet first, then ask about DCA strategies"
+                  isInPlanCreationFlow 
+                    ? "Review the plan details above and click 'Review Plan Details' to proceed..." 
+                    : isConnected 
+                      ? "Ask me anything about DCA investing..." 
+                      : "Connect wallet first, then ask about DCA strategies"
                 }
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-2xl bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                rows={1}
-                style={{ minHeight: 44, maxHeight: 120 }}
+                className="w-full px-4 py-1.5 border border-white/30 rounded-2xl bg-white/10 backdrop-blur-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-[#c199e4]/50 focus:border-[#c199e4]/50 transition-all duration-300"
+                style={{ minHeight: 44 }}
               />
             </div>
             <button
               onClick={handleSendMessage}
               disabled={!inputMessage.trim() || isLoading}
-              className="h-11 w-11 p-0 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-full transition-colors flex items-center justify-center"
+              className="h-11 w-11 p-0 bg-gradient-to-br from-[#c199e4] to-[#b380db] hover:from-[#d9b3ed] hover:to-[#c199e4] disabled:from-white/20 disabled:to-white/10 disabled:cursor-not-allowed text-white rounded-2xl transition-all duration-300 flex items-center justify-center shadow-lg backdrop-blur-sm"
               aria-label="Send message"
             >
               {isLoading ? (

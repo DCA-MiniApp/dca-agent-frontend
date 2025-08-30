@@ -93,7 +93,7 @@ export const ERC20_ABI = [
 ] as const;
 
 // DCA contract address (placeholder - replace with actual deployed contract)
-export const EXECUATOR_ADDRESS = '0x3816BA21dCC9dfD3C714fFDB987163695408653F';
+export const EXECUATOR_ADDRESS = '0xE4Ffe4F839D2288a7C1e69C2b25e28F1363F8ca5';
 
 /**
  * Get token info by symbol

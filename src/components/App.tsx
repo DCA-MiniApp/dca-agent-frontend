@@ -150,15 +150,15 @@ export default function App(
         <div className="absolute bottom-[35%] right-[8%] w-[150px] h-[150px] bg-[#c199e4]/50 blur-3xl opacity-100 rounded-full z-0"/>
       
       {/* Header - Fixed at top */}
-      <div className="fixed top-0 left-0 right-0 h-20 z-40 bg-[#0a0a0a]/20">
+      <div className="fixed top-0 left-0 right-0 h-16 z-40 bg-[#0a0a0a]/20">
         <Header neynarUser={neynarUser} />
       </div>
 
       {/* Main content - Scrollable between header and footer */}
-      <div className="absolute top-20 left-0 right-0 bottom-40 overflow-y-auto z-10">
+      <div className="absolute top-16 left-0 right-0 bottom-36 overflow-y-auto z-10">
         <div className="px-4 py-4">
           {/* Main title */}
-          <h1 className="text-2xl font-bold text-center mb-6 text-white">{title}</h1>
+          {/* <h1 className="text-2xl font-bold text-center mb-6 text-white">{title}</h1> */}
 
           {/* Tab content rendering with animation */}
           <AnimatePresence mode="wait">
@@ -259,7 +259,7 @@ export default function App(
       </AnimatePresence>
 
       {/* Footer - Fixed at bottom */}
-      <div className="fixed bottom-0 left-0 right-0 h-40 mt-8 z-40">
+      <div className="fixed bottom-0 left-0 right-0 h-36 mt-8 z-40">
         <Footer 
           activeTab={currentTab as Tab} 
           setActiveTab={handleTabChange} 

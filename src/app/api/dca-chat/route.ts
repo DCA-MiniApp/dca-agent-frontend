@@ -13,6 +13,8 @@ const ChatRequestSchema = z.object({
   // Confirmation flow fields
   confirmationId: z.string().optional(),
   action: z.enum(['confirm', 'cancel']).optional(),
+  // Frontend context flags
+  isPlanCreationRequest: z.boolean().optional(),
 }).refine((data) => {
   // If it's a confirmation action, message can be empty
   if (data.confirmationId && data.action) {
@@ -49,9 +51,9 @@ export async function POST(request: NextRequest) {
   try {
     // Parse and validate request
     const body = await request.json();
-    const { message, userAddress, conversationHistory, confirmationId, action } = ChatRequestSchema.parse(body);
+    const { message, userAddress, conversationHistory, confirmationId, action, isPlanCreationRequest } = ChatRequestSchema.parse(body);
 
-    console.log('[DCA Chat API] Received:', { message, userAddress, confirmationId, action });
+    console.log('[DCA Chat API] Received:', { message, userAddress, confirmationId, action, isPlanCreationRequest });
 
     // Handle confirmation actions first
     if (confirmationId && action) {
@@ -70,8 +72,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if this is an initial plan creation request
-    const planCreationIntent = analyzePlanCreationIntent(message, '');
+    const planCreationIntent = analyzePlanCreationIntent(message, '', isPlanCreationRequest);
     if (planCreationIntent.shouldConfirm) {
+      console.log('[Plan Creation] Detected plan creation intent, showing confirmation instead of calling VibeKit');
       const confirmationId = generateConfirmationId(planCreationIntent.planData);
       const confirmationMessage = generateConfirmationMessage(planCreationIntent.planData);
       
@@ -647,7 +650,7 @@ function analyzeResponseForActions(responseText: string): { type: string; data?:
 /**
  * Analyze if the user's message suggests creating a DCA plan
  */
-function analyzePlanCreationIntent(userMessage: string, agentResponse: string): {
+function analyzePlanCreationIntent(userMessage: string, agentResponse: string, isPlanCreationRequest?: boolean): {
   shouldConfirm: boolean;
   planData?: any;
 } {
@@ -660,14 +663,29 @@ function analyzePlanCreationIntent(userMessage: string, agentResponse: string): 
   const hasCreationIntent = creationKeywords.some(keyword => lowerUserMessage.includes(keyword)) &&
                            planKeywords.some(keyword => lowerUserMessage.includes(keyword));
   
-  if (hasCreationIntent) {
+  // If frontend flagged this as a plan creation request, be more lenient
+  const shouldAnalyze = hasCreationIntent || isPlanCreationRequest;
+  
+  if (shouldAnalyze) {
     // Try to extract plan parameters from the user message
     const planData = extractPlanParameters(userMessage);
-    if (planData.fromToken && planData.toToken && planData.amount) {
+    console.log('[Plan Analysis] Extracted plan data:', planData);
+    
+    // Check if we have the minimum required data for a plan
+    const hasRequiredData = planData.fromToken && planData.toToken && planData.amount;
+    console.log('[Plan Analysis] Has required data:', hasRequiredData, {
+      fromToken: planData.fromToken,
+      toToken: planData.toToken,
+      amount: planData.amount
+    });
+    
+    if (hasRequiredData) {
       return {
         shouldConfirm: true,
         planData
       };
+    } else {
+      console.log('[Plan Analysis] Missing required data, will let VibeKit handle incomplete request');
     }
   }
 
@@ -687,35 +705,63 @@ function extractPlanParameters(message: string): any {
   };
   
   const planData: any = {
-    intervalMinutes: 10080, // Default: weekly
-    durationWeeks: 4, // Default: 4 weeks
-    slippage: '0.5' // Default: 0.5%
+    slippage: '200' // Default: 2%
   };
 
-  // Extract amount and tokens
-  const amountMatch = message.match(/(\d+(?:\.\d+)?)\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
-  if (amountMatch) {
+  const lowerMessage = message.toLowerCase();
+  console.log('[Parameter Extraction] Processing message:', message);
+
+  // Extract amount and tokens - multiple patterns
+  let amountMatch = message.match(/(\d+(?:\.\d+)?)\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
+  if (!amountMatch) {
+    // Try alternative patterns
+    amountMatch = message.match(/(\d+(?:\.\d+)?)\s*(?:usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
+  }
+  if (!amountMatch) {
+    // Try $ amount pattern
+    amountMatch = message.match(/\$(\d+(?:\.\d+)?)/i);
+    if (amountMatch) {
+      planData.amount = amountMatch[1];
+      planData.fromToken = 'USDC'; // Assume USDC for $ amounts
+    }
+  } else {
     planData.amount = amountMatch[1];
     planData.fromToken = tokenMap[amountMatch[2].toLowerCase()] || amountMatch[2].toUpperCase();
   }
 
-  // Extract target token
-  const intoMatch = message.match(/(?:into|to|buy)\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
+  // Extract target token - multiple patterns
+  let intoMatch = message.match(/(?:into|to|buy|invest\s+in)\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
+  if (!intoMatch) {
+    // Try pattern like "USDC into ETH"
+    intoMatch = message.match(/(?:usdc|usdt|dai|eth|btc|arb|weth|wbtc)\s+(?:into|to)\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
+  }
+  if (!intoMatch) {
+    // Try pattern like "invest in ETH"
+    intoMatch = message.match(/invest\s+(?:in\s+)?(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
+  }
+  
   if (intoMatch) {
     planData.toToken = tokenMap[intoMatch[1].toLowerCase()] || intoMatch[1].toUpperCase();
   }
 
   // Extract frequency
-  if (message.toLowerCase().includes('daily')) {
+  if (lowerMessage.includes('daily') || lowerMessage.includes('day')) {
     planData.intervalMinutes = 1440; // 24 hours
-  } else if (message.toLowerCase().includes('weekly')) {
+  } else if (lowerMessage.includes('weekly') || lowerMessage.includes('week')) {
     planData.intervalMinutes = 10080; // 7 days
-  } else if (message.toLowerCase().includes('monthly')) {
+  } else if (lowerMessage.includes('monthly') || lowerMessage.includes('month')) {
     planData.intervalMinutes = 43200; // 30 days
+  } else if (lowerMessage.includes('hourly') || lowerMessage.includes('hour')) {
+    planData.intervalMinutes = 60; // 1 hour
   }
 
   // Extract duration
-  const durationMatch = message.match(/(?:for|over)\s*(\d+)\s*(week|month)/i);
+  let durationMatch = message.match(/(?:for|over)\s*(\d+)\s*(week|month|day)/i);
+  if (!durationMatch) {
+    // Try alternative patterns
+    durationMatch = message.match(/(\d+)\s*(week|month|day)/i);
+  }
+  
   if (durationMatch) {
     const duration = parseInt(durationMatch[1]);
     const unit = durationMatch[2].toLowerCase();
@@ -723,9 +769,12 @@ function extractPlanParameters(message: string): any {
       planData.durationWeeks = duration;
     } else if (unit.startsWith('month')) {
       planData.durationWeeks = duration * 4;
+    } else if (unit.startsWith('day')) {
+      planData.durationWeeks = Math.ceil(duration / 7);
     }
   }
 
+  console.log('[Parameter Extraction] Extracted plan data:', planData);
   return planData;
 }
 
@@ -761,7 +810,7 @@ function generateConfirmationMessage(planData: any): string {
          `• **Duration**: ${durationText}\n` +
          `• **Total Investment**: ~${totalInvestment} ${planData.fromToken}\n` +
          `• **Total Executions**: ${totalExecutions} swaps\n` +
-         `• **Slippage Tolerance**: ${planData.slippage}%\n\n` +
+         `• **Slippage Tolerance**: ${planData.slippage/100}%\n\n` +
          `⚠️ **Important**: This will create an automated investment plan that executes transactions from your wallet. Ensure you have sufficient ${planData.fromToken} balance and the token is approved for spending.\n\n` +
          `✅ **Ready to proceed with this DCA plan?**`;
 }
