@@ -684,6 +684,23 @@ function analyzePlanCreationIntent(userMessage: string, agentResponse: string, i
         shouldConfirm: true,
         planData
       };
+    } else if (isPlanCreationRequest) {
+      // If frontend explicitly flagged this as plan creation but we don't have complete data,
+      // still show confirmation with what we have and let user provide more details
+      console.log('[Plan Analysis] Frontend flagged as plan creation but incomplete data, showing confirmation anyway');
+      return {
+        shouldConfirm: true,
+        planData: {
+          ...planData,
+          // Set defaults for missing fields
+          fromToken: planData.fromToken || 'USDC',
+          toToken: planData.toToken || 'ETH',
+          amount: planData.amount || '100',
+          intervalMinutes: planData.intervalMinutes || 10080, // weekly
+          durationWeeks: planData.durationWeeks || 4, // 1 month
+          slippage: planData.slippage || 200 // 2%
+        }
+      };
     } else {
       console.log('[Plan Analysis] Missing required data, will let VibeKit handle incomplete request');
     }
@@ -803,16 +820,16 @@ function generateConfirmationMessage(planData: any): string {
   const totalExecutions = Math.floor((planData.durationWeeks * 7 * 24 * 60) / planData.intervalMinutes);
   const totalInvestment = (parseFloat(planData.amount) * totalExecutions).toFixed(2);
 
-  return `🎯 **DCA Plan Summary**\n\n` +
-         `📊 **Investment Details:**\n` +
-         `• **Amount**: ${planData.amount} ${planData.fromToken} ${frequencyText}\n` +
-         `• **Target**: ${planData.toToken}\n` +
-         `• **Duration**: ${durationText}\n` +
-         `• **Total Investment**: ~${totalInvestment} ${planData.fromToken}\n` +
-         `• **Total Executions**: ${totalExecutions} swaps\n` +
-         `• **Slippage Tolerance**: ${planData.slippage/100}%\n\n` +
-         `⚠️ **Important**: This will create an automated investment plan that executes transactions from your wallet. Ensure you have sufficient ${planData.fromToken} balance and the token is approved for spending.\n\n` +
-         `✅ **Ready to proceed with this DCA plan?**`;
+  return `🔐 **Token Approval Required**\n\n` +
+         `📊 **Plan Summary:**\n` +
+         `• **Investment:** ${planData.amount} ${planData.fromToken} ${frequencyText}\n` +
+         `• **Target:** ${planData.toToken}\n` +
+         `• **Duration:** ${durationText}\n` +
+         `• **Total Investment:** ${totalInvestment} ${planData.fromToken}\n` +
+         `• **Total Executions:** ${totalExecutions}\n` +
+         `• **Slippage:** ${planData.slippage/100}%\n\n` +
+         `⚠️ **Approval Required:** To create this DCA plan, you need to approve spending of ${totalInvestment} ${planData.fromToken} tokens.\n\n` +
+         `Ready to proceed with token approval?`;
 }
 
 /**

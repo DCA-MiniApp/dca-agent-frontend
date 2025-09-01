@@ -4,10 +4,12 @@ import { useMiniApp } from "@neynar/react";
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { HiOutlineEye, HiOutlineDocumentText } from "react-icons/hi";
-import { FaExternalLinkAlt } from "react-icons/fa";
 import { StatusSelect } from "./StatusSelect";
 import { useAccount } from "wagmi";
-import { fetchUserExecutionHistory, type ExecutionHistory } from '../../../lib/api';
+import {
+  fetchUserExecutionHistory,
+  type ExecutionHistory,
+} from "../../../lib/api";
 
 /**
  * ContextTab component displays a transaction history with filters and pagination.
@@ -22,11 +24,12 @@ import { fetchUserExecutionHistory, type ExecutionHistory } from '../../../lib/a
  * - View (eye icon opens details modal)
  */
 export function ContextTab() {
-  const { context } = useMiniApp();
-  const { address, isConnected } = useAccount();
+  const { address } = useAccount();
 
   // Dynamic data state
-  const [executionHistory, setExecutionHistory] = useState<ExecutionHistory[]>([]);
+  const [executionHistory, setExecutionHistory] = useState<ExecutionHistory[]>(
+    []
+  );
   const [isLoading, setIsLoading] = useState(true);
 
   type TransactionStatus = "SUCCESS" | "FAILED" | "PENDING";
@@ -70,7 +73,7 @@ export function ContextTab() {
       const history = await fetchUserExecutionHistory(address, 100); // Fetch up to 100 records
       setExecutionHistory(history);
     } catch (error) {
-      console.error('Error fetching execution history:', error);
+      console.error("Error fetching execution history:", error);
       setExecutionHistory([]);
     } finally {
       setIsLoading(false);
@@ -89,14 +92,16 @@ export function ContextTab() {
       const fromAmount = parseFloat(execution.fromAmount);
       const toAmount = parseFloat(execution.toAmount);
       const exchangeRate = parseFloat(execution.exchangeRate);
-      
+
       return {
         id: execution.id,
         planId: execution.planId,
-        fromToken: execution.plan?.fromToken || 'UNKNOWN',
-        toToken: execution.plan?.toToken || 'UNKNOWN',
+        fromToken: execution.plan?.fromToken || "UNKNOWN",
+        toToken: execution.plan?.toToken || "UNKNOWN",
         fromAmount: `$${fromAmount.toFixed(2)}`,
-        toAmount: `${toAmount.toFixed(6)} ${execution.plan?.toToken || 'TOKEN'}`,
+        toAmount: `${toAmount.toFixed(6)} ${
+          execution.plan?.toToken || "TOKEN"
+        }`,
         exchangeRateNum: exchangeRate,
         gasFee: execution.gasFee,
         dateISO: executedAt.toISOString().slice(0, 10),
@@ -163,22 +168,6 @@ export function ContextTab() {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const statusPill = (s: TransactionStatus) => {
-    const map: Record<TransactionStatus, string> = {
-      SUCCESS:
-        "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
-      PENDING: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
-      FAILED: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
-    };
-    return (
-      <span
-        className={`px-2 py-0.5 rounded-full text-xs font-medium ${map[s]}`}
-      >
-        {s}
-      </span>
-    );
-  };
-
   // Modal state
   const [selectedTx, setSelectedTx] = useState<TransactionRow | null>(null);
   const openModal = (tx: TransactionRow) => setSelectedTx(tx);
@@ -204,11 +193,11 @@ export function ContextTab() {
       </div>
 
       {/* Filters */}
-      <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl p-6 border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 space-y-4">
+      <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl p-6 border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 space-y-4 relative z-[50]">
         <h3 className="text-lg font-bold text-white mb-4">
           Filter Transactions
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="flex flex-col">
             <label className="text-sm text-[#c199e4]/90 mb-2 font-medium">
               Token Search
@@ -224,18 +213,10 @@ export function ContextTab() {
               className="px-3 py-2 bg-gradient-to-br from-[#4a2b7a]/80 to-[#341e64]/20 backdrop-blur-lg rounded-xl border border-[#4a2b7a]/80 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-[#c199e4] focus:border-[#c199e4]/50 text-sm transition-all duration-300"
             />
           </div>
-          <div className="flex flex-col">
+          <div className="flex flex-col relative z-[99999]">
             <label className="text-sm text-[#c199e4]/90 mb-2 font-medium">
               Status
             </label>
-            {/* <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value as any);
-                setPage(1);
-              }}
-              className="px-3 py-2 bg-gradient-to-br from-[#4a2b7a]/40 to-[#341e64]/20 backdrop-blur-lg rounded-xl border border-[#c199e4]/20 text-black focus:outline-none focus:ring-2 focus:ring-[#c199e4] focus:border-[#c199e4]/50 text-sm transition-all duration-300"
-            > */}
             <StatusSelect
               value={statusFilter}
               onChange={(val) => {
@@ -272,7 +253,6 @@ export function ContextTab() {
               className="px-3 py-2 bg-gradient-to-br from-[#4a2b7a]/80 to-[#341e64]/20 backdrop-blur-lg rounded-xl border border-[#4a2b7a]/80 text-white focus:outline-none focus:ring-2 focus:ring-[#c199e4] focus:border-[#c199e4]/50 text-sm transition-all duration-300"
             />
           </div>
-          
         </div>
         <div className="pt-2">
           <button
@@ -285,7 +265,7 @@ export function ContextTab() {
       </div>
 
       {/* Table */}
-      <div className="mt-8 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 overflow-hidden ">
+      <div className="mt-8 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 overflow-hidden z-[10]">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gradient-to-r from-[#4a2b7a]/30 to-[#341e64]/20 backdrop-blur-lg border-b border-[#c199e4]/20">
@@ -311,12 +291,14 @@ export function ContextTab() {
                   <td colSpan={4} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center space-y-3">
                       <div className="w-8 h-8 border-2 border-[#c199e4]/30 border-t-[#c199e4] rounded-full animate-spin"></div>
-                      <p className="text-white/70 font-medium">Loading transaction history...</p>
+                      <p className="text-white/70 font-medium">
+                        Loading transaction history...
+                      </p>
                     </div>
                   </td>
                 </tr>
               )}
-              
+
               {/* No Connection State */}
               {!isLoading && !address && (
                 <tr>
@@ -341,77 +323,75 @@ export function ContextTab() {
                     <div className="flex flex-col items-center space-y-2">
                       <HiOutlineDocumentText className="text-[#c199e4]/50 size-12" />
                       <p className="text-white/70 font-medium">
-                        {filtered.length === 0 && transactions.length > 0 
+                        {filtered.length === 0 && transactions.length > 0
                           ? "No transactions match your filters"
-                          : "No transaction history found"
-                        }
+                          : "No transaction history found"}
                       </p>
                       <p className="text-white/50 text-sm">
                         {filtered.length === 0 && transactions.length > 0
                           ? "Try adjusting your filters"
-                          : "Your DCA execution history will appear here"
-                        }
+                          : "Your DCA execution history will appear here"}
                       </p>
                     </div>
                   </td>
                 </tr>
               )}
-              {!isLoading && pageItems.map((tx, index) => (
-                <motion.tr
-                  key={tx.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.1 }}
-                  className="hover:bg-[#c199e4]/5 transition-colors duration-200 group"
-                >
-                  <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-white group-hover:text-[#d9b3ed] transition-colors duration-200">
-                    #{(page - 1) * pageSize + index + 1}
-                    {/* <div className="text-xs text-white/50 font-mono">{tx.planId.slice(0, 8)}...</div> */}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="text-white font-medium">
-                        {tx.fromToken}
-                      </span>
-                      <svg
-                        className="w-4 h-4 text-[#c199e4]"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+              {!isLoading &&
+                pageItems.map((tx, index) => (
+                  <motion.tr
+                    key={tx.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.1 }}
+                    className="hover:bg-[#c199e4]/5 transition-colors duration-200 group"
+                  >
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-white group-hover:text-[#d9b3ed] transition-colors duration-200">
+                      #{(page - 1) * pageSize + index + 1}
+                      {/* <div className="text-xs text-white/50 font-mono">{tx.planId.slice(0, 8)}...</div> */}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-white font-medium">
+                          {tx.fromToken}
+                        </span>
+                        <svg
+                          className="w-4 h-4 text-[#c199e4]"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M17 8l4 4m0 0l-4 4m4-4H3"
+                          />
+                        </svg>
+                        <span className="text-white font-medium">
+                          {tx.toToken}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-[#c199e4]">
+                      {tx.fromAmount}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm">
+                      <button
+                        onClick={() => openModal(tx)}
+                        className="inline-flex items-center justify-center w-8 h-8 bg-gradient-to-br from-[#c199e4]/20 to-[#b380db]/20 hover:from-[#c199e4]/30 hover:to-[#b380db]/30 rounded-xl border border-[#c199e4]/30 text-[#c199e4] hover:text-white transition-all duration-300 hover:scale-110"
+                        aria-label="View transaction details"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M17 8l4 4m0 0l-4 4m4-4H3"
-                        />
-                      </svg>
-                      <span className="text-white font-medium">
-                        {tx.toToken}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-[#c199e4]">
-                    {tx.fromAmount}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm">
-                    <button
-                      onClick={() => openModal(tx)}
-                      className="inline-flex items-center justify-center w-8 h-8 bg-gradient-to-br from-[#c199e4]/20 to-[#b380db]/20 hover:from-[#c199e4]/30 hover:to-[#b380db]/30 rounded-xl border border-[#c199e4]/30 text-[#c199e4] hover:text-white transition-all duration-300 hover:scale-110"
-                      aria-label="View transaction details"
-                    >
-                      <HiOutlineEye className="w-4 h-4" />
-                    </button>
-                  </td>
-                </motion.tr>
-              ))}
+                        <HiOutlineEye className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </motion.tr>
+                ))}
             </tbody>
           </table>
         </div>
 
         {/* Pagination */}
         <div className="flex flex-col items-center justify-between px-6 py-4 bg-gradient-to-r from-[#4a2b7a]/20 to-[#341e64]/10 backdrop-blur-lg border-t border-[#c199e4]/20">
-          
           <div className="flex items-center gap-2 mb-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -478,7 +458,8 @@ export function ContextTab() {
                       Execution Details
                     </h3>
                     <p className="text-sm text-white/70">
-                      {selectedTx.fromToken} → {selectedTx.toToken} • Plan: {selectedTx.planId.slice(0, 8)}...
+                      {selectedTx.fromToken} → {selectedTx.toToken} • Plan:{" "}
+                      {selectedTx.planId.slice(0, 8)}...
                     </p>
                   </div>
                 </div>
@@ -552,7 +533,9 @@ export function ContextTab() {
                     Gas Fee
                   </p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
-                    {selectedTx.gasFee ? `$${parseFloat(selectedTx.gasFee).toFixed(4)}` : 'N/A'}
+                    {selectedTx.gasFee
+                      ? `$${parseFloat(selectedTx.gasFee).toFixed(4)}`
+                      : "N/A"}
                   </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
@@ -584,13 +567,15 @@ export function ContextTab() {
                 </p>
                 <div className="flex items-center justify-between gap-3">
                   <span className="font-mono text-gray-100 text-sm">
-                    {selectedTx.txHash ? truncateHash(selectedTx.txHash) : 'No hash available'}
+                    {selectedTx.txHash
+                      ? truncateHash(selectedTx.txHash)
+                      : "No hash available"}
                   </span>
                 </div>
               </div>
 
               {/* Error Message (if failed) */}
-              {selectedTx.status === 'FAILED' && selectedTx.errorMessage && (
+              {selectedTx.status === "FAILED" && selectedTx.errorMessage && (
                 <div className="rounded-2xl p-3 border border-red-400/20 bg-red-400/5">
                   <p className="text-sm text-red-300 font-medium mb-2">
                     Error Message
@@ -620,22 +605,6 @@ export function ContextTab() {
                     )}
                   </p>
                 </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 ">
-                <button
-                  onClick={closeModal}
-                  className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg group-hover:scale-[1.02]"
-                >
-                  Close
-                </button>
-                <button
-                  onClick={() => openTxExternal(selectedTx.txHash)}
-                  className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg group-hover:scale-[1.02]"
-                >
-                  View Explorer
-                </button>
               </div>
             </div>
           </motion.div>

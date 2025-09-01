@@ -2,18 +2,24 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMiniApp } from "@neynar/react";
-import { ShareButton } from "../Share";
 
 import { type Haptics } from "@farcaster/miniapp-sdk";
 import { APP_URL } from "~/lib/constants";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from "wagmi";
-import { maxUint256, parseUnits } from "viem";
+import {
+  useAccount,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+  useReadContract,
+} from "wagmi";
+import { maxUint256 } from "viem";
 import { arbitrum } from "wagmi/chains";
-import { truncateAddress } from "../../../lib/truncateAddress";
-import { ARBITRUM_TOKENS, ERC20_ABI, getTokenInfo, EXECUATOR_ADDRESS } from "../../../lib/tokenContracts";
-import { useRouter } from 'next/navigation';
-import { IoPersonCircle } from 'react-icons/io5';
-// import { TbRobot } from "react-icons/tb";
+import {
+  ERC20_ABI,
+  getTokenInfo,
+  EXECUATOR_ADDRESS,
+} from "../../../lib/tokenContracts";
+import { useRouter } from "next/navigation";
+import { IoPersonCircle } from "react-icons/io5";
 import { RiRobot2Fill } from "react-icons/ri";
 /**
  * ActionsTab component handles mini app actions like sharing, notifications, and haptic feedback.
@@ -67,19 +73,15 @@ function formatAddress(
 
 export function ActionsTab() {
   // --- Hooks ---
-  const {notificationDetails, haptics, context } =
-    useMiniApp();
+  const { notificationDetails, haptics, context } = useMiniApp();
 
   const { address, isConnected } = useAccount();
-  const router = useRouter();
-  
+
   // --- State ---
   const [notificationState, setNotificationState] = useState({
     sendStatus: "",
     shareUrlCopied: false,
   });
-  const [selectedHapticIntensity, setSelectedHapticIntensity] =
-    useState<Haptics.ImpactOccurredType>("medium");
 
   // --- Chat State ---
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -99,6 +101,7 @@ export function ActionsTab() {
   ]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isApprovalLoading, setIsApprovalLoading] = useState(false); // Separate loading state for approval
   const [connectionStatus, setConnectionStatus] = useState<
     "connecting" | "connected" | "error" | null
   >(null);
@@ -109,132 +112,49 @@ export function ActionsTab() {
   const [inputContainerHeight, setInputContainerHeight] = useState<number>(72);
 
   // Token approval state
-  const [approvalStatus, setApprovalStatus] = useState<'idle' | 'approving' | 'approved' | 'error'>('idle');
-  const [pendingConfirmationId, setPendingConfirmationId] = useState<string | null>(null);
-  const [confirmationStep, setConfirmationStep] = useState<'summary' | 'approval' | 'completed'>('summary');
+  const [approvalStatus, setApprovalStatus] = useState<
+    "idle" | "approving" | "approved" | "error"
+  >("idle");
+  const [pendingConfirmationId, setPendingConfirmationId] = useState<
+    string | null
+  >(null);
+  const [confirmationStep, setConfirmationStep] = useState<
+    "summary" | "approval" | "completed"
+  >("summary");
   const [currentPlanData, setCurrentPlanData] = useState<any>(null);
   const [isInPlanCreationFlow, setIsInPlanCreationFlow] = useState(false);
 
   // Contract interactions for token approval
-  const { writeContract, data: approvalTxHash, error: approvalError, isPending: isApprovePending } = useWriteContract();
-  const { isLoading: isApprovalConfirming, isSuccess: isApprovalConfirmed } = useWaitForTransactionReceipt({
-    hash: approvalTxHash,
-  });
-
-  // Balance checking for current plan - COMMENTED OUT
-  // const [currentTokenBalance, setCurrentTokenBalance] = useState<bigint | null>(null);
-  
-  // Get token info for current plan
-  // const currentTokenInfo = currentPlanData?.fromToken ? getTokenInfo(currentPlanData.fromToken) : null;
-  
-  // const { data: tokenBalance, isLoading: isBalanceLoading } = useReadContract({
-  //   address: currentTokenInfo?.address as `0x${string}` | undefined,
-  //   abi: ERC20_ABI,
-  //   functionName: 'balanceOf',
-  //   args: address ? [address] : undefined,
-  //   query: {
-  //     enabled: !!currentTokenInfo?.address && !!address,
-  //   },
-  // });
-
-  // Respect miniapp safe area insets
-  const safeTop = context?.client?.safeAreaInsets?.top ?? 0;
-  const safeBottom = context?.client?.safeAreaInsets?.bottom ?? 0;
-
-  // --- Utility Functions ---
-  
-  // Check if user has sufficient balance for the plan - COMMENTED OUT
-  // const checkSufficientBalance = useCallback((planData: any): { sufficient: boolean; required: bigint; available: bigint; message: string } => {
-  //   console.log("[Balance] Checking sufficiency for plan:", planData);
-  //   console.log("[Balance] Current state:", {
-  //     address: address?.slice(0, 10) + '...',
-  //     isBalanceLoading,
-  //     tokenBalance: tokenBalance?.toString(),
-  //     currentTokenInfo,
-  //     currentPlanData: currentPlanData?.fromToken
-  //   });
-    
-  //   if (!planData) {
-  //     return { sufficient: false, required: 0n, available: 0n, message: "No plan data provided" };
-  //   }
-    
-  //   if (!address) {
-  //     return { sufficient: false, required: 0n, available: 0n, message: "Wallet not connected" };
-  //   }
-    
-  //   if (isBalanceLoading) {
-  //     return { sufficient: false, required: 0n, available: 0n, message: "Checking balance..." };
-  //   }
-    
-  //   if (tokenBalance === undefined || tokenBalance === null) {
-  //     console.log("[Balance] Token balance is undefined or null", tokenBalance);
-  //     console.log("[Balance] Token info for", planData.fromToken, ":", getTokenInfo(planData.fromToken));
-  //     return { sufficient: false, required: 0n, available: 0n, message: "Unable to fetch balance" };
-  //   }
-
-  //   const tokenInfo = getTokenInfo(planData.fromToken);
-  //   if (!tokenInfo) {
-  //     return { sufficient: false, required: 0n, available: 0n, message: "Unsupported token" };
-  //   }
-
-  //   const totalExecutions = Math.floor((planData.durationWeeks * 7 * 24 * 60) / planData.intervalMinutes);
-  //   console.log("totalExecutions 152:", totalExecutions);
-  //   const amountPerExecution = parseUnits(planData.amount, tokenInfo.decimals);
-  //   console.log("amountPerExecution 154:", amountPerExecution);
-  //   const totalRequired = amountPerExecution * BigInt(totalExecutions);
-  //   console.log("totalRequired 156:", totalRequired);
-  //   const available = tokenBalance;
-  //   console.log("available 158:", available);
-  //   const sufficient = available >= totalRequired;
-  //   console.log("sufficient 160:", sufficient);
-  //   const message = sufficient 
-  //     ? `✅ Sufficient balance available`
-  //     : `❌ Insufficient balance. Required: ${formatTokenAmount(totalRequired, tokenInfo.decimals)} ${planData.fromToken}, Available: ${formatTokenAmount(available, tokenInfo.decimals)} ${planData.fromToken}`;
-
-  //   return { sufficient, required: totalRequired, available, message };
-  // }, [tokenBalance, address, isBalanceLoading, currentTokenInfo, currentPlanData]);
-
-  // Format token amount for display
-  const formatTokenAmount = useCallback((amount: bigint, decimals: number): string => {
-    const divisor = BigInt(10 ** decimals);
-    const quotient = amount / divisor;
-    const remainder = amount % divisor;
-    
-    if (remainder === 0n) {
-      return quotient.toString();
-    }
-    
-    const remainderStr = remainder.toString().padStart(decimals, '0');
-    const trimmedRemainder = remainderStr.replace(/0+$/, '');
-    
-    if (trimmedRemainder === '') {
-      return quotient.toString();
-    }
-    
-    return `${quotient}.${trimmedRemainder}`;
-  }, []);
-
-
+  const {
+    writeContract,
+    data: approvalTxHash,
+    error: approvalError,
+    isPending: isApprovePending,
+  } = useWriteContract();
+  const { isLoading: isApprovalConfirming, isSuccess: isApprovalConfirmed } =
+    useWaitForTransactionReceipt({
+      hash: approvalTxHash,
+    });
 
   // Render markdown text with basic formatting
   const renderMarkdownText = useCallback((text: string): React.ReactNode => {
     if (!text) return null;
-    
+
     // Split by lines to handle line breaks
-    const lines = text.split('\n');
-    
+    const lines = text.split("\n");
+
     return lines.map((line, lineIndex) => {
-      if (line.trim() === '') {
+      if (line.trim() === "") {
         return <br key={lineIndex} />;
       }
-      
+
       // Handle bold text (**text**)
       const parts = line.split(/(\*\*.*?\*\*)/g);
-      
+
       return (
         <span key={lineIndex}>
           {parts.map((part, partIndex) => {
-            if (part.startsWith('**') && part.endsWith('**')) {
+            if (part.startsWith("**") && part.endsWith("**")) {
               // Bold text
               const boldText = part.slice(2, -2);
               return (
@@ -254,24 +174,53 @@ export function ActionsTab() {
   // Helper to detect if user is requesting plan creation
   const isPlanCreationRequest = useCallback((message: string): boolean => {
     const lowerMessage = message.toLowerCase();
-    
+
     // Keywords that indicate plan creation intent
     const planCreationKeywords = [
-      'create', 'start', 'set up', 'begin', 'initiate', 'establish',
-      'dca plan', 'investment plan', 'strategy', 'automated',
-      'buy', 'invest', 'purchase', 'dollar cost average'
+      "create",
+      "start",
+      "set up",
+      "begin",
+      "initiate",
+      "establish",
+      "dca plan",
+      "investment plan",
+      "strategy",
+      "automated",
+      "buy",
+      "invest",
+      "purchase",
+      "dollar cost average",
     ];
-    
+
     // Check if message contains plan creation keywords
-    const hasPlanKeywords = planCreationKeywords.some(keyword => 
+    const hasPlanKeywords = planCreationKeywords.some((keyword) =>
       lowerMessage.includes(keyword)
     );
-    
+
     // Also check for specific tokens and amounts (indicating concrete plan)
-    const hasTokenMentions = /(usdc|usdt|dai|eth|btc|arb|link|uni)\s+\d+/.test(lowerMessage);
-    const hasAmountMentions = /\$\d+|\d+\s*(usdc|usdt|dai|eth|btc|arb|link|uni)/i.test(lowerMessage);
-    
-    return hasPlanKeywords && (hasTokenMentions || hasAmountMentions);
+    const hasTokenMentions = /(usdc|usdt|dai|eth|btc|arb|link|uni)\s+\d+/.test(
+      lowerMessage
+    );
+    const hasAmountMentions =
+      /\$\d+|\d+\s*(usdc|usdt|dai|eth|btc|arb|link|uni)/i.test(lowerMessage);
+
+    // Check for frequency indicators
+    const hasFrequencyIndicators =
+      /(daily|weekly|monthly|hourly|every\s+\d+)/i.test(lowerMessage);
+
+    // Check for duration indicators
+    const hasDurationIndicators =
+      /(for\s+\d+|over\s+\d+|weeks?|months?|days?)/i.test(lowerMessage);
+
+    // Return true if we have plan keywords AND either specific details OR frequency/duration indicators
+    return (
+      hasPlanKeywords &&
+      (hasTokenMentions ||
+        hasAmountMentions ||
+        hasFrequencyIndicators ||
+        hasDurationIndicators)
+    );
   }, []);
 
   useEffect(() => {
@@ -299,22 +248,6 @@ export function ActionsTab() {
     // Auto-scroll on new messages or while loading
     scrollToBottom(true);
   }, [messages, isLoading]);
-
-  // Update current token balance when plan data changes - COMMENTED OUT
-  // useEffect(() => {
-  //   console.log('[Balance] Token balance updated:', {
-  //     tokenBalance: tokenBalance?.toString(),
-  //     isBalanceLoading,
-  //     currentPlanData: currentPlanData?.fromToken,
-  //     currentTokenInfo: currentTokenInfo,
-  //     address: address?.slice(0, 10) + '...',
-  //     enabled: !!currentTokenInfo?.address && !!address
-  //   });
-    
-  //   if (tokenBalance !== undefined) {
-  //     setCurrentTokenBalance(tokenBalance);
-  //   }
-  // }, [tokenBalance, isBalanceLoading, currentPlanData, currentTokenInfo, address]);
 
   useEffect(() => {
     // Update chat context when wallet connection changes
@@ -372,6 +305,12 @@ export function ActionsTab() {
     setIsLoading(true);
     scrollToBottom(false);
 
+    // Reset approval states when starting new conversation
+    setApprovalStatus("idle");
+    setPendingConfirmationId(null);
+    setCurrentPlanData(null);
+    setIsInPlanCreationFlow(false);
+    setIsApprovalLoading(false);
 
     try {
       // Set connecting status
@@ -379,7 +318,7 @@ export function ActionsTab() {
 
       // Determine if this is a plan creation request
       const isPlanRequest = isPlanCreationRequest(currentInput);
-      
+
       // Call our DCA chat API endpoint
       const response = await fetch("/api/dca-chat", {
         method: "POST",
@@ -406,6 +345,11 @@ export function ActionsTab() {
         setConnectionStatus("connected");
 
         const assistantMessageId = (Date.now() + 1).toString();
+
+        // Check if this is a plan confirmation response that already contains approval content
+        const isPlanConfirmationResponse =
+          result.action === "plan_confirmation_required";
+
         const assistantMessage: ChatMessage = {
           id: assistantMessageId,
           role: "assistant",
@@ -413,13 +357,26 @@ export function ActionsTab() {
             result.response ||
             "I received your message but had trouble generating a response.",
           timestamp: new Date(),
+          // If this is a plan confirmation response, mark it for DCA Chat API response:
+          ...(isPlanConfirmationResponse && result.data
+            ? {
+                requiresConfirmation: true,
+                confirmationId: `approve-${result.data.confirmationId}`,
+                confirmationData: result.data.planData,
+              }
+            : {}),
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
 
-        // Handle specific actions if provided
-        if (result.action) {
+        // Handle specific actions if provided (but skip plan_confirmation_required since we already handled it)
+        if (result.action && result.action !== "plan_confirmation_required") {
           handleChatAction(result.action, result.data, assistantMessageId);
+        }
+
+        // If this is a plan confirmation, set the flow state
+        if (isPlanConfirmationResponse) {
+          setIsInPlanCreationFlow(true);
         }
       } else {
         setConnectionStatus("error");
@@ -445,97 +402,82 @@ export function ActionsTab() {
   }, [inputMessage, isLoading, address, messages]);
 
   // --- Chat Action Handlers ---
-  const handleChatAction = useCallback((action: string, data?: any, messageId?: string) => {
-    console.log("Handling chat action:", action, data, messageId);
+  const handleChatAction = useCallback(
+    (action: string, data?: any, messageId?: string) => {
+      console.log("Handling chat action:", action, data, messageId);
 
-    switch (action) {
-      case "request_wallet_connection":
-        // Could trigger wallet connection modal or guide user
-        console.log("Action: Request wallet connection");
-        break;
+      switch (action) {
+        case "request_wallet_connection":
+          // Could trigger wallet connection modal or guide user
+          console.log("Action: Request wallet connection");
+          break;
 
-      case "plan_confirmation_required":
-        // Show confirmation UI for DCA plan creation - ONLY when we have complete plan data
-        console.log("Action: Plan confirmation required", data);
-        if (data?.confirmationId && data?.planData && messageId) {
-          // Validate that we have all required plan data
-          const planData = data.planData;
-          const requiredFields = ['fromToken', 'toToken', 'amount', 'intervalMinutes', 'durationWeeks', 'slippage'];
-          const hasAllRequiredFields = requiredFields.every(field => planData[field] !== undefined && planData[field] !== null);
-          
-          if (hasAllRequiredFields) {
-            console.log("Complete plan data received, showing confirmation flow");
-            setIsInPlanCreationFlow(true);
-            // Update the message to show confirmation state
-            setMessages(prev => prev.map(msg => 
-              msg.id === messageId 
-                ? { 
-                    ...msg, 
-                    requiresConfirmation: true, 
-                    confirmationId: data.confirmationId, 
-                    confirmationData: data.planData 
-                  }
-                : msg
-            ));
-          } else {
-            console.log("Incomplete plan data, not showing confirmation yet");
-            // Don't show confirmation if data is incomplete
-          }
-        }
-        break;
+        case "plan_confirmation_required":
+          // This case is now handled directly in the API response processing
+          // to prevent duplicate approval messages
+          console.log(
+            "Action: Plan confirmation required - handled in response processing"
+          );
+          break;
 
-      case "plan_created":
-      case "plan_confirmed":
-        // Plan was successfully created
-        console.log("Action: Plan created/confirmed successfully");
-        break;
+        case "plan_created":
+        case "plan_confirmed":
+          // Plan was successfully created
+          console.log("Action: Plan created/confirmed successfully");
+          break;
 
-      case "action_cancelled":
-        // User cancelled the action
-        console.log("Action: Action cancelled by user");
-        break;
+        case "action_cancelled":
+          // User cancelled the action
+          console.log("Action: Action cancelled by user");
+          break;
 
-      case "approval_required":
-        // Token approval required
-        console.log("Action: Token approval required", data);
-        break;
+        case "approval_required":
+          // Token approval required
+          console.log("Action: Token approval required", data);
+          break;
 
-      case "show_plans":
-        // Could display plans in a structured format or table
-        console.log("Action: Show user plans", data);
-        break;
+        case "show_plans":
+          // Could display plans in a structured format or table
+          console.log("Action: Show user plans", data);
+          break;
 
-      case "show_stats":
-        // Could display stats in a chart or structured format
-        console.log("Action: Show platform stats", data);
-        break;
+        case "show_stats":
+          // Could display stats in a chart or structured format
+          console.log("Action: Show platform stats", data);
+          break;
 
-      case "execution_triggered":
-        // Could show transaction status or redirect to transaction view
-        console.log("Action: DCA execution triggered");
-        break;
+        case "execution_triggered":
+          // Could show transaction status or redirect to transaction view
+          console.log("Action: DCA execution triggered");
+          break;
 
-      case "plan_paused":
-      case "plan_resumed":
-        // Could show confirmation message
-        console.log("Action: Plan status changed");
-        break;
+        case "plan_paused":
+        case "plan_resumed":
+          // Could show confirmation message
+          console.log("Action: Plan status changed");
+          break;
 
-      default:
-        console.log("Unknown action:", action);
-    }
-  }, []);
+        default:
+          console.log("Unknown action:", action);
+      }
+    },
+    []
+  );
 
   // Handle approval transaction success
   useEffect(() => {
     if (isApprovalConfirmed && approvalTxHash && pendingConfirmationId) {
-      setApprovalStatus('approved');
-      
+      setApprovalStatus("approved");
+      setIsApprovalLoading(false);
+
       // Add success message with transaction hash and copy functionality
       const approvalMessage: ChatMessage = {
         id: Date.now().toString(),
-        role: "assistant", 
-        content: `✅ Token approval confirmed!\n\n**Transaction Hash:** ${approvalTxHash.slice(0, 10)}...${approvalTxHash.slice(-8)}\n\nNow creating your DCA plan...`,
+        role: "assistant",
+        content: `✅ Token approval confirmed!\n\n**Transaction Hash:** ${approvalTxHash.slice(
+          0,
+          10
+        )}...${approvalTxHash.slice(-8)}\n\nNow creating your DCA plan...`,
         timestamp: new Date(),
         // Add transaction hash data for copy functionality
         transactionHash: approvalTxHash,
@@ -551,19 +493,21 @@ export function ActionsTab() {
   // Handle approval error
   useEffect(() => {
     if (approvalError) {
-      setApprovalStatus('error');
+      setApprovalStatus("error");
       setPendingConfirmationId(null);
-      
+      setIsApprovalLoading(false);
+
       // Check if it's a user rejection (MetaMask cancellation)
-      const isUserRejection = approvalError.message.includes('User rejected') || 
-                             approvalError.message.includes('User denied') ||
-                             approvalError.message.includes('cancelled') ||
-                             approvalError.message.includes('rejected');
-      
+      const isUserRejection =
+        approvalError.message.includes("User rejected") ||
+        approvalError.message.includes("User denied") ||
+        approvalError.message.includes("cancelled") ||
+        approvalError.message.includes("rejected");
+
       const errorMessage: ChatMessage = {
         id: Date.now().toString(),
         role: "assistant",
-        content: isUserRejection 
+        content: isUserRejection
           ? "❌ Token approval was cancelled. No plan was created.\n\nYou can try creating the plan again when you're ready."
           : `❌ Token approval failed: ${approvalError.message}\n\nYou need to approve token spending to create the DCA plan. Please try again.`,
         timestamp: new Date(),
@@ -571,347 +515,255 @@ export function ActionsTab() {
       setMessages((prev) => [...prev, errorMessage]);
       setIsLoading(false);
       setCurrentPlanData(null);
+      setIsInPlanCreationFlow(false);
+      setConfirmationStep("summary");
     }
   }, [approvalError]);
 
   // Proceed with plan creation after approval
-  const proceedWithPlanCreation = useCallback(async (confirmationId: string) => {
-    try {
-      console.log('[Confirmation] Creating plan after approval:', confirmationId);
-      
-      // Add loading message for plan creation
-      const loadingMessage: ChatMessage = {
-        id: Date.now().toString(),
-        role: "assistant",
-        content: "🔄 Creating your DCA plan...",
-        timestamp: new Date(),
-        isCreatingPlan: true,
-      };
-      setMessages((prev) => [...prev, loadingMessage]);
-      
-      // Call the API with confirmation
-      const response = await fetch("/api/dca-chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: "", // Empty message for confirmation actions
-          userAddress: address,
-          confirmationId: confirmationId,
-          action: "confirm",
-        }),
-      });
+  const proceedWithPlanCreation = useCallback(
+    async (confirmationId: string) => {
+      try {
+        console.log(
+          "[Confirmation] Creating plan after approval:",
+          confirmationId
+        );
 
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-
-      const result = await response.json();
-      console.log("Plan confirmation response:", result);
-      console.log("Actual response content:", result.response);
-
-      if (result.success) {
-        // Remove loading message and show success
-        setMessages((prev) => prev.filter(msg => !msg.isCreatingPlan));
-        
-        // Show the actual response from the backend/SSE
-        const confirmationMessage: ChatMessage = {
+        // Add loading message for plan creation
+        const loadingMessage: ChatMessage = {
           id: Date.now().toString(),
           role: "assistant",
-          content: result.response || "🎉 DCA plan created successfully!\n\nYour automated investment strategy is now active and will execute according to your schedule.",
+          content: "🔄 Creating your DCA plan...",
+          timestamp: new Date(),
+          isCreatingPlan: true,
+        };
+        setMessages((prev) => [...prev, loadingMessage]);
+
+        // Call the API with confirmation
+        const response = await fetch("/api/dca-chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            message: "", // Empty message for confirmation actions
+            userAddress: address,
+            confirmationId: confirmationId,
+            action: "confirm",
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log("Plan confirmation response:", result);
+        console.log("Actual response content:", result.response);
+
+        if (result.success) {
+          // Remove loading message and show success
+          setMessages((prev) => prev.filter((msg) => !msg.isCreatingPlan));
+
+          // Show the actual response from the backend/SSE
+          const confirmationMessage: ChatMessage = {
+            id: Date.now().toString(),
+            role: "assistant",
+            content:
+              result.response ||
+              "🎉 DCA plan created successfully!\n\nYour automated investment strategy is now active and will execute according to your schedule.",
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, confirmationMessage]);
+
+          // Handle action response
+          if (result.action) {
+            handleChatAction(result.action, result.data);
+          }
+        } else {
+          throw new Error(result.error || "Failed to create plan");
+        }
+      } catch (error) {
+        console.error("Error creating plan:", error);
+
+        // Remove loading message
+        setMessages((prev) => prev.filter((msg) => !msg.isCreatingPlan));
+
+        const errorMessage: ChatMessage = {
+          id: Date.now().toString(),
+          role: "assistant",
+          content:
+            "❌ Sorry, I encountered an error while creating your plan. Please try again.",
           timestamp: new Date(),
         };
-        setMessages((prev) => [...prev, confirmationMessage]);
-
-        // Handle action response
-        if (result.action) {
-          handleChatAction(result.action, result.data);
-        }
-      } else {
-        throw new Error(result.error || "Failed to create plan");
+        setMessages((prev) => [...prev, errorMessage]);
+      } finally {
+        setIsLoading(false);
+        setIsApprovalLoading(false);
+        setApprovalStatus("idle");
+        setCurrentPlanData(null);
+        setIsInPlanCreationFlow(false);
+        setPendingConfirmationId(null);
+        setConfirmationStep("summary");
       }
-    } catch (error) {
-      console.error("Error creating plan:", error);
-      
-      // Remove loading message
-      setMessages((prev) => prev.filter(msg => !msg.isCreatingPlan));
-      
-      const errorMessage: ChatMessage = {
-        id: Date.now().toString(),
-        role: "assistant",
-        content: "❌ Sorry, I encountered an error while creating your plan. Please try again.",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-      setApprovalStatus('idle');
-      setCurrentPlanData(null);
-      setIsInPlanCreationFlow(false);
-    }
-  }, [address, handleChatAction]);
+    },
+    [address, handleChatAction]
+  );
 
   // Start approval process after user confirms the plan summary
-  const startApprovalProcess = useCallback(async (confirmationId: string, planData: any) => {
-    const tokenInfo = getTokenInfo(planData.fromToken);
-    if (!tokenInfo) {
-      console.error('Unsupported token:', planData.fromToken);
-      return;
-    }
-
-    try {
-      const totalExecutions = Math.floor((planData.durationWeeks * 7 * 24 * 60) / planData.intervalMinutes);
-      const totalAmount = parseFloat(planData.amount) * totalExecutions;
-
-      // Show approval request message
-      const approvalMessage: ChatMessage = {
-        id: Date.now().toString(),
-        role: "assistant",
-        content: `🔐 **Requesting Token Approval**\n\nPlease check your wallet and approve spending of ${totalAmount.toFixed(6)} ${planData.fromToken} tokens. This allows our contract to execute your DCA plan automatically.\n\n*Check your wallet popup...*`,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, approvalMessage]);
-
-      setConfirmationStep('approval');
-      setApprovalStatus('approving');
-      setPendingConfirmationId(confirmationId);
-
-      console.log('[Approval] Starting token approval process:', {
-        token: tokenInfo.symbol,
-        amount: totalAmount,
-        totalExecutions,
-      });
-
-      // Trigger wallet approval popup  
-      writeContract({
-        address: tokenInfo.address as `0x${string}`,
-        abi: ERC20_ABI,
-        functionName: 'approve',
-        args: [EXECUATOR_ADDRESS as `0x${string}`, maxUint256],
-        chainId: arbitrum.id,
-      });
-
-    } catch (error) {
-      console.error("Error starting approval process:", error);
-      
-      const errorMessage: ChatMessage = {
-        id: Date.now().toString(),
-        role: "assistant",
-        content: "❌ Failed to start token approval process. Please try again.",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-      setApprovalStatus('idle');
-    }
-  }, [writeContract]);
-
-  // --- Confirmation Handlers ---
-  const handleConfirmPlan = useCallback(async (confirmationId: string) => {
-    if (!confirmationId || !address) return;
-    
-    setIsLoading(true);
-    
-    // First, get the confirmation data to show plan summary
-    const confirmationMessage = messages.find(msg => msg.confirmationId === confirmationId);
-    const planData = confirmationMessage?.confirmationData;
-    
-    if (!planData) {
-      console.error('No plan data found for confirmation');
-      setIsLoading(false);
-      return;
-    }
-
-    const tokenInfo = getTokenInfo(planData.fromToken);
-    if (!tokenInfo) {
-      console.error('Unsupported token:', planData.fromToken);
-      const errorMessage: ChatMessage = {
-        id: Date.now().toString(),
-        role: "assistant",
-        content: `❌ Unsupported token: ${planData.fromToken}. Please choose a different token.`,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-      setIsLoading(false);
-      return;
-    }
-
-        // Set current plan data for balance checking - COMMENTED OUT
-    // setCurrentPlanData(planData);
-
-    // Wait for balance to load, then check - COMMENTED OUT
-    // let retryCount = 0;
-    // const maxRetries = 15; // 15 seconds max wait
-    
-    // const checkBalance = () => {
-    //   console.log("[Balance] Check attempt", retryCount + 1, "of", maxRetries);
-    //   console.log("[Balance] Current state:", {
-    //     isBalanceLoading,
-    //     tokenBalance: tokenBalance?.toString(),
-    //     currentTokenInfo,
-    //     address: address?.slice(0, 10) + '...'
-    //   });
-      
-    //   if (isBalanceLoading && retryCount < maxRetries) {
-    //     // Still loading, wait a bit more
-    //     retryCount++;
-    //     setTimeout(checkBalance, 1000);
-    //     return;
-    //   }
-      
-    //   if (retryCount >= maxRetries) {
-    //     // Timeout reached
-    //     const errorMessage: ChatMessage = {
-    //       id: Date.now().toString(),
-    //       role: "assistant",
-    //       content: "❌ **Balance check timeout**\n\nUnable to fetch your token balance. Please ensure your wallet is connected and try again.",
-    //       timestamp: new Date(),
-    //     };
-    //     setMessages((prev) => [...prev, errorMessage]);
-    //     setIsLoading(false);
-    //     setCurrentPlanData(null);
-    //     return;
-    //   }
-      
-    //   const balanceCheck = checkSufficientBalance(planData);
-    //   console.log("[Balance] Balance check result:", balanceCheck);
-      
-    //   if (balanceCheck.message === "Unable to fetch balance" || balanceCheck.message === "Checking balance...") {
-    //     // Balance still not available, retry
-    //     retryCount++;
-    //     setTimeout(checkBalance, 1000);
-    //     return;
-    //   }
-        
-    //     if (!balanceCheck.sufficient) {
-    //       const errorMessage: ChatMessage = {
-    //         id: Date.now().toString(),
-    //         role: "assistant",
-    //         content: `❌ **Insufficient Balance**\n\n${balanceCheck.message}\n\nPlease ensure you have enough ${planData.fromToken} tokens before creating this plan.`,
-    //         timestamp: new Date(),
-    //       };
-    //       setMessages((prev) => [...prev, errorMessage]);
-    //       setIsLoading(false);
-    //       setCurrentPlanData(null);
-    //       return;
-    //     }
-
-    // Calculate total investment details for summary
-    const totalExecutions = Math.floor((planData.durationWeeks * 7 * 24 * 60) / planData.intervalMinutes);
-    const totalAmount = parseFloat(planData.amount) * totalExecutions;
-    
-    const frequencyText = planData.intervalMinutes === 60 ? 'hourly' :
-                         planData.intervalMinutes === 1440 ? 'daily' :
-                         planData.intervalMinutes === 10080 ? 'weekly' :
-                         planData.intervalMinutes === 43200 ? 'monthly' :
-                         `every ${planData.intervalMinutes} minutes`;
-    
-    const durationText = planData.durationWeeks === 1 ? '1 week' :
-                        planData.durationWeeks === 4 ? '1 month' :
-                        planData.durationWeeks === 52 ? '1 year' :
-                        `${planData.durationWeeks} weeks`;
-
-    // Show plan summary WITHOUT balance confirmation
-    const summaryMessage: ChatMessage = {
-      id: `summary-${Date.now()}`,
-      role: "assistant",
-      content: `📊 **Investment Plan Summary**\n\n` +
-              `• **Investment Amount:** ${planData.amount} ${planData.fromToken} per execution\n` +
-              `• **Target Token:** ${planData.toToken}\n` +
-              `• **Frequency:** ${frequencyText}\n` +
-              `• **Duration:** ${durationText}\n` +
-              `• **Total Executions:** ${totalExecutions}\n` +
-              `• **Total Investment:** ${totalAmount.toFixed(6)} ${planData.fromToken}\n` +
-              `• **Slippage:** ${planData.slippage/100}%\n\n` +
-              `⚠️ **Important:** This will create an automated investment plan that will execute transactions from your wallet. Please review the details carefully.\n\n` +
-              `Ready to proceed with token approval?`,
-      timestamp: new Date(),
-      requiresConfirmation: true,
-      confirmationId: `approve-${confirmationId}`,
-      confirmationData: planData,
-    };
-    
-    setMessages((prev) => [...prev, summaryMessage]);
-    setConfirmationStep('summary');
-    setIsLoading(false);
-    
-    // Start checking balance - COMMENTED OUT
-    // checkBalance();
-  }, [address, messages]);
-
-  // Handle the approve confirmation (after summary)
-  const handleApproveConfirm = useCallback(async (confirmationId: string) => {
-    const originalConfirmationId = confirmationId.replace('approve-', '');
-    const confirmationMessage = messages.find(msg => msg.confirmationId === originalConfirmationId);
-    const planData = confirmationMessage?.confirmationData;
-    
-    if (planData) {
-      await startApprovalProcess(originalConfirmationId, planData);
-    }
-  }, [messages, startApprovalProcess]);
-
-  const handleCancelPlan = useCallback(async (confirmationId: string) => {
-    if (!confirmationId) return;
-    
-    setIsLoading(true);
-    
-    try {
-      console.log('[Confirmation] Cancelling plan creation:', confirmationId);
-      
-      // Call the API with cancellation
-      const response = await fetch("/api/dca-chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: "", // Empty message for confirmation actions
-          userAddress: address,
-          confirmationId: confirmationId,
-          action: "cancel",
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+  const startApprovalProcess = useCallback(
+    async (confirmationId: string, planData: any) => {
+      const tokenInfo = getTokenInfo(planData.fromToken);
+      if (!tokenInfo) {
+        console.error("Unsupported token:", planData.fromToken);
+        return;
       }
 
-      const result = await response.json();
-      console.log("Plan cancellation response:", result);
+      try {
+        const totalExecutions = Math.floor(
+          (planData.durationWeeks * 7 * 24 * 60) / planData.intervalMinutes
+        );
+        const totalAmount = parseFloat(planData.amount) * totalExecutions;
 
-      if (result.success) {
-        const cancellationMessage: ChatMessage = {
+        // Show approval request message
+        const approvalMessage: ChatMessage = {
           id: Date.now().toString(),
           role: "assistant",
-          content: result.response || "✅ Action cancelled successfully. No DCA plan was created.",
+          content: `🔐 **Requesting Token Approval**\n\nPlease check your wallet and approve spending of ${totalAmount.toFixed(
+            6
+          )} ${
+            planData.fromToken
+          } tokens. This allows our contract to execute your DCA plan automatically.\n\n*Check your wallet popup...*`,
           timestamp: new Date(),
         };
-        setMessages((prev) => [...prev, cancellationMessage]);
+        setMessages((prev) => [...prev, approvalMessage]);
 
-        // Handle action response
-        if (result.action) {
-          handleChatAction(result.action, result.data);
-        }
-      } else {
-        throw new Error(result.error || "Failed to cancel");
+        setConfirmationStep("approval");
+        setApprovalStatus("approving");
+        setPendingConfirmationId(confirmationId);
+        setIsApprovalLoading(true);
+
+        console.log("[Approval] Starting token approval process:", {
+          token: tokenInfo.symbol,
+          amount: totalAmount,
+          totalExecutions,
+        });
+
+        // Trigger wallet approval popup
+        writeContract({
+          address: tokenInfo.address as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: "approve",
+          args: [EXECUATOR_ADDRESS as `0x${string}`, maxUint256],
+          chainId: arbitrum.id,
+        });
+      } catch (error) {
+        console.error("Error starting approval process:", error);
+
+        const errorMessage: ChatMessage = {
+          id: Date.now().toString(),
+          role: "assistant",
+          content:
+            "❌ Failed to start token approval process. Please try again.",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+        setApprovalStatus("idle");
       }
-    } catch (error) {
-      console.error("Error cancelling plan:", error);
-      
-      const errorMessage: ChatMessage = {
-        id: Date.now().toString(),
-        role: "assistant",
-        content: "✅ Action cancelled locally. No DCA plan was created.",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-      setCurrentPlanData(null);
-      setApprovalStatus('idle');
-      setIsInPlanCreationFlow(false);
-    }
-  }, [address, handleChatAction]);
+    },
+    [writeContract]
+  );
+
+  // --- Confirmation Handlers ---
+  // Note: handleConfirmPlan is no longer needed since we show approval directly for plan creation requests
+
+  // Handle the approve confirmation (after summary)
+  const handleApproveConfirm = useCallback(
+    async (confirmationId: string) => {
+      const originalConfirmationId = confirmationId.replace("approve-", "");
+      const confirmationMessage = messages.find(
+        (msg) => msg.confirmationId === confirmationId
+      );
+      const planData = confirmationMessage?.confirmationData;
+
+      if (planData) {
+        setIsApprovalLoading(true);
+        await startApprovalProcess(originalConfirmationId, planData);
+      }
+    },
+    [messages, startApprovalProcess]
+  );
+
+  const handleCancelPlan = useCallback(
+    async (confirmationId: string) => {
+      if (!confirmationId) return;
+
+      setIsLoading(true);
+
+      try {
+        console.log("[Confirmation] Cancelling plan creation:", confirmationId);
+
+        // Call the API with cancellation
+        const response = await fetch("/api/dca-chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            message: "", // Empty message for confirmation actions
+            userAddress: address,
+            confirmationId: confirmationId,
+            action: "cancel",
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log("Plan cancellation response:", result);
+
+        if (result.success) {
+          const cancellationMessage: ChatMessage = {
+            id: Date.now().toString(),
+            role: "assistant",
+            content:
+              result.response ||
+              "✅ Action cancelled successfully. No DCA plan was created.",
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, cancellationMessage]);
+
+          // Handle action response
+          if (result.action) {
+            handleChatAction(result.action, result.data);
+          }
+        } else {
+          throw new Error(result.error || "Failed to cancel");
+        }
+      } catch (error) {
+        console.error("Error cancelling plan:", error);
+
+        const errorMessage: ChatMessage = {
+          id: Date.now().toString(),
+          role: "assistant",
+          content: "✅ Action cancelled locally. No DCA plan was created.",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+      } finally {
+        setIsLoading(false);
+        setIsApprovalLoading(false);
+        setCurrentPlanData(null);
+        setApprovalStatus("idle");
+        setIsInPlanCreationFlow(false);
+        setPendingConfirmationId(null);
+        setConfirmationStep("summary");
+      }
+    },
+    [address, handleChatAction]
+  );
 
   const generateAssistantResponse = (userInput: string): string => {
     const lowerInput = userInput.toLowerCase();
@@ -1028,13 +880,6 @@ export function ActionsTab() {
    * This function calls the haptics.impactOccurred method with the current
    * selectedHapticIntensity setting. It handles errors gracefully by logging them.
    */
-  const triggerHapticFeedback = useCallback(async () => {
-    try {
-      await haptics.impactOccurred(selectedHapticIntensity);
-    } catch (error) {
-      console.error("Haptic feedback failed:", error);
-    }
-  }, [haptics, selectedHapticIntensity]);
 
   // --- Render ---
   return (
@@ -1063,33 +908,42 @@ export function ActionsTab() {
         {/* Address pill */}
         <div className="flex-shrink-0 flex justify-end p-3 pb-2">
           <div className="px-3 py-1.5 rounded-full bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 border border-[#c199e4]/30 text-xs font-mono text-white/90 shadow-sm flex items-center gap-2">
-            <svg className="w-3.5 h-3.5 text-[#c199e4]" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
+            <svg
+              className="w-3.5 h-3.5 text-[#c199e4]"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden
+            >
               <path d="M12 12c2.761 0 5-2.239 5-5s-2.239-5-5-5-5 2.239-5 5 2.239 5 5 5zm0 2c-3.866 0-7 3.134-7 7h2c0-2.761 2.239-5 5-5s5 2.239 5 5h2c0-3.866-3.134-7-7-7z" />
             </svg>
-            {address ? formatAddress(address) : 'Not Connected'}
+            {address ? formatAddress(address) : "Not Connected"}
           </div>
         </div>
 
         {/* Chat Messages - Scrollable */}
-        <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-3"
-          style={{ 
-            scrollbarWidth: 'thin',
-            scrollbarColor: '#c199e4 transparent'
+        <div
+          className="flex-1 overflow-y-auto px-3 pb-4 space-y-3"
+          style={{
+            scrollbarWidth: "thin",
+            scrollbarColor: "#c199e4 transparent",
           }}
         >
-
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`flex items-start gap-1.5 ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
+              className={`flex items-start gap-1.5 ${
+                message.role === "user" ? "flex-row-reverse" : "flex-row"
+              }`}
             >
               {/* Avatar Icon */}
-              <div className={`flex-shrink-0 size-6 rounded-full flex items-center justify-center ${
-                message.role === 'user' 
-                  ? 'bg-gradient-to-br from-[#c199e4] to-[#b380db]' 
-                  : 'bg-gradient-to-br from-white/20 to-white/10 border border-white/30'
-              }`}>
-                {message.role === 'user' ? (
+              <div
+                className={`flex-shrink-0 size-6 rounded-full flex items-center justify-center ${
+                  message.role === "user"
+                    ? "bg-gradient-to-br from-[#c199e4] to-[#b380db]"
+                    : "bg-gradient-to-br from-white/20 to-white/10 border border-white/30"
+                }`}
+              >
+                {message.role === "user" ? (
                   <IoPersonCircle className="size-4 text-white" />
                 ) : (
                   <RiRobot2Fill className="size-3.5 text-[#c199e4]" />
@@ -1099,9 +953,9 @@ export function ActionsTab() {
               {/* Message Content */}
               <div
                 className={`rounded-2xl px-3 py-3 ${
-                  message.role === 'user'
-                    ? 'max-w-[75%] bg-gradient-to-br from-[#c199e4] to-[#b380db] text-white shadow-lg'
-                    : 'bg-gradient-to-br from-white/15 to-white/10 backdrop-blur-sm text-white border border-white/20'
+                  message.role === "user"
+                    ? "max-w-[75%] bg-gradient-to-br from-[#c199e4] to-[#b380db] text-white shadow-lg"
+                    : "bg-gradient-to-br from-white/15 to-white/10 backdrop-blur-sm text-white border border-white/20"
                 }`}
               >
                 <div className="text-sm leading-relaxed">
@@ -1109,12 +963,18 @@ export function ActionsTab() {
                   {message.isCreatingPlan && (
                     <div className="mt-2 flex space-x-1">
                       <div className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div
+                        className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce"
+                        style={{ animationDelay: "0.1s" }}
+                      ></div>
+                      <div
+                        className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce"
+                        style={{ animationDelay: "0.2s" }}
+                      ></div>
                     </div>
                   )}
                 </div>
-                
+
                 {/* Copy Transaction Hash Button */}
                 {message.transactionHash && (
                   <div className="mt-2 flex items-center gap-2">
@@ -1125,65 +985,121 @@ export function ActionsTab() {
                       }}
                       className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                     >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                      <svg
+                        className="w-3 h-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
+                        />
                       </svg>
                       Copy Full Hash
                     </button>
                   </div>
                 )}
-                
+
                 {/* Confirmation Buttons */}
                 {message.requiresConfirmation && message.confirmationId && (
                   <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                     <div className="flex gap-2 justify-center">
                       <button
                         onClick={() => {
-                          if (message.confirmationId?.startsWith('approve-')) {
+                          if (message.confirmationId?.startsWith("approve-")) {
                             handleApproveConfirm(message.confirmationId);
                           } else {
-                            handleConfirmPlan(message.confirmationId as string);
+                            // This case should ideally not be reached for plan creation requests
+                            // but as a fallback, we can call handleConfirmPlan if it were still here
+                            // For now, we'll just show the cancel button
+                            handleCancelPlan(message.confirmationId as string);
                           }
                         }}
-                        disabled={isLoading || isApprovePending || isApprovalConfirming}
+                        disabled={
+                          isLoading ||
+                          isApprovalLoading ||
+                          isApprovePending ||
+                          isApprovalConfirming
+                        }
                         className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
                       >
-                        {(isApprovePending || isApprovalConfirming) ? (
+                        {isApprovePending || isApprovalConfirming ? (
                           <>
                             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            {isApprovePending ? "Wallet Approval..." : "Confirming Approval..."}
+                            {isApprovePending
+                              ? "Wallet Approval..."
+                              : "Confirming Approval..."}
+                          </>
+                        ) : isApprovalLoading ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            {message.confirmationId?.startsWith("approve-")
+                              ? "Starting Approval..."
+                              : "Creating Plan..."}
                           </>
                         ) : isLoading ? (
                           <>
                             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            {message.confirmationId?.startsWith('approve-') ? 'Starting Approval...' : 'Creating Plan...'}
+                            &apos;Processing...&apos;
                           </>
                         ) : (
                           <>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M5 13l4 4L19 7"
+                              />
                             </svg>
-                            {message.confirmationId?.startsWith('approve-') ? 'Proceed with Approval' : 'Review Plan Details'}
+                            {message.confirmationId?.startsWith("approve-")
+                              ? "Proceed with Approval"
+                              : "Review Plan Details"}
                           </>
                         )}
                       </button>
                       <button
-                        onClick={() => handleCancelPlan(message.confirmationId!)}
-                        disabled={isLoading || isApprovePending || isApprovalConfirming}
+                        onClick={() =>
+                          handleCancelPlan(message.confirmationId!)
+                        }
+                        disabled={
+                          isLoading ||
+                          isApprovalLoading ||
+                          isApprovePending ||
+                          isApprovalConfirming
+                        }
                         className="flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
                         </svg>
                         Cancel
                       </button>
                     </div>
                   </div>
                 )}
-                
+
                 <div
                   className={`text-xs mt-1 ${
-                    message.role === 'user' ? 'text-white/80' : 'text-white/60'
+                    message.role === "user" ? "text-white/80" : "text-white/60"
                   }`}
                 >
                   {message.timestamp.toLocaleTimeString([], {
@@ -1201,8 +1117,14 @@ export function ActionsTab() {
               <div className="max-w-[85%] bg-gradient-to-br from-white/15 to-white/10 backdrop-blur-sm border border-white/20 rounded-2xl px-4 py-3">
                 <div className="flex space-x-1">
                   <div className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div
+                    className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce"
+                    style={{ animationDelay: "0.1s" }}
+                  ></div>
+                  <div
+                    className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce"
+                    style={{ animationDelay: "0.2s" }}
+                  ></div>
                 </div>
               </div>
             </div>
@@ -1221,25 +1143,25 @@ export function ActionsTab() {
           {/* Quick Action Buttons */}
           <div className="flex flex-wrap gap-2 mb-2">
             <button
-              onClick={() => setInputMessage('Show my DCA plans')}
+              onClick={() => setInputMessage("Show my DCA plans")}
               className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
             >
               My Plans
             </button>
             <button
-              onClick={() => setInputMessage('Create a new DCA strategy')}
+              onClick={() => setInputMessage("Create a new DCA strategy")}
               className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
             >
               Create Plan
             </button>
             <button
-              onClick={() => setInputMessage('Platform statistics')}
+              onClick={() => setInputMessage("Platform statistics")}
               className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
             >
               Stats
             </button>
             <button
-              onClick={() => setInputMessage('Help me understand DCA')}
+              onClick={() => setInputMessage("Help me understand DCA")}
               className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
             >
               Help
@@ -1249,15 +1171,19 @@ export function ActionsTab() {
           {/* Connection Status Indicator */}
           {connectionStatus && (
             <div className="flex items-center gap-2 mb-1 text-xs">
-              <div className={`w-2 h-2 rounded-full ${
-                connectionStatus === 'connected' ? 'bg-green-400' : 
-                connectionStatus === 'connecting' ? 'bg-yellow-400 animate-pulse' : 
-                'bg-red-400'
-              }`} />
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  connectionStatus === "connected"
+                    ? "bg-green-400"
+                    : connectionStatus === "connecting"
+                    ? "bg-yellow-400 animate-pulse"
+                    : "bg-red-400"
+                }`}
+              />
               <span className="text-white/70">
-                {connectionStatus === 'connected' && 'Connected to DCA Backend'}
-                {connectionStatus === 'connecting' && 'Connecting...'}
-                {connectionStatus === 'error' && 'Connection Error'}
+                {connectionStatus === "connected" && "Connected to DCA Backend"}
+                {connectionStatus === "connecting" && "Connecting..."}
+                {connectionStatus === "error" && "Connection Error"}
               </span>
             </div>
           )}
@@ -1279,18 +1205,18 @@ export function ActionsTab() {
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
+                  if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
                     handleSendMessage();
                   }
                 }}
                 onFocus={handleInputFocus}
                 placeholder={
-                  isInPlanCreationFlow 
-                    ? "Review the plan details above and click 'Review Plan Details' to proceed..." 
-                    : isConnected 
-                      ? "Ask me anything about DCA investing..." 
-                      : "Connect wallet first, then ask about DCA strategies"
+                  isInPlanCreationFlow
+                    ? "Review the plan details above and click 'Review Plan Details' to proceed..."
+                    : isConnected
+                    ? "Ask me anything about DCA investing..."
+                    : "Connect wallet first, then ask about DCA strategies"
                 }
                 className="w-full px-4 py-1.5 border border-white/30 rounded-2xl bg-white/10 backdrop-blur-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-[#c199e4]/50 focus:border-[#c199e4]/50 transition-all duration-300"
                 style={{ minHeight: 44 }}
@@ -1298,11 +1224,11 @@ export function ActionsTab() {
             </div>
             <button
               onClick={handleSendMessage}
-              disabled={!inputMessage.trim() || isLoading}
+              disabled={!inputMessage.trim() || isLoading || isApprovalLoading}
               className="h-11 w-11 p-0 bg-gradient-to-br from-[#c199e4] to-[#b380db] hover:from-[#d9b3ed] hover:to-[#c199e4] disabled:from-white/20 disabled:to-white/10 disabled:cursor-not-allowed text-white rounded-2xl transition-all duration-300 flex items-center justify-center shadow-lg backdrop-blur-sm"
               aria-label="Send message"
             >
-              {isLoading ? (
+              {isLoading || isApprovalLoading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <svg
@@ -1323,7 +1249,6 @@ export function ActionsTab() {
           </div>
         </div>
       </div>
-
 
       {/* Original Actions (Commented out for now) */}
       {/*

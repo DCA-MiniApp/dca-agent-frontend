@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Check } from "lucide-react";
 
@@ -18,12 +18,73 @@ const options = [
 
 export function StatusSelect({ value, onChange }: StatusSelectProps) {
   const [open, setOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState<'bottom' | 'top'>('bottom');
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const selectedLabel =
     options.find((opt) => opt.value === value)?.label || "Select Status";
 
+  // Calculate dropdown position to avoid overlapping
+  useEffect(() => {
+    if (open && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+      const dropdownHeight = 200; // Approximate dropdown height
+      
+      // Check if there's enough space below
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      
+      // Check horizontal positioning
+      const spaceRight = viewportWidth - rect.left;
+      const spaceLeft = rect.left;
+      
+      // Determine vertical position
+      if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+        setDropdownPosition('top');
+      } else {
+        setDropdownPosition('bottom');
+      }
+      
+      // Adjust horizontal position if needed
+      if (rect.left + rect.width > viewportWidth - 20) {
+        // If dropdown would overflow right edge, adjust positioning
+        const container = containerRef.current;
+        if (container) {
+          container.style.position = 'relative';
+        }
+      }
+    }
+  }, [open]);
+
+  // Close dropdown when clicking outside and handle resize
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    const handleResize = () => {
+      if (open) {
+        setOpen(false);
+      }
+    };
+
+    if (open) {
+      document.addEventListener('mousedown', handleClickOutside);
+      window.addEventListener('resize', handleResize);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [open]);
+
   return (
-    <div className="relative w-full z-[1000]">
+    <div className="relative w-full z-[99999]" ref={containerRef}>
       {/* Trigger */}
       <button
         type="button"
@@ -44,12 +105,19 @@ export function StatusSelect({ value, onChange }: StatusSelectProps) {
       <AnimatePresence>
         {open && (
           <motion.ul
-            initial={{ opacity: 0, y: -5 }}
+            initial={{ opacity: 0, y: dropdownPosition === 'bottom' ? -5 : 5 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -5 }}
+            exit={{ opacity: 0, y: dropdownPosition === 'bottom' ? -5 : 5 }}
             transition={{ duration: 0.15 }}
-            className="absolute left-0 top-full z-[1001] mt-2 w-full max-h-56 overflow-auto 
-            bg-black/95 rounded-2xl border border-white/15 hover:border-[#c199e4]/40 shadow-2xl ring-1 ring-black/50 divide-y divide-white/10 backdrop-blur-lg"
+            className={`absolute w-full max-h-56 overflow-auto 
+            bg-black/95 rounded-2xl border border-white/15 hover:border-[#c199e4]/40 shadow-2xl ring-1 ring-black/50 divide-y divide-white/10 backdrop-blur-lg z-[99999]
+            ${dropdownPosition === 'bottom' ? 'top-full mt-2' : 'bottom-full mb-2'}`}
+            style={{
+              maxWidth: 'calc(100vw - 2rem)',
+              minWidth: '200px',
+              left: '0',
+              right: '0',
+            }}
           >
             <li className="sticky top-0 z-[1] px-3 py-2 text-[11px] uppercase tracking-wide text-white/70 bg-black/90 flex justify-between items-center">
               <span>FILTER STATUS</span>

@@ -7,35 +7,35 @@ import { useReadContract } from "wagmi";
 import { formatUnits } from "viem";
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { HiCurrencyDollar } from "react-icons/hi2";
+import {
+  HiCurrencyDollar,
+  HiOutlineCheck,
+  HiOutlineClipboard,
+} from "react-icons/hi2";
 import { HiOutlineChartBar } from "react-icons/hi";
 import { PiStrategyBold } from "react-icons/pi";
-import { FaArrowTrendUp, FaCircleUser } from "react-icons/fa6";
-import { HiOutlineWallet, HiOutlineDocumentChartBar, HiOutlineCheckCircle, HiOutlineDevicePhoneMobile, HiOutlineXMark } from "react-icons/hi2";
-// import { MdArrowRightAlt } from "react-icons/md";
+import { FaCircleUser } from "react-icons/fa6";
+import {
+  HiOutlineWallet,
+  HiOutlineDocumentChartBar,
+  HiOutlineCheckCircle,
+  HiOutlineDevicePhoneMobile,
+  HiOutlineXMark,
+} from "react-icons/hi2";
 import { HiOutlineArrowNarrowRight } from "react-icons/hi";
-import {FaChevronLeft , FaChevronRight } from "react-icons/fa";
-import { fetchUserDCAPlans, fetchPlatformStats, updatePlanStatus, calculateTotalInvested, formatInterval, formatDuration, type DCAPlan, type PlatformStats } from '../../../lib/api';
-import { IoAirplaneOutline } from "react-icons/io5";
+import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import {
+  fetchUserDCAPlans,
+  fetchPlatformStats,
+  updatePlanStatus,
+  calculateTotalInvested,
+  formatInterval,
+  formatDuration,
+  type DCAPlan,
+  type PlatformStats,
+} from "../../../lib/api";
 
 // Legacy interface for compatibility - will be replaced with DCAPlan
-interface InvestmentPlan {
-  id: string;
-  name: string;
-  status: "active" | "paused" | "completed" | "failed";
-  fromToken: string;
-  toToken: string;
-  amount: string;
-  interval: string;
-  duration: string;
-  createdAt: string;
-  nextExecution: string;
-  executionCount: number;
-  totalExecutions: number;
-  totalInvested: string;
-  exchangeRate: string;
-}
-
 /**
  * HomeTab component displays the main landing content for the mini app.
  *
@@ -74,26 +74,8 @@ const USDC_ABI = [
   },
 ];
 
-// Investment Plan Interface
-interface InvestmentPlan {
-  id: string;
-  name: string;
-  status: "active" | "paused" | "completed" | "failed";
-  fromToken: string;
-  toToken: string;
-  amount: string;
-  interval: string;
-  duration: string;
-  createdAt: string;
-  nextExecution: string;
-  executionCount: number;
-  totalExecutions: number;
-  totalInvested: string;
-  exchangeRate: string;
-}
-
 export function HomeTab() {
-  const { address, isConnected } = useAccount();
+  const { address } = useAccount();
   const { context } = useMiniApp();
 
   const { data: usdcRawBalance } = useReadContract({
@@ -108,14 +90,20 @@ export function HomeTab() {
 
   // Dynamic data state
   const [userPlans, setUserPlans] = useState<DCAPlan[]>([]);
-  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
+  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(
+    null
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [totalInvested, setTotalInvested] = useState(0);
 
   // Modal state
   const [selectedPlan, setSelectedPlan] = useState<DCAPlan | null>(null);
   const [showPlanModal, setShowPlanModal] = useState(false);
-  
+
+  //Plan status state
+  const [Ispaushing, setIsPaushing] = useState(false);
+  const [IsResuming, setIsResuming] = useState(false);
+
   // Slider state
   const [currentPlanIndex, setCurrentPlanIndex] = useState(0);
 
@@ -154,6 +142,7 @@ export function HomeTab() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [dontShowAgain, setDontShowAgain] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Fetch user data when address changes
   const fetchUserData = useCallback(async () => {
@@ -173,17 +162,17 @@ export function HomeTab() {
 
       setUserPlans(plans);
       setPlatformStats(stats);
-      let totalInvested = calculateTotalInvested(plans);
+      const totalInvested = calculateTotalInvested(plans);
       console.log("Total Invested line number 173:", totalInvested);
       setTotalInvested(calculateTotalInvested(plans));
       console.log("Total Invested:", totalInvested);
-      
+
       // Reset current plan index if we have fewer plans now
       if (plans.length > 0 && currentPlanIndex >= plans.length) {
         setCurrentPlanIndex(0);
       }
     } catch (error) {
-      console.error('Error fetching user data:', error);
+      console.error("Error fetching user data:", error);
     } finally {
       setIsLoading(false);
     }
@@ -193,7 +182,6 @@ export function HomeTab() {
   useEffect(() => {
     fetchUserData();
   }, [fetchUserData]);
-  
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -229,35 +217,51 @@ export function HomeTab() {
     if (currentStepIndex > 0) setCurrentStepIndex((i) => i - 1);
   };
 
+  const handleCopyPlanId = () => {
+    if (selectedPlan?.id) {
+      navigator.clipboard.writeText(selectedPlan.id);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    }
+  };
+
   // Calculate active and paused plans from real data
-  const activePlans = userPlans.filter(plan => plan.status === "ACTIVE");
-  const pausedPlans = userPlans.filter(plan => plan.status === "PAUSED");
+  const activePlans = userPlans.filter((plan) => plan.status === "ACTIVE");
+  const pausedPlans = userPlans.filter((plan) => plan.status === "PAUSED");
 
   // Plan actions with real API calls
   const handlePausePlan = async (planId: string) => {
     try {
-      const success = await updatePlanStatus(planId, 'PAUSED');
+      setIsPaushing(true);
+      const success = await updatePlanStatus(planId, "PAUSED");
       if (success) {
         await fetchUserData(); // Refresh data
         console.log("✅ Plan paused successfully:", planId);
+        setIsPaushing(false);
       } else {
+        setIsPaushing(false);
         console.error("❌ Failed to pause plan:", planId);
       }
     } catch (error) {
+      setIsPaushing(false);
       console.error("❌ Error pausing plan:", error);
     }
   };
 
   const handleResumePlan = async (planId: string) => {
     try {
-      const success = await updatePlanStatus(planId, 'ACTIVE');
+      setIsResuming(true);
+      const success = await updatePlanStatus(planId, "ACTIVE");
       if (success) {
         await fetchUserData(); // Refresh data
         console.log("✅ Plan resumed successfully:", planId);
+        setIsResuming(false);
       } else {
+        setIsResuming(false);
         console.error("❌ Failed to resume plan:", planId);
       }
     } catch (error) {
+      setIsResuming(false);
       console.error("❌ Error resuming plan:", error);
     }
   };
@@ -274,13 +278,13 @@ export function HomeTab() {
 
   // Slider navigation functions
   const goToNextPlan = () => {
-    setCurrentPlanIndex((prev) => 
+    setCurrentPlanIndex((prev) =>
       prev === userPlans.length - 1 ? 0 : prev + 1
     );
   };
 
   const goToPrevPlan = () => {
-    setCurrentPlanIndex((prev) => 
+    setCurrentPlanIndex((prev) =>
       prev === 0 ? userPlans.length - 1 : prev - 1
     );
   };
@@ -288,18 +292,17 @@ export function HomeTab() {
   // Handle keyboard navigation
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
-      if (event.key === 'ArrowLeft') {
+      if (event.key === "ArrowLeft") {
         goToPrevPlan();
-      } else if (event.key === 'ArrowRight') {
+      } else if (event.key === "ArrowRight") {
         goToNextPlan();
       }
     };
 
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
   }, []);
 
-  // Dummy data - replace with actual data later
   const userGreeting = `${getTimeGreeting()}, ${context?.user?.username} 👋`;
   const usdcBalance =
     typeof usdcRawBalance === "bigint"
@@ -312,21 +315,6 @@ export function HomeTab() {
   const step = onboardingSteps[currentStepIndex];
   const progressPercent =
     ((currentStepIndex + 1) / onboardingSteps.length) * 100;
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
-      case "paused":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
-      case "completed":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
-      case "failed":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
-    }
-  };
 
   return (
     <div className="flex flex-col h-full py-3 px-2 space-y-6 overflow-y-auto">
@@ -348,16 +336,17 @@ export function HomeTab() {
               {/* Header */}
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center group-hover:from-[#c199e4]/30 group-hover:to-[#c199e4]/20 transition-all duration-300 border border-[#c199e4]/20 group-hover:scale-110" aria-hidden>
+                  <div
+                    className="w-12 h-12 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center group-hover:from-[#c199e4]/30 group-hover:to-[#c199e4]/20 transition-all duration-300 border border-[#c199e4]/20 group-hover:scale-110"
+                    aria-hidden
+                  >
                     {step.icon}
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-[#c199e4] transition-colors duration-300">
                       {step.title}
                     </h3>
-                    <p className="text-sm text-white/70">
-                      {step.description}
-                    </p>
+                    <p className="text-sm text-white/70">{step.description}</p>
                   </div>
                 </div>
                 <button
@@ -371,7 +360,9 @@ export function HomeTab() {
               {/* Progress Bar */}
               <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20">
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-sm text-gray-300 font-medium">Onboarding Progress</p>
+                  <p className="text-sm text-gray-300 font-medium">
+                    Onboarding Progress
+                  </p>
                   <p className="text-sm text-gray-200 font-medium">
                     {currentStepIndex + 1}/{onboardingSteps.length}
                   </p>
@@ -393,9 +384,12 @@ export function HomeTab() {
                   Quick Start Guide
                 </p>
                 <div className="backdrop-blur-lg rounded-xl p-3 border border-[#c199e4]/20">
-                  <p className="text-sm text-gray-100 font-medium">Connect your wallet and tell us:</p>
+                  <p className="text-sm text-gray-100 font-medium">
+                    Connect your wallet and tell us:
+                  </p>
                   <p className="text-sm text-gray-200 mt-1 italic">
-                    &ldquo;I want to invest [amount] in [token] every [frequency] for [duration]&rdquo;
+                    &ldquo;I want to invest [amount] in [token] every
+                    [frequency] for [duration]&rdquo;
                   </p>
                 </div>
               </div>
@@ -435,7 +429,7 @@ export function HomeTab() {
                   />
                   Don&apos;t show this again
                 </label>
-                
+
                 {/* Action Buttons */}
                 <div className="flex gap-3 pt-2">
                   <button
@@ -456,20 +450,20 @@ export function HomeTab() {
                 </div>
               </div>
             </div>
-            </motion.div>
-          </div>
+          </motion.div>
+        </div>
       )}
 
       {/* User Greeting */}
       <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20">
-        <h1 className="text-xl font-bold text-white">
-          {userGreeting}
-        </h1>
+        <h1 className="text-xl font-bold text-white">{userGreeting}</h1>
         {address && (
           <div className="flex items-center gap-1.5 text-white/70 mt-2">
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse aspect-square"></div>
             <span className="text-sm">Connected:</span>
-            <code className="text-xs bg-white/20 px-2 py-1 rounded-md">{truncateAddress(address)}</code>
+            <code className="text-xs bg-white/20 px-2 py-1 rounded-md">
+              {address.slice(0, 6)}...{address.slice(-4)}
+            </code>
           </div>
         )}
       </div>
@@ -480,10 +474,12 @@ export function HomeTab() {
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 bg-gradient-to-br from-[#c199e4]/30 to-[#c199e4]/20 rounded-full flex items-center justify-center group-hover:from-[#c199e4]/40 group-hover:to-[#c199e4]/30 transition-all duration-300">
-              <HiCurrencyDollar className="text-[#c199e4] size-6"/>
+                <HiCurrencyDollar className="text-[#c199e4] size-6" />
               </div>
               <div>
-                <span className="text-sm text-white/90 font-medium">Available Balance</span>
+                <span className="text-sm text-white/90 font-medium">
+                  Available Balance
+                </span>
                 {/* <div className="flex items-center gap-2 mt-1">
                   <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
                   <span className="text-xs text-white/70">Real-time</span>
@@ -491,13 +487,20 @@ export function HomeTab() {
               </div>
             </div>
             <div className="space-y-1">
-              <p className="text-4xl font-bold text-white group-hover:text-[#c199e4] transition-colors duration-300">{usdcBalance}</p>
-              <p className="text-sm text-white/70">Ready for smart investments</p>
+              <p className="text-4xl font-bold text-white group-hover:text-[#c199e4] transition-colors duration-300">
+                {usdcBalance}
+              </p>
+              <p className="text-sm text-white/70">
+                Ready for smart investments
+              </p>
             </div>
           </div>
           <div className="flex flex-col items-end">
-            <span className={`text-xs font-bold px-4 py-2 rounded-full transition-all duration-300 bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30 uppercase`}>
-                    USDC</span>
+            <span
+              className={`text-xs font-bold px-4 py-2 rounded-full transition-all duration-300 bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30 uppercase`}
+            >
+              USDC
+            </span>
           </div>
         </div>
       </div>
@@ -508,46 +511,62 @@ export function HomeTab() {
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center group-hover:from-[#c199e4]/30 group-hover:to-[#c199e4]/20 transition-all duration-300 border border-[#c199e4]/20">
-              <HiOutlineChartBar className="text-[#c199e4] size-6"/>
+                <HiOutlineChartBar className="text-[#c199e4] size-6" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white group-hover:text-[#c199e4] transition-colors duration-300">Portfolio Overview</h2>
-                <p className="text-sm text-white/70">Your investment performance</p>
+                <h2 className="text-xl font-bold text-white group-hover:text-[#c199e4] transition-colors duration-300">
+                  Portfolio Overview
+                </h2>
+                <p className="text-sm text-white/70">
+                  Your investment performance
+                </p>
               </div>
             </div>
-            
+
             <div className="space-y-4">
               <div>
                 <div className="flex items-baseline gap-2 mb-1">
                   <p className="text-3xl font-bold text-[#c199e4]">
-                    {isLoading ? '...' : `$${totalInvested.toLocaleString(undefined, {
-                      minimumFractionDigits: 1,
-                      maximumFractionDigits: 1,
-                    })}`}
+                    {isLoading
+                      ? "..."
+                      : `$${totalInvested.toLocaleString(undefined, {
+                          minimumFractionDigits: 1,
+                          maximumFractionDigits: 1,
+                        })}`}
                   </p>
-                  <span className="text-sm text-white/60 font-medium">Total Invested</span>
+                  <span className="text-sm text-white/60 font-medium">
+                    Total Invested
+                  </span>
                 </div>
                 <p className="text-sm text-white/70">
-                  {isLoading ? 'Loading...' : `Across ${userPlans.length} ${userPlans.length === 1 ? 'strategy' : 'strategies'}`}
+                  {isLoading
+                    ? "Loading..."
+                    : `Across ${userPlans.length} ${
+                        userPlans.length === 1 ? "strategy" : "strategies"
+                      }`}
                 </p>
               </div>
-              
+
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-                  <span className="text-sm text-white/90 font-medium">{activePlans.length} Active Plans</span>
+                  <span className="text-sm text-white/90 font-medium">
+                    {activePlans.length} Active Plans
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                  <span className="text-sm text-white/90 font-medium">{pausedPlans.length} Paused Plans</span>
+                  <span className="text-sm text-white/90 font-medium">
+                    {pausedPlans.length} Paused Plans
+                  </span>
                 </div>
               </div>
             </div>
           </div>
-          
+
           <div className="ml-6 flex flex-col items-end">
             <div className="w-12 h-12 bg-gradient-to-br from-emerald-400/20 to-green-500/20 rounded-2xl flex items-center justify-center border border-emerald-400/30 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
-            <FaCircleUser className="text-emerald-400 size-6"/>
+              <FaCircleUser className="text-emerald-400 size-6" />
             </div>
             {/* <div className="mt-2 text-center">
               <div className="text-xs text-emerald-400 font-semibold">+24.5%</div>
@@ -567,7 +586,7 @@ export function HomeTab() {
             <div className="w-1 h-1 bg-white rounded-full"></div>
           </div>
         </div>
-        
+
         {/* Plan Card Container */}
         <div className="space-y-4">
           {/* Show loading state */}
@@ -593,100 +612,132 @@ export function HomeTab() {
           {!isLoading && userPlans.length === 0 && (
             <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl p-8 border border-white/20 text-center">
               <div className="w-16 h-16 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-[#c199e4]/20">
-                <PiStrategyBold className="text-[#c199e4] size-8"/>
+                <PiStrategyBold className="text-[#c199e4] size-8" />
               </div>
-              <h4 className="text-xl font-bold text-white mb-2">No Active Strategies</h4>
-              <p className="text-white/70 text-sm mb-4">Create your first DCA strategy to start automated investing</p>
-              <div className="text-xs text-white/50">Connect your wallet and use the chat to get started</div>
+              <h4 className="text-xl font-bold text-white mb-2">
+                No Active Strategies
+              </h4>
+              <p className="text-white/70 text-sm mb-4">
+                Create your first DCA strategy to start automated investing
+              </p>
+              <div className="text-xs text-white/50">
+                Use the chat to get started 💡
+              </div>
             </div>
           )}
 
           {/* Plan Card */}
-          {!isLoading && userPlans.length > 0 && userPlans[currentPlanIndex] && (
-            <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl p-6 border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 hover:shadow-xl hover:from-[#c199e4]/10 hover:to-white/10 group">
-              <div className="flex justify-between items-start mb-6">
-                <div className="flex items-start gap-4 flex-1">
-                  <div className="w-12 h-12 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center group-hover:from-[#c199e4]/30 group-hover:to-[#c199e4]/20 transition-all duration-300 border border-[#c199e4]/20 group-hover:scale-110">
-                  <PiStrategyBold className="text-[#c199e4] size-6"/>
+          {!isLoading &&
+            userPlans.length > 0 &&
+            userPlans[currentPlanIndex] && (
+              <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl p-6 border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 hover:shadow-xl hover:from-[#c199e4]/10 hover:to-white/10 group">
+                <div className="flex justify-between items-start mb-6">
+                  <div className="flex items-start gap-4 flex-1">
+                    <div className="w-12 h-12 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center group-hover:from-[#c199e4]/30 group-hover:to-[#c199e4]/20 transition-all duration-300 border border-[#c199e4]/20 group-hover:scale-110">
+                      <PiStrategyBold className="text-[#c199e4] size-6" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-xl font-bold text-white group-hover:text-[#c199e4] transition-colors duration-300 mb-1">
+                        DCA Strategy #{currentPlanIndex + 1}
+                      </h4>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-sm text-white/90 font-medium">
+                          {userPlans[currentPlanIndex].fromToken}
+                        </span>
+                        <HiOutlineArrowNarrowRight />
+                        <span className="text-sm text-white/90 font-medium">
+                          {userPlans[currentPlanIndex].toToken}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <h4 className="text-xl font-bold text-white group-hover:text-[#c199e4] transition-colors duration-300 mb-1">
-                      DCA Strategy #{currentPlanIndex + 1}
-                    </h4>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-sm text-white/90 font-medium">
-                        {userPlans[currentPlanIndex].fromToken}
-                      </span>
-                      <HiOutlineArrowNarrowRight />
-                      <span className="text-sm text-white/90 font-medium">
-                        {userPlans[currentPlanIndex].toToken}
-                      </span>
+                  <div>
+                    <span
+                      className={`text-xs font-bold px-4 py-2 rounded-full transition-all duration-300 ${
+                        userPlans[currentPlanIndex].status === "ACTIVE"
+                          ? "bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30"
+                          : userPlans[currentPlanIndex].status === "PAUSED"
+                          ? "bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 group-hover:bg-yellow-400/30"
+                          : userPlans[currentPlanIndex].status === "COMPLETED"
+                          ? "bg-blue-400/20 text-blue-300 border border-blue-400/40 group-hover:bg-blue-400/30"
+                          : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
+                      }`}
+                    >
+                      {userPlans[currentPlanIndex].status}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-4 mb-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-gradient-to-br from-white/5 to-transparent rounded-2xl p-4 border border-white/10 hover:border-[#c199e4]/30 transition-all duration-300 group/item">
+                      <p className="text-xs text-white/70 mb-2 font-medium">
+                        Investment Amount
+                      </p>
+                      <p className="text-2xl font-bold text-white group-hover/item:text-[#c199e4] transition-colors duration-300">
+                        $
+                        {parseFloat(userPlans[currentPlanIndex].amount).toFixed(
+                          2
+                        )}
+                      </p>
+                    </div>
+                    <div className="bg-gradient-to-br from-white/5 to-transparent rounded-2xl p-4 border border-white/10 hover:border-[#c199e4]/30 transition-all duration-300 group/item">
+                      <p className="text-xs text-white/70 mb-2 font-medium">
+                        Frequency
+                      </p>
+                      <p className="text-2xl font-bold text-white group-hover/item:text-[#c199e4] transition-colors duration-300">
+                        {formatInterval(
+                          userPlans[currentPlanIndex].intervalMinutes
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-r from-[#c199e4]/10 to-transparent rounded-2xl p-4 border border-[#c199e4]/20">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm text-white/90 font-medium">
+                        Total Invested
+                      </p>
+                      <p className="text-sm text-[#c199e4] font-medium">
+                        {userPlans[currentPlanIndex].executionCount}/
+                        {userPlans[currentPlanIndex].totalExecutions} executions
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-2xl font-bold text-[#c199e4]">
+                        $
+                        {(
+                          parseFloat(userPlans[currentPlanIndex].amount) *
+                          userPlans[currentPlanIndex].executionCount
+                        ).toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="w-full bg-white/20 rounded-full h-3">
+                      <div
+                        className="bg-gradient-to-r from-[#c199e4] to-emerald-400 h-3 rounded-full transition-all duration-700 shadow-sm"
+                        style={{
+                          width: `${
+                            (userPlans[currentPlanIndex].executionCount /
+                              userPlans[currentPlanIndex].totalExecutions) *
+                            100
+                          }%`,
+                        }}
+                      />
                     </div>
                   </div>
                 </div>
-                <div>
-                  <span className={`text-xs font-bold px-4 py-2 rounded-full transition-all duration-300 ${
-                    userPlans[currentPlanIndex].status === 'ACTIVE' 
-                      ? 'bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30' 
-                      : userPlans[currentPlanIndex].status === 'PAUSED'
-                      ? 'bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 group-hover:bg-yellow-400/30'
-                      : userPlans[currentPlanIndex].status === 'COMPLETED'
-                      ? 'bg-blue-400/20 text-blue-300 border border-blue-400/40 group-hover:bg-blue-400/30'
-                      : 'bg-gray-400/20 text-gray-300 border border-gray-400/40'
-                  }`}>
-                    {userPlans[currentPlanIndex].status}
-                  </span>
-                </div>
-              </div>
 
-              <div className="space-y-4 mb-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gradient-to-br from-white/5 to-transparent rounded-2xl p-4 border border-white/10 hover:border-[#c199e4]/30 transition-all duration-300 group/item">
-                    <p className="text-xs text-white/70 mb-2 font-medium">Investment Amount</p>
-                    <p className="text-2xl font-bold text-white group-hover/item:text-[#c199e4] transition-colors duration-300">
-                      ${parseFloat(userPlans[currentPlanIndex].amount).toFixed(2)}
-                    </p>
+                <button
+                  onClick={() => openPlanModal(userPlans[currentPlanIndex])}
+                  className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg group-hover:scale-[1.02]"
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <span>View Strategy Details</span>
+                    <HiOutlineArrowNarrowRight className="size-5" />
                   </div>
-                  <div className="bg-gradient-to-br from-white/5 to-transparent rounded-2xl p-4 border border-white/10 hover:border-[#c199e4]/30 transition-all duration-300 group/item">
-                    <p className="text-xs text-white/70 mb-2 font-medium">Frequency</p>
-                    <p className="text-2xl font-bold text-white group-hover/item:text-[#c199e4] transition-colors duration-300">
-                      {formatInterval(userPlans[currentPlanIndex].intervalMinutes)}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="bg-gradient-to-r from-[#c199e4]/10 to-transparent rounded-2xl p-4 border border-[#c199e4]/20">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm text-white/90 font-medium">Total Invested</p>
-                    <p className="text-sm text-[#c199e4] font-medium">
-                      {userPlans[currentPlanIndex].executionCount}/{userPlans[currentPlanIndex].totalExecutions} executions
-                    </p>
-                  </div>
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-2xl font-bold text-[#c199e4]">
-                      ${(parseFloat(userPlans[currentPlanIndex].amount) * userPlans[currentPlanIndex].executionCount).toFixed(2)}
-                    </p>
-                  </div>
-                  <div className="w-full bg-white/20 rounded-full h-3">
-                    <div
-                      className="bg-gradient-to-r from-[#c199e4] to-emerald-400 h-3 rounded-full transition-all duration-700 shadow-sm"
-                      style={{ width: `${(userPlans[currentPlanIndex].executionCount / userPlans[currentPlanIndex].totalExecutions) * 100}%` }}
-                    />
-                  </div>
-                </div>
+                </button>
               </div>
-
-              <button
-                onClick={() => openPlanModal(userPlans[currentPlanIndex])}
-                className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg group-hover:scale-[1.02]"
-              >
-                <div className="flex items-center justify-center gap-2">
-                  <span>View Strategy Details</span>
-                  <HiOutlineArrowNarrowRight className="size-5"/>
-                </div>
-              </button>
-            </div>
-          )}
+            )}
 
           {/* Navigation Controls */}
           {userPlans.length > 1 && (
@@ -698,7 +749,7 @@ export function HomeTab() {
               >
                 <FaChevronLeft />
               </button>
-              
+
               <button
                 onClick={goToNextPlan}
                 className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-xl border border-white/20 text-white/80 hover:text-white transition-all duration-300 flex items-center justify-center backdrop-blur-lg"
@@ -709,7 +760,7 @@ export function HomeTab() {
             </div>
           )}
         </div>
-        
+
         {/* Plan Indicator */}
         {userPlans.length > 1 && (
           <div className="flex justify-center space-x-2">
@@ -718,16 +769,16 @@ export function HomeTab() {
                 key={index}
                 onClick={() => setCurrentPlanIndex(index)}
                 className={`size-1.5 rounded-full transition-all duration-300 ${
-                  index === currentPlanIndex 
-                    ? 'bg-white shadow-lg scale-125' 
-                    : 'bg-white/40 hover:bg-white/60'
+                  index === currentPlanIndex
+                    ? "bg-white shadow-lg scale-125"
+                    : "bg-white/40 hover:bg-white/60"
                 }`}
                 aria-label={`Go to plan ${index + 1}`}
               />
             ))}
           </div>
         )}
-        
+
         {/* Plan Counter */}
         {/* <div className="text-center text-sm text-white/60">
           {currentPlanIndex + 1} of {investmentPlans.length} strategies
@@ -737,11 +788,11 @@ export function HomeTab() {
       {/* Plan Details Modal */}
       {showPlanModal && selectedPlan && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          <div 
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
-            onClick={closePlanModal} 
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={closePlanModal}
           />
-          <motion.div 
+          <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
@@ -752,15 +803,16 @@ export function HomeTab() {
               {/* Header */}
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center group-hover:from-[#c199e4]/30 group-hover:to-[#c199e4]/20 transition-all duration-300 border border-[#c199e4]/20 group-hover:scale-110">
-                  <PiStrategyBold className="text-[#c199e4] size-6"/>
+                  <div className="w-12 h-12 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center group-hover:from-[#c199e4]/30 group-hover:to-[#c199e4]/20 transition-all duration-300 border border-[#c199e4]/20 group-hover:scale-110">
+                    <PiStrategyBold className="text-[#c199e4] size-6" />
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-[#c199e4] transition-colors duration-300">
                       DCA Strategy
                     </h3>
                     <p className="text-sm text-white/70">
-                      {selectedPlan.fromToken} → {selectedPlan.toToken} Investment Plan
+                      {selectedPlan.fromToken} → {selectedPlan.toToken}{" "}
+                      Investment Plan
                     </p>
                   </div>
                 </div>
@@ -768,24 +820,58 @@ export function HomeTab() {
                   onClick={closePlanModal}
                   className="text-white/70 hover:text-white transition-colors duration-200 p-2 hover:bg-white/10 rounded-xl"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                      clipRule="evenodd"
+                    />
                   </svg>
                 </button>
               </div>
 
               {/* Status and Actions */}
+              <div className="flex items-center justify-between p-3 backdrop-blur-lg rounded-2xl border border-[#c199e4]/20">
+                {/* Left: Plan ID label */}
+                <span className="text-sm text-gray-400 font-medium">
+                  Plan ID:
+                </span>
+                {/* Right: Plan ID value and copy icon */}
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-bold text-white">
+                    {selectedPlan.id}
+                  </span>
+                  <button
+                    onClick={handleCopyPlanId}
+                    className="ml-2 text-[#c199e4] hover:text-white transition-colors"
+                    title="Copy Plan ID"
+                  >
+                    {copied ? (
+                      <HiOutlineCheck className="w-5 h-5 text-green-400" />
+                    ) : (
+                      <HiOutlineClipboard className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
               <div className="flex items-center justify-between p-3  backdrop-blur-lg rounded-2xl border border-[#c199e4]/20">
                 <div className="flex items-center gap-3">
-                  <span className={`text-xs font-bold px-4 py-2 rounded-full transition-all duration-300 ${
-                    selectedPlan.status === 'ACTIVE' 
-                      ? 'bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30' 
-                      : selectedPlan.status === 'PAUSED'
-                       ? 'bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 group-hover:bg-yellow-400/30'
-                      : selectedPlan.status === 'COMPLETED'
-                      ? 'bg-blue-400/20 text-blue-300 border border-blue-400/40 group-hover:bg-blue-400/30'
-                      : 'bg-gray-400/20 text-gray-300 border border-gray-400/40'
-                  }`}>
+                  <span
+                    className={`text-xs font-bold px-4 py-2 rounded-full transition-all duration-300 ${
+                      selectedPlan.status === "ACTIVE"
+                        ? "bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30"
+                        : selectedPlan.status === "PAUSED"
+                        ? "bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 group-hover:bg-yellow-400/30"
+                        : selectedPlan.status === "COMPLETED"
+                        ? "bg-blue-400/20 text-blue-300 border border-blue-400/40 group-hover:bg-blue-400/30"
+                        : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
+                    }`}
+                  >
                     {selectedPlan.status}
                   </span>
                 </div>
@@ -793,17 +879,22 @@ export function HomeTab() {
                   {selectedPlan.status === "ACTIVE" && (
                     <button
                       onClick={() => handlePausePlan(selectedPlan.id)}
-                      className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-3 px-5 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg group-hover:scale-[1.02]"
+                      className={`w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-3 px-5 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg group-hover:scale-[1.02] cursor-pointer ${
+                        Ispaushing ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
+                      disabled={Ispaushing}
                     >
-                      Pause
+                      {Ispaushing ? "Pausing..." : "Pause"}
                     </button>
                   )}
                   {selectedPlan.status === "PAUSED" && (
                     <button
                       onClick={() => handleResumePlan(selectedPlan.id)}
-                      className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-3 px-5 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg group-hover:scale-[1.02]"
+                      className={`w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-3 px-5 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg group-hover:scale-[1.02] cursor-pointer ${
+                        IsResuming ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
                     >
-                      Resume
+                      {IsResuming ? "Resuming..." : "Resume"}
                     </button>
                   )}
                 </div>
@@ -812,98 +903,140 @@ export function HomeTab() {
               {/* Plan Details Grid */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">From Token</p>
-                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">{selectedPlan.fromToken}</p>
+                  <p className="text-sm text-gray-400 mb-2 font-medium">
+                    From Token
+                  </p>
+                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
+                    {selectedPlan.fromToken}
+                  </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">To Token</p>
-                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">{selectedPlan.toToken}</p>
+                  <p className="text-sm text-gray-400 mb-2 font-medium">
+                    To Token
+                  </p>
+                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
+                    {selectedPlan.toToken}
+                  </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">Amount</p>
-                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">${parseFloat(selectedPlan.amount).toFixed(2)}</p>
+                  <p className="text-sm text-gray-400 mb-2 font-medium">
+                    Amount
+                  </p>
+                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
+                    ${parseFloat(selectedPlan.amount).toFixed(2)}
+                  </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">Interval</p>
-                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">{formatInterval(selectedPlan.intervalMinutes)}</p>
+                  <p className="text-sm text-gray-400 mb-2 font-medium">
+                    Interval
+                  </p>
+                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
+                    {formatInterval(selectedPlan.intervalMinutes)}
+                  </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">Duration</p>
-                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">{formatDuration(selectedPlan.durationWeeks)}</p>
+                  <p className="text-sm text-gray-400 mb-2 font-medium">
+                    Duration
+                  </p>
+                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
+                    {formatDuration(selectedPlan.durationWeeks)}
+                  </p>
                 </div>
               </div>
 
               {/* Slippage */}
               <div className="rounded-2xl p-4 border border-[#c199e4]/20">
-                <p className="text-sm text-gray-300 font-medium mb-2">Slippage Tolerance</p>
-                <p className="text-lg font-bold text-gray-100">{(parseFloat(selectedPlan.slippage) * 100).toFixed(2)}%</p>
+                <p className="text-sm text-gray-300 font-medium mb-2">
+                  Slippage Tolerance
+                </p>
+                <p className="text-lg font-bold text-gray-100">
+                  {parseFloat(selectedPlan.slippage).toFixed(2)}%
+                </p>
               </div>
 
               {/* Progress Section */}
               <div className="space-y-4">
                 <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20">
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm text-gray-300 font-medium">Execution Progress</p>
+                    <p className="text-sm text-gray-300 font-medium">
+                      Execution Progress
+                    </p>
                     <p className="text-sm text-gray-200 font-medium">
-                      {selectedPlan.executionCount}/{selectedPlan.totalExecutions}
+                      {selectedPlan.executionCount}/
+                      {selectedPlan.totalExecutions}
                     </p>
                   </div>
                   <div className="w-full bg-white/20 rounded-full h-3 mb-2">
                     <div
                       className="bg-gradient-to-r from-[#c199e4]/40 to-[#c199e4]/30 h-3 rounded-full transition-all duration-700 shadow-sm"
-                      style={{ width: `${(selectedPlan.executionCount / selectedPlan.totalExecutions) * 100}%` }}
+                      style={{
+                        width: `${
+                          (selectedPlan.executionCount /
+                            selectedPlan.totalExecutions) *
+                          100
+                        }%`,
+                      }}
                     />
                   </div>
                   <p className="text-xs text-gray-400">
-                    {Math.round((selectedPlan.executionCount / selectedPlan.totalExecutions) * 100)}% Complete
+                    {Math.round(
+                      (selectedPlan.executionCount /
+                        selectedPlan.totalExecutions) *
+                        100
+                    )}
+                    % Complete
                   </p>
                 </div>
 
                 <div className=" rounded-2xl p-4 border border-[#c199e4]/20">
-                  <p className="text-sm text-gray-300 font-medium mb-2">Total Invested</p>
-                  <p className="text-2xl font-bold text-gray-100">${(parseFloat(selectedPlan.amount) * selectedPlan.executionCount).toFixed(2)}</p>
+                  <p className="text-sm text-gray-300 font-medium mb-2">
+                    Total Invested
+                  </p>
+                  <p className="text-2xl font-bold text-gray-100">
+                    $
+                    {(
+                      parseFloat(selectedPlan.amount) *
+                      selectedPlan.executionCount
+                    ).toFixed(2)}
+                  </p>
                 </div>
               </div>
 
               {/* Timeline Details */}
               <div className="space-y-3">
                 <div className="rounded-2xl p-4 border border-[#c199e4]/20">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">Created</p>
+                  <p className="text-sm text-gray-400 mb-2 font-medium">
+                    Created
+                  </p>
                   <p className="text-sm font-semibold text-gray-200">
-                    {new Date(selectedPlan.createdAt).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
+                    {new Date(selectedPlan.createdAt).toLocaleDateString(
+                      "en-US",
+                      {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      }
+                    )}
                   </p>
                 </div>
                 <div className="rounded-2xl p-4 border border-[#c199e4]/20">
-                  <p className="text-sm text-gray-300 font-medium mb-2">Next Execution</p>
+                  <p className="text-sm text-gray-300 font-medium mb-2">
+                    Next Execution
+                  </p>
                   <p className="text-sm font-bold text-gray-100">
-                    {selectedPlan.nextExecution ? 
-                      new Date(selectedPlan.nextExecution).toLocaleString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit'
-                      }) : 
-                      'No upcoming execution'
-                    }
+                    {selectedPlan.nextExecution
+                      ? new Date(selectedPlan.nextExecution).toLocaleString(
+                          "en-US",
+                          {
+                            month: "short",
+                            day: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          }
+                        )
+                      : "No upcoming execution"}
                   </p>
                 </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={closePlanModal}
-                  className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg group-hover:scale-[1.02]"
-                >
-                  Close
-                </button>
-                <button className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg group-hover:scale-[1.02]">
-                  Edit Plan
-                </button>
               </div>
             </div>
           </motion.div>
