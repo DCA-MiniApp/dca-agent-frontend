@@ -16,7 +16,7 @@ import { arbitrum } from "wagmi/chains";
 import {
   ERC20_ABI,
   getTokenInfo,
-  EXECUATOR_ADDRESS,
+  EXECUTOR_ADDRESS,
 } from "../../../lib/tokenContracts";
 import { useRouter } from "next/navigation";
 import { IoPersonCircle } from "react-icons/io5";
@@ -654,7 +654,7 @@ export function ActionsTab() {
           address: tokenInfo.address as `0x${string}`,
           abi: ERC20_ABI,
           functionName: "approve",
-          args: [EXECUATOR_ADDRESS as `0x${string}`, maxUint256],
+          args: [EXECUTOR_ADDRESS as `0x${string}`, maxUint256],
           chainId: arbitrum.id,
         });
       } catch (error) {
