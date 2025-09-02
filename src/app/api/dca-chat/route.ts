@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { gptIntelligence, type DCAPlanData } from '../../../lib/gptIntelligence';
+import { planSessionManager } from '../../../lib/planSessionManager';
 
 // Request/Response schemas
 const ChatRequestSchema = z.object({
@@ -71,25 +73,84 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Check if this is an initial plan creation request
-    const planCreationIntent = analyzePlanCreationIntent(message, '', isPlanCreationRequest);
-    if (planCreationIntent.shouldConfirm) {
-      console.log('[Plan Creation] Detected plan creation intent, showing confirmation instead of calling VibeKit');
-      const confirmationId = generateConfirmationId(planCreationIntent.planData);
-      const confirmationMessage = generateConfirmationMessage(planCreationIntent.planData);
+    // Get or create session for intelligent plan creation
+    const session = planSessionManager.getOrCreateSession(userAddress);
+    
+    // Check if this is plan creation intent or continuing plan creation
+    const isPlanCreation = planSessionManager.isPlanCreationIntent(message, session.id) || isPlanCreationRequest;
+    
+    if (isPlanCreation) {
+      console.log('[Intelligent Plan Creation] Processing plan creation request');
       
-      return NextResponse.json({
-        success: true,
-        response: confirmationMessage,
-        action: 'plan_confirmation_required',
-        data: {
-          confirmationId,
-          planData: planCreationIntent.planData
+      // Add user message to conversation history
+      planSessionManager.addToConversationHistory(session.id, 'user', message);
+      
+      // Use GPT intelligence to extract plan data
+      const extractionResult = await gptIntelligence.extractPlanData(
+        message,
+        planSessionManager.getConversationContext(session.id),
+        session.planData
+      );
+      
+      // Update session with extracted data
+      planSessionManager.updateSessionPlanData(session.id, extractionResult.planData);
+      
+      // Check if plan is complete
+      if (extractionResult.isComplete) {
+        console.log('[Plan Creation] Plan data complete, showing confirmation');
+        
+        const completePlanData = extractionResult.planData as DCAPlanData;
+        const confirmationId = generateConfirmationId(completePlanData);
+        const confirmationMessage = gptIntelligence.generatePlanSummary(completePlanData);
+        
+        // Add assistant response to conversation
+        planSessionManager.addToConversationHistory(session.id, 'assistant', confirmationMessage);
+        
+        return NextResponse.json({
+          success: true,
+          response: confirmationMessage,
+          action: 'plan_confirmation_required',
+          data: {
+            confirmationId,
+            planData: completePlanData
+          }
+        });
+      } else {
+        // Plan is incomplete, ask for missing information
+        let responseMessage = '';
+        
+        if (extractionResult.validationErrors && extractionResult.validationErrors.length > 0) {
+          responseMessage += `❌ **Issues found:**\n${extractionResult.validationErrors.map(err => `• ${err}`).join('\n')}\n\n`;
         }
-      });
+        
+        if (Object.keys(extractionResult.planData).length > 0) {
+          responseMessage += `✅ **Information collected so far:**\n`;
+          if (extractionResult.planData.fromToken) responseMessage += `• From token: ${extractionResult.planData.fromToken}\n`;
+          if (extractionResult.planData.toToken) responseMessage += `• To token: ${extractionResult.planData.toToken}\n`;
+          if (extractionResult.planData.amount) responseMessage += `• Amount: ${extractionResult.planData.amount}\n`;
+          if (extractionResult.planData.interval) responseMessage += `• Frequency: ${extractionResult.planData.interval}\n`;
+          if (extractionResult.planData.duration) responseMessage += `• Duration: ${extractionResult.planData.duration}\n`;
+          responseMessage += '\n';
+        }
+        
+        responseMessage += `❓ **${extractionResult.nextQuestion}**`;
+        
+        // Add assistant response to conversation
+        planSessionManager.addToConversationHistory(session.id, 'assistant', responseMessage);
+        
+        return NextResponse.json({
+          success: true,
+          response: responseMessage,
+          action: 'collect_plan_data',
+          data: {
+            planData: extractionResult.planData,
+            missingFields: extractionResult.missingFields
+          }
+        });
+      }
     }
 
-    // Send all other messages to VibeKit agent for processing
+    // For non-plan creation messages, send to VibeKit agent
     console.log('[DCA Operation] Sending to VibeKit agent:', message);
     const vibekitResponse = await sendToVibeKitAgent(message, userAddress, conversationHistory);
     
@@ -133,6 +194,11 @@ async function handleConfirmationAction(
   console.log('[Confirmation] Handling action:', { confirmationId, action, userAddress });
   
   if (action === 'cancel') {
+    // Clear the session for this user
+    if (userAddress) {
+      planSessionManager.clearSession(userAddress);
+    }
+    
     return {
       success: true,
       response: "✅ **Plan creation cancelled.** No DCA plan was created. Is there anything else I can help you with?",
@@ -157,11 +223,11 @@ async function handleConfirmationAction(
       
       console.log('[Confirmation] Creating confirmed plan:', planData);
       
-      // Skip token approval check - frontend already handled approval before reaching this point
-      console.log('[Token Approval] Skipping approval check - frontend confirmed approval completed');
+      // Clear the session since plan creation is confirmed
+      planSessionManager.clearSession(userAddress);
       
       // Create instruction for VibeKit agent
-      const createInstruction = `Create DCA plan: Invest ${planData.amount} ${planData.fromToken} into ${planData.toToken} every ${planData.intervalMinutes} minutes for ${planData.durationWeeks} weeks with ${planData.slippage}% slippage`;
+      const createInstruction = `Create DCA plan: Invest ${planData.amount} ${planData.fromToken} into ${planData.toToken} every ${planData.interval} for ${planData.duration} with ${planData.slippage || 2}% slippage`;
       const vibekitResponse = await sendToVibeKitAgent(createInstruction, userAddress);
       
       return {
@@ -822,9 +888,10 @@ function generateConfirmationMessage(planData: any): string {
 
   return `🔐 **Token Approval Required**\n\n` +
          `📊 **Plan Summary:**\n` +
-         `• **Investment:** ${planData.amount} ${planData.fromToken} ${frequencyText}\n` +
+         `• **Investment:** ${planData.amount} ${planData.fromToken}\n` +
          `• **Target:** ${planData.toToken}\n` +
          `• **Duration:** ${durationText}\n` +
+         `• **frequency:** ${frequencyText}\n` +
          `• **Total Investment:** ${totalInvestment} ${planData.fromToken}\n` +
          `• **Total Executions:** ${totalExecutions}\n` +
          `• **Slippage:** ${planData.slippage/100}%\n\n` +
