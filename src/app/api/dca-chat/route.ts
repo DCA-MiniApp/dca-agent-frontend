@@ -469,6 +469,7 @@ async function sendToVibeKitAgent(
         
         // Parse the SSE response format
         let responseText = 'I understand your request, but I encountered an issue processing it. Could you please try again?';
+        let artifactsData: any = null;
         
         if (sseResponse.error) {
           responseText = `Error: ${sseResponse.error.message || 'Unknown MCP error'}`;
@@ -488,13 +489,24 @@ async function sendToVibeKitAgent(
                 // Direct parts array (current structure)
                 textPart = taskData.parts.find((part: any) => part.kind === 'text');
               } else if (taskData.status && taskData.status.message && taskData.status.message.parts) {
-                // Legacy structure
+                // Standard structure with status.message.parts
                 textPart = taskData.status.message.parts.find((part: any) => part.kind === 'text');
+              }
+              
+              // Extract artifacts data if available
+              if (taskData.artifacts && Array.isArray(taskData.artifacts) && taskData.artifacts.length > 0) {
+                artifactsData = taskData.artifacts[0];
+                console.log('[Response Parser] Found artifacts data:', artifactsData);
               }
               
               console.log('[Response Parser] Found text part:', textPart);
               if (textPart && textPart.text) {
                 responseText = textPart.text;
+                
+                // Enhance response with artifacts data if available
+                if (artifactsData && artifactsData.data) {
+                  responseText = enhanceResponseWithData(textPart.text, artifactsData.data);
+                }
               }
             } catch (parseError) {
               console.warn('[Response Parser] Failed to parse resource text:', parseError);
@@ -513,7 +525,7 @@ async function sendToVibeKitAgent(
         return {
           response: responseText,
           action: action?.type,
-          data: action?.data
+          data: artifactsData?.data || action?.data
         };
       } catch (sseError) {
         console.error('[VibeKit Agent] SSE Error:', sseError);
@@ -687,6 +699,60 @@ async function waitForSSEResponseWithReader(
   });
 }
 
+
+/**
+ * Enhance response text with structured data for better frontend display
+ */
+function enhanceResponseWithData(responseText: string, data: any): string {
+  // If data looks like platform statistics
+  if (data && typeof data === 'object' && 'totalPlans' in data && 'activePlans' in data) {
+    return `${responseText}\n\n📊 **Platform Statistics:**\n` +
+           `💰 Total Plans: ${data.totalPlans}\n` +
+           `🔥 Active Plans: ${data.activePlans}\n` +
+           `👥 Total Users: ${data.totalUsers}\n` +
+           `⚡ Total Executions: ${data.totalExecutions}\n` +
+           `📈 Last 24h: ${data.last24hExecutions} executions\n` +
+           `📅 Last 7 days: ${data.last7dExecutions} executions`;
+  }
+  
+  // If data looks like DCA plan information
+  if (data && typeof data === 'object' && 'id' in data && 'fromToken' in data) {
+    return `${responseText}\n\n📋 **Plan Details:**\n` +
+           `🆔 Plan ID: ${data.id}\n` +
+           `💱 ${data.fromToken} → ${data.toToken}\n` +
+           `💰 Amount: ${data.amount} ${data.fromToken}\n` +
+           `⏱️ Interval: Every ${data.intervalMinutes} minutes\n` +
+           `📅 Duration: ${data.durationWeeks} weeks\n` +
+           `📊 Status: ${data.status}`;
+  }
+  
+  // If data looks like user plans array
+  if (data && Array.isArray(data) && data.length > 0 && 'fromToken' in data[0]) {
+    const plansText = data.map((plan: any, index: number) => 
+      `${index + 1}. **${plan.fromToken} → ${plan.toToken}**\n` +
+      `   Amount: ${plan.amount} ${plan.fromToken}\n` +
+      `   Interval: Every ${plan.intervalMinutes} minutes\n` +
+      `   Status: ${plan.status}\n` +
+      `   Progress: ${plan.executionCount}/${plan.totalExecutions} executions`
+    ).join('\n\n');
+    
+    return `${responseText}\n\n📋 **Your DCA Plans:**\n\n${plansText}`;
+  }
+  
+  // If data looks like execution history
+  if (data && Array.isArray(data) && data.length > 0 && 'txHash' in data[0]) {
+    const historyText = data.slice(0, 5).map((execution: any, index: number) => 
+      `${index + 1}. **${execution.status}** - ${execution.fromAmount} → ${execution.toAmount}\n` +
+      `   Gas: ${execution.gasFee}\n` +
+      `   TX: ${execution.txHash?.substring(0, 10)}...`
+    ).join('\n\n');
+    
+    return `${responseText}\n\n📝 **Recent Executions:**\n\n${historyText}`;
+  }
+  
+  // For other data types, just return the original text
+  return responseText;
+}
 
 /**
  * Analyze agent response to determine what actions were taken
