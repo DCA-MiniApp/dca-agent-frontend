@@ -24,6 +24,7 @@ import {
 } from "react-icons/hi2";
 import { HiOutlineArrowNarrowRight } from "react-icons/hi";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { useRouter } from "next/navigation";
 import {
   fetchUserDCAPlans,
   fetchPlatformStats,
@@ -55,7 +56,7 @@ function getTimeGreeting() {
   return "Good evening";
 }
 
-// USDC contract address (example: Ethereum mainnet)
+// USDC contract address (example: Arbitrum mainnet)
 const USDC_ADDRESS = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
 const USDC_ABI = [
   {
@@ -77,6 +78,7 @@ const USDC_ABI = [
 export function HomeTab() {
   const { address,isConnected } = useAccount();
   const { context, setActiveTab } = useMiniApp();
+  const router = useRouter();
 
   const { data: usdcRawBalance } = useReadContract({
     address: USDC_ADDRESS,
@@ -1044,6 +1046,27 @@ export function HomeTab() {
               </p>
               <div className="text-xs text-white/50">
                 Use the chat to get started 💡
+              </div>
+              <div className="mt-4">
+                <button
+                  onClick={() => router.push('/chat')}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-[#c199e4]/20 to-[#b380db]/10 hover:from-[#c199e4]/30 hover:to-[#b380db]/20 text-white text-sm font-semibold rounded-2xl border border-[#c199e4]/30 hover:border-[#c199e4]/50 transition-all duration-300"
+                >
+                  Talk to Agent
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 7l5 5m0 0l-5 5m5-5H6"
+                    />
+                  </svg>
+                </button>
               </div>
               </>)}
             <p className="text-white/70 text-sm mb-4">
