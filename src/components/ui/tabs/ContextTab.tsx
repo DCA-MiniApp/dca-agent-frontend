@@ -25,6 +25,7 @@ import {
  */
 export function ContextTab() {
   const { address } = useAccount();
+  const { setActiveTab } = useMiniApp();
 
   // Dynamic data state
   const [executionHistory, setExecutionHistory] = useState<ExecutionHistory[]>(
@@ -119,7 +120,8 @@ export function ContextTab() {
   );
   const [startDate, setStartDate] = useState<string>(""); // YYYY-MM-DD
   const [endDate, setEndDate] = useState<string>("");
-  const [tokenSearch, setTokenSearch] = useState<string>(""); // Token search
+  const [fromTokenSearch, setFromTokenSearch] = useState<string>("");
+  const [toTokenSearch, setToTokenSearch] = useState<string>("");
 
   // Pagination
   const [page, setPage] = useState<number>(1);
@@ -130,22 +132,17 @@ export function ContextTab() {
       if (statusFilter !== "All" && tx.status !== statusFilter) return false;
       if (startDate && tx.dateISO < startDate) return false;
       if (endDate && tx.dateISO > endDate) return false;
-      if (tokenSearch) {
-        const searchLower = tokenSearch.toLowerCase();
+      if (fromTokenSearch) {
         const fromTokenLower = tx.fromToken.toLowerCase();
+        if (!fromTokenLower.includes(fromTokenSearch.toLowerCase())) return false;
+      }
+      if (toTokenSearch) {
         const toTokenLower = tx.toToken.toLowerCase();
-        const planIdLower = tx.planId.toLowerCase();
-        if (
-          !fromTokenLower.includes(searchLower) &&
-          !toTokenLower.includes(searchLower) &&
-          !planIdLower.includes(searchLower)
-        ) {
-          return false;
-        }
+        if (!toTokenLower.includes(toTokenSearch.toLowerCase())) return false;
       }
       return true;
     });
-  }, [transactions, endDate, startDate, statusFilter, tokenSearch]);
+  }, [transactions, endDate, startDate, statusFilter, fromTokenSearch, toTokenSearch]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -158,7 +155,8 @@ export function ContextTab() {
     setStatusFilter("All");
     setStartDate("");
     setEndDate("");
-    setTokenSearch("");
+    setFromTokenSearch("");
+    setToTokenSearch("");
     setPage(1);
   };
 
@@ -200,14 +198,29 @@ export function ContextTab() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="flex flex-col">
             <label className="text-sm text-[#c199e4]/90 mb-2 font-medium">
-              Token Search
+              From Token
             </label>
             <input
               type="text"
-              placeholder="Search by token name..."
-              value={tokenSearch}
+              placeholder="e.g., USDC, ETH"
+              value={fromTokenSearch}
               onChange={(e) => {
-                setTokenSearch(e.target.value);
+                setFromTokenSearch(e.target.value);
+                setPage(1);
+              }}
+              className="px-3 py-2 bg-gradient-to-br from-[#4a2b7a]/80 to-[#341e64]/20 backdrop-blur-lg rounded-xl border border-[#4a2b7a]/80 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-[#c199e4] focus:border-[#c199e4]/50 text-sm transition-all duration-300"
+            />
+          </div>
+          <div className="flex flex-col">
+            <label className="text-sm text-[#c199e4]/90 mb-2 font-medium">
+              To Token
+            </label>
+            <input
+              type="text"
+              placeholder="e.g., BTC, ARB"
+              value={toTokenSearch}
+              onChange={(e) => {
+                setToTokenSearch(e.target.value);
                 setPage(1);
               }}
               className="px-3 py-2 bg-gradient-to-br from-[#4a2b7a]/80 to-[#341e64]/20 backdrop-blur-lg rounded-xl border border-[#4a2b7a]/80 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-[#c199e4] focus:border-[#c199e4]/50 text-sm transition-all duration-300"
@@ -303,7 +316,7 @@ export function ContextTab() {
               {!isLoading && !address && (
                 <tr>
                   <td colSpan={4} className="px-6 py-12 text-center">
-                    <div className="flex flex-col items-center space-y-2">
+                    <div className="flex flex-col items-center space-y-3">
                       <HiOutlineDocumentText className="text-[#c199e4]/50 size-12" />
                       <p className="text-white/70 font-medium">
                         Connect Your Wallet
@@ -311,6 +324,25 @@ export function ContextTab() {
                       <p className="text-white/50 text-sm">
                         Connect your wallet to view transaction history
                       </p>
+                      <button
+                        onClick={() => setActiveTab('wallet' as any)}
+                        className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-[#c199e4]/20 to-[#b380db]/10 hover:from-[#c199e4]/30 hover:to-[#b380db]/20 text-white text-sm font-medium rounded-xl border border-[#c199e4]/30 hover:border-[#c199e4]/50 transition-all duration-300"
+                      >
+                        Go to Wallet
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M13 7l5 5m0 0l-5 5m5-5H6"
+                          />
+                        </svg>
+                      </button>
                     </div>
                   </td>
                 </tr>

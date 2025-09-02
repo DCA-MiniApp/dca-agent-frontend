@@ -75,8 +75,8 @@ const USDC_ABI = [
 ];
 
 export function HomeTab() {
-  const { address } = useAccount();
-  const { context } = useMiniApp();
+  const { address,isConnected } = useAccount();
+  const { context, setActiveTab } = useMiniApp();
 
   const { data: usdcRawBalance } = useReadContract({
     address: USDC_ADDRESS,
@@ -108,13 +108,14 @@ export function HomeTab() {
   const [currentPlanIndex, setCurrentPlanIndex] = useState(0);
 
   // Onboarding state
-  const onboardingSteps = [
+  const [onboardingSteps, setOnboardingSteps] = useState([
     {
       step: 1,
       title: "Connect Wallet",
       description: "Link your wallet to get started",
       action: "Next",
       icon: <HiOutlineWallet className="w-6 h-6 text-[#c199e4]" />,
+      completed: false,
     },
     {
       step: 2,
@@ -122,6 +123,7 @@ export function HomeTab() {
       description: "Tell us what you want to invest",
       action: "Next",
       icon: <HiOutlineDocumentChartBar className="w-6 h-6 text-[#c199e4]" />,
+      completed: false,
     },
     {
       step: 3,
@@ -129,6 +131,7 @@ export function HomeTab() {
       description: "Confirm your investment strategy",
       action: "Next",
       icon: <HiOutlineCheckCircle className="w-6 h-6 text-[#c199e4]" />,
+      completed: false,
     },
     {
       step: 4,
@@ -136,13 +139,22 @@ export function HomeTab() {
       description: "Monitor your automated investments",
       action: "Got it",
       icon: <HiOutlineDevicePhoneMobile className="w-6 h-6 text-[#c199e4]" />,
+      completed: false,
     },
-  ];
+  ]);
 
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [stepAnimation, setStepAnimation] = useState<"enter" | "exit" | "idle">(
+    "idle"
+  );
+  const [showStepCelebration, setShowStepCelebration] = useState(false);
+  const [completedStepIndex, setCompletedStepIndex] = useState<number | null>(
+    null
+  );
 
   // Fetch user data when address changes
   const fetchUserData = useCallback(async () => {
@@ -206,15 +218,59 @@ export function HomeTab() {
   };
 
   const goNext = () => {
+    if (isTransitioning) return;
+
+    setIsTransitioning(true);
+    setStepAnimation("exit");
+
+    // Show celebration for completed step
     if (currentStepIndex < onboardingSteps.length - 1) {
-      setCurrentStepIndex((i) => i + 1);
-    } else {
-      completeOnboarding();
+      setCompletedStepIndex(currentStepIndex);
+      setShowStepCelebration(true);
+
+      setTimeout(() => {
+        setShowStepCelebration(false);
+        setCompletedStepIndex(null);
+      }, 1500);
     }
+
+    setTimeout(() => {
+      if (currentStepIndex < onboardingSteps.length - 1) {
+        // Mark current step as completed
+        setOnboardingSteps((prev) =>
+          prev.map((step, idx) =>
+            idx === currentStepIndex ? { ...step, completed: true } : step
+          )
+        );
+
+        setCurrentStepIndex((i) => i + 1);
+        setStepAnimation("enter");
+
+        setTimeout(() => {
+          setStepAnimation("idle");
+          setIsTransitioning(false);
+        }, 300);
+      } else {
+        completeOnboarding();
+      }
+    }, 200);
   };
 
   const goPrev = () => {
-    if (currentStepIndex > 0) setCurrentStepIndex((i) => i - 1);
+    if (isTransitioning || currentStepIndex === 0) return;
+
+    setIsTransitioning(true);
+    setStepAnimation("exit");
+
+    setTimeout(() => {
+      setCurrentStepIndex((i) => i - 1);
+      setStepAnimation("enter");
+
+      setTimeout(() => {
+        setStepAnimation("idle");
+        setIsTransitioning(false);
+      }, 300);
+    }, 200);
   };
 
   const handleCopyPlanId = () => {
@@ -325,6 +381,133 @@ export function HomeTab() {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={closeOnboarding}
           />
+
+          {/* Step Transition Overlay */}
+          {isTransitioning && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-20 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+            >
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.8, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-[#c199e4]/30 shadow-2xl"
+              >
+                <div className="text-center space-y-4">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{
+                      duration: 1,
+                      repeat: Infinity,
+                      ease: "linear",
+                    }}
+                    className="w-12 h-12 border-4 border-[#c199e4]/30 border-t-[#c199e4] rounded-full mx-auto"
+                  />
+                  <div>
+                    <h3 className="text-lg font-bold text-white mb-2">
+                      {stepAnimation === "exit"
+                        ? "Moving to next step..."
+                        : "Loading step..."}
+                    </h3>
+                    <p className="text-sm text-white/70">
+                      Step {currentStepIndex + 1} of {onboardingSteps.length}
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {/* Step Completion Celebration */}
+          {showStepCelebration && completedStepIndex !== null && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-30 pointer-events-none"
+            >
+              {/* Confetti particles */}
+              {[...Array(12)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  initial={{
+                    opacity: 0,
+                    scale: 0,
+                    x: Math.random() * 400 - 200,
+                    y: Math.random() * 400 - 200,
+                  }}
+                  animate={{
+                    opacity: [0, 1, 0],
+                    scale: [0, 1, 0],
+                    x: Math.random() * 600 - 300,
+                    y: Math.random() * 600 - 300,
+                    rotate: Math.random() * 360,
+                  }}
+                  transition={{
+                    duration: 1.5,
+                    delay: i * 0.1,
+                    ease: "easeOut",
+                  }}
+                  className="absolute w-2 h-2 rounded-full"
+                  style={{
+                    backgroundColor: [
+                      "#c199e4",
+                      "#10b981",
+                      "#f59e0b",
+                      "#ef4444",
+                    ][i % 4],
+                    left: "50%",
+                    top: "50%",
+                  }}
+                />
+              ))}
+
+              {/* Success message */}
+              <motion.div
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0, opacity: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
+              >
+                <div className="bg-green-500/90 backdrop-blur-lg rounded-2xl p-4 border border-green-400/50 shadow-2xl">
+                  <div className="flex items-center gap-3">
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ duration: 0.3, delay: 0.5, type: "spring" }}
+                      className="w-8 h-8 bg-white rounded-full flex items-center justify-center"
+                    >
+                      <svg
+                        className="w-5 h-5 text-green-500"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </motion.div>
+                    <div>
+                      <h4 className="text-white font-bold text-sm">
+                        Step {completedStepIndex + 1} Completed!
+                      </h4>
+                      <p className="text-white/90 text-xs">
+                        Great job! Moving to next step...
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -334,19 +517,47 @@ export function HomeTab() {
           >
             <div className="p-6 space-y-4">
               {/* Header */}
-              <div className="flex items-start justify-between">
+              <motion.div
+                key={`header-${currentStepIndex}`}
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.1 }}
+                className="flex items-start justify-between"
+              >
                 <div className="flex items-center gap-3">
-                  <div
+                  <motion.div
+                    key={`icon-${currentStepIndex}`}
+                    initial={{ scale: 0.8, rotate: -180 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{
+                      duration: 0.5,
+                      type: "spring",
+                      stiffness: 200,
+                    }}
                     className="w-12 h-12 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center group-hover:from-[#c199e4]/30 group-hover:to-[#c199e4]/20 transition-all duration-300 border border-[#c199e4]/20 group-hover:scale-110"
                     aria-hidden
                   >
                     {step.icon}
-                  </div>
+                  </motion.div>
                   <div>
-                    <h3 className="text-xl font-bold text-[#c199e4] transition-colors duration-300">
+                    <motion.h3
+                      key={`title-${currentStepIndex}`}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.4, delay: 0.2 }}
+                      className="text-xl font-bold text-[#c199e4] transition-colors duration-300"
+                    >
                       {step.title}
-                    </h3>
-                    <p className="text-sm text-white/70">{step.description}</p>
+                    </motion.h3>
+                    <motion.p
+                      key={`desc-${currentStepIndex}`}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.4, delay: 0.3 }}
+                      className="text-sm text-white/70"
+                    >
+                      {step.description}
+                    </motion.p>
                   </div>
                 </div>
                 <button
@@ -355,10 +566,16 @@ export function HomeTab() {
                 >
                   <HiOutlineXMark className="h-5 w-5" />
                 </button>
-              </div>
+              </motion.div>
 
-              {/* Progress Bar */}
-              <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20">
+              {/* Enhanced Progress Bar */}
+              <motion.div
+                key={`progress-${currentStepIndex}`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.4 }}
+                className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20"
+              >
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm text-gray-300 font-medium">
                     Onboarding Progress
@@ -367,19 +584,73 @@ export function HomeTab() {
                     {currentStepIndex + 1}/{onboardingSteps.length}
                   </p>
                 </div>
-                <div className="w-full bg-white/20 rounded-full h-3 mb-2">
-                  <div
-                    className="bg-gradient-to-r from-[#c199e4]/40 to-[#c199e4]/30 h-3 rounded-full transition-all duration-700 shadow-sm"
-                    style={{ width: `${progressPercent}%` }}
-                  />
+                <div className="w-full bg-white/20 rounded-full h-3 mb-2 relative overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progressPercent}%` }}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                    className="bg-gradient-to-r from-[#c199e4]/60 to-[#c199e4]/40 h-3 rounded-full shadow-lg relative"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
+                  </motion.div>
                 </div>
                 <p className="text-xs text-gray-400">
                   {Math.round(progressPercent)}% Complete
                 </p>
-              </div>
+              </motion.div>
+
+              {/* Step Indicators */}
+              <motion.div
+                key={`indicators-${currentStepIndex}`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.5 }}
+                className="flex items-center justify-center gap-2"
+              >
+                {onboardingSteps.map((s, idx) => (
+                  <div key={s.step} className="flex items-center">
+                    <motion.div
+                      initial={{ scale: 0.8 }}
+                      animate={{
+                        scale: idx === currentStepIndex ? 1.2 : 1,
+                        backgroundColor:
+                          idx === currentStepIndex
+                            ? "#c199e4"
+                            : idx < currentStepIndex
+                            ? "#10b981"
+                            : "#6b7280",
+                      }}
+                      transition={{ duration: 0.3, type: "spring" }}
+                      className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                        idx === currentStepIndex
+                          ? "ring-2 ring-[#c199e4]/50"
+                          : ""
+                      }`}
+                    />
+                    {idx < onboardingSteps.length - 1 && (
+                      <motion.div
+                        initial={{ scaleX: 0 }}
+                        animate={{ scaleX: idx < currentStepIndex ? 1 : 0.3 }}
+                        transition={{ duration: 0.5, delay: 0.2 }}
+                        className={`w-8 h-0.5 mx-2 rounded-full ${
+                          idx < currentStepIndex
+                            ? "bg-green-400"
+                            : "bg-gray-600"
+                        }`}
+                      />
+                    )}
+                  </div>
+                ))}
+              </motion.div>
 
               {/* Quick Start Guide */}
-              <div className="rounded-2xl p-4 border border-[#c199e4]/20">
+              <motion.div
+                key={`guide-${currentStepIndex}`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.6 }}
+                className="rounded-2xl p-4 border border-[#c199e4]/20"
+              >
                 <p className="text-sm text-gray-300 font-medium mb-2">
                   Quick Start Guide
                 </p>
@@ -388,38 +659,121 @@ export function HomeTab() {
                     Connect your wallet and tell us:
                   </p>
                   <p className="text-sm text-gray-200 mt-1 italic">
-                    &ldquo;I want to invest [amount] in [token] every
-                    [frequency] for [duration]&rdquo;
+                    &ldquo;I want create a DCA plan with [amount] [fromtoken] to
+                    [totoken] every [interval] for [duration]&rdquo;
                   </p>
                 </div>
-              </div>
+              </motion.div>
 
-              {/* Steps Grid */}
-              <div className="grid grid-cols-2 gap-2">
+              {/* Enhanced Steps Grid */}
+              <motion.div
+                key={`steps-grid-${currentStepIndex}`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.7 }}
+                className="grid grid-cols-2 gap-2"
+              >
                 {onboardingSteps.map((s, idx) => (
-                  <div
+                  <motion.div
                     key={s.step}
-                    className={`backdrop-blur-lg rounded-2xl p-3 border transition-all duration-300 group ${
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.3, delay: 0.1 * idx }}
+                    className={`backdrop-blur-lg rounded-2xl p-3 border transition-all duration-300 group relative overflow-hidden ${
                       idx === currentStepIndex
-                        ? "border-[#c199e4]/50 shadow-lg"
+                        ? "border-[#c199e4]/50 shadow-lg ring-2 ring-[#c199e4]/30"
+                        : idx < currentStepIndex
+                        ? "border-green-400/50 shadow-lg"
                         : "border-[#c199e4]/20 hover:border-[#c199e4]/30"
                     }`}
                   >
+                    {/* Completion indicator */}
+                    {idx < currentStepIndex && (
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ duration: 0.3, delay: 0.2 }}
+                        className="absolute top-2 right-2 w-5 h-5 bg-green-400 rounded-full flex items-center justify-center"
+                      >
+                        <svg
+                          className="w-3 h-3 text-white"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </motion.div>
+                    )}
+
+                    {/* Current step indicator */}
+                    {idx === currentStepIndex && (
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ duration: 0.3, delay: 0.1 }}
+                        className="absolute top-2 right-2 w-5 h-5 bg-[#c199e4] rounded-full flex items-center justify-center"
+                      >
+                        <motion.div
+                          animate={{
+                            scale: [1, 1.2, 1],
+                            opacity: [1, 0.7, 1],
+                          }}
+                          transition={{
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                          }}
+                          className="w-2 h-2 bg-white rounded-full"
+                        />
+                        <motion.div
+                          animate={{
+                            scale: [1, 1.5, 1],
+                            opacity: [0.3, 0, 0.3],
+                          }}
+                          transition={{
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                            delay: 0.5,
+                          }}
+                          className="absolute inset-0 bg-[#c199e4] rounded-full"
+                        />
+                      </motion.div>
+                    )}
+
                     <div className="mb-2" aria-hidden>
                       {s.icon}
                     </div>
-                    <div className="text-sm font-bold text-white group-hover:text-gray-200 transition-colors duration-300 mb-1">
+                    <div
+                      className={`text-sm font-bold transition-colors duration-300 mb-1 ${
+                        idx === currentStepIndex
+                          ? "text-[#c199e4]"
+                          : idx < currentStepIndex
+                          ? "text-green-400"
+                          : "text-white group-hover:text-gray-200"
+                      }`}
+                    >
                       {s.title}
                     </div>
                     <div className="text-xs text-gray-400 leading-relaxed">
                       {s.description}
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
 
               {/* Controls */}
-              <div className="space-y-3">
+              <motion.div
+                key={`controls-${currentStepIndex}`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.8 }}
+                className="space-y-3"
+              >
                 <label className="flex items-center gap-2 text-sm text-gray-400">
                   <input
                     type="checkbox"
@@ -432,23 +786,63 @@ export function HomeTab() {
 
                 {/* Action Buttons */}
                 <div className="flex gap-3 pt-2">
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={goPrev}
-                    disabled={currentStepIndex === 0}
-                    className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg group-hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    disabled={currentStepIndex === 0 || isTransitioning}
+                    className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                   >
-                    Back
-                  </button>
-                  <button
+                    {isTransitioning ? (
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{
+                          duration: 1,
+                          repeat: Infinity,
+                          ease: "linear",
+                        }}
+                        className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full mx-auto"
+                      />
+                    ) : (
+                      "Back"
+                    )}
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={goNext}
-                    className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg group-hover:scale-[1.02]"
+                    disabled={isTransitioning}
+                    className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg relative overflow-hidden group"
                   >
-                    {currentStepIndex === onboardingSteps.length - 1
-                      ? "Got it!"
-                      : step.action}
-                  </button>
+                    {/* Button background animation */}
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-[#c199e4]/40 to-[#c199e4]/20"
+                      initial={{ x: "-100%" }}
+                      whileHover={{ x: "0%" }}
+                      transition={{ duration: 0.3 }}
+                    />
+
+                    {/* Button content */}
+                    <span className="relative z-10">
+                      {isTransitioning ? (
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{
+                            duration: 1,
+                            repeat: Infinity,
+                            ease: "linear",
+                          }}
+                          className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full mx-auto"
+                        />
+                      ) : currentStepIndex === onboardingSteps.length - 1 ? (
+                        "Got it!"
+                      ) : (
+                        step.action
+                      )}
+                    </span>
+                  </motion.button>
                 </div>
-              </div>
+              </motion.div>
             </div>
           </motion.div>
         </div>
@@ -456,8 +850,34 @@ export function HomeTab() {
 
       {/* User Greeting */}
       <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20">
-        <h1 className="text-xl font-bold text-white">{userGreeting}</h1>
-        {address && (
+        <h1 className="text-xl font-bold text-white">{isConnected?userGreeting:"Please connect your wallet !"}</h1>
+        {!isConnected && (
+          <div className="mt-3">
+            <p className="text-sm text-white/70 mb-2">
+              Connect your wallet to view balances and manage your DCA strategies.
+            </p>
+            <button
+              onClick={() => setActiveTab('wallet' as any)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-[#c199e4]/20 to-[#b380db]/10 hover:from-[#c199e4]/30 hover:to-[#b380db]/20 text-white text-sm font-medium rounded-xl border border-[#c199e4]/30 hover:border-[#c199e4]/50 transition-all duration-300"
+            >
+              Go to Wallet
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 7l5 5m0 0l-5 5m5-5H6"
+                />
+              </svg>
+            </button>
+          </div>
+        )}
+        {address &&  (
           <div className="flex items-center gap-1.5 text-white/70 mt-2">
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse aspect-square"></div>
             <span className="text-sm">Connected:</span>
@@ -606,8 +1026,7 @@ export function HomeTab() {
                 <div className="h-12 bg-white/10 rounded-2xl"></div>
               </div>
             </div>
-          )}
-
+          )}          
           {/* Show message when no plans */}
           {!isLoading && userPlans.length === 0 && (
             <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl p-8 border border-white/20 text-center">
@@ -617,12 +1036,20 @@ export function HomeTab() {
               <h4 className="text-xl font-bold text-white mb-2">
                 No Active Strategies
               </h4>
+
+              
+            {isConnected && (<>
               <p className="text-white/70 text-sm mb-4">
                 Create your first DCA strategy to start automated investing
               </p>
               <div className="text-xs text-white/50">
                 Use the chat to get started 💡
               </div>
+              </>)}
+            <p className="text-white/70 text-sm mb-4">
+              {!isConnected && "Connect your wallet to create your first DCA strategy."}
+            </p>
+
             </div>
           )}
 
