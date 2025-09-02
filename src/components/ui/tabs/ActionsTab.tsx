@@ -420,6 +420,12 @@ export function ActionsTab() {
           );
           break;
 
+        case "collect_plan_data":
+          // Plan data collection in progress - no special handling needed
+          // The response message already guides the user for next input
+          console.log("Action: Collecting plan data", data);
+          break;
+
         case "plan_created":
         case "plan_confirmed":
           // Plan was successfully created
