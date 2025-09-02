@@ -539,7 +539,7 @@ export function ActionsTab() {
         const loadingMessage: ChatMessage = {
           id: Date.now().toString(),
           role: "assistant",
-          content: "🔄 Creating your DCA plan...",
+          content: " Creating your DCA plan...",
           timestamp: new Date(),
           isCreatingPlan: true,
         };
@@ -922,7 +922,12 @@ export function ActionsTab() {
             >
               <path d="M12 12c2.761 0 5-2.239 5-5s-2.239-5-5-5-5 2.239-5 5 2.239 5 5 5zm0 2c-3.866 0-7 3.134-7 7h2c0-2.761 2.239-5 5-5s5 2.239 5 5h2c0-3.866-3.134-7-7-7z" />
             </svg>
-            {address ? formatAddress(address) : "Not Connected"}
+            {/* {address ? formatAddress(address) : "Not Connected"} */}
+            {!isConnected
+              ? "Wallet Not Connected"
+              : isConnected && !address
+              ? "Connecting..."
+              : formatAddress(address as `0x${string}`)}
           </div>
         </div>
 
@@ -1230,7 +1235,12 @@ export function ActionsTab() {
             </div>
             <button
               onClick={handleSendMessage}
-              disabled={!inputMessage.trim() || isLoading || isApprovalLoading}
+              disabled={
+                !isConnected ||
+                !inputMessage.trim() ||
+                isLoading ||
+                isApprovalLoading
+              }
               className="h-11 w-11 p-0 bg-gradient-to-br from-[#c199e4] to-[#b380db] hover:from-[#d9b3ed] hover:to-[#c199e4] disabled:from-white/20 disabled:to-white/10 disabled:cursor-not-allowed text-white rounded-2xl transition-all duration-300 flex items-center justify-center shadow-lg backdrop-blur-sm"
               aria-label="Send message"
             >
