@@ -39,8 +39,10 @@ interface DCABackendResponse {
 }
 
 // Configuration for DCA backend connection
-const DCA_BACKEND_URL = process.env.DCA_BACKEND_URL || 'http://localhost:3001';
-const DCA_API_URL = process.env.DCA_API_URL || 'http://localhost:3002';
+const DCA_BACKEND_URL = process.env.DCA_BACKEND_URL;
+const DCA_API_URL = process.env.NEXT_PUBLIC_API_URL;
+console.log("DCA_API_URL",DCA_API_URL);
+console.log("DCA_BACKEND_URL",DCA_BACKEND_URL);
 
 /**
  * Chat API endpoint that interfaces with the DCA VibeKit Agent
