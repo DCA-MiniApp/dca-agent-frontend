@@ -3,7 +3,7 @@
 import { useMiniApp } from "@neynar/react";
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { HiOutlineEye, HiOutlineDocumentText } from "react-icons/hi";
+import { HiOutlineEye, HiOutlineDocumentText, HiOutlineFilter } from "react-icons/hi";
 import { StatusSelect } from "./StatusSelect";
 import { useAccount } from "wagmi";
 import {
@@ -32,6 +32,7 @@ export function ContextTab() {
     []
   );
   const [isLoading, setIsLoading] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
 
   type TransactionStatus = "SUCCESS" | "FAILED" | "PENDING";
   interface TransactionRow {
@@ -169,6 +170,7 @@ export function ContextTab() {
   // Modal state
   const [selectedTx, setSelectedTx] = useState<TransactionRow | null>(null);
   const openModal = (tx: TransactionRow) => setSelectedTx(tx);
+  console.log("Selected TX:", selectedTx);
   const closeModal = () => setSelectedTx(null);
 
   return (
@@ -190,92 +192,146 @@ export function ContextTab() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl p-6 border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 space-y-4 relative z-[50]">
-        <h3 className="text-lg font-bold text-white mb-4">
-          Filter Transactions
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="flex flex-col">
-            <label className="text-sm text-[#c199e4]/90 mb-2 font-medium">
-              From Token
-            </label>
-            <input
-              type="text"
-              placeholder="e.g., USDC, ETH"
-              value={fromTokenSearch}
-              onChange={(e) => {
-                setFromTokenSearch(e.target.value);
-                setPage(1);
-              }}
-              className="px-3 py-2 bg-gradient-to-br from-[#4a2b7a]/80 to-[#341e64]/20 backdrop-blur-lg rounded-xl border border-[#4a2b7a]/80 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-[#c199e4] focus:border-[#c199e4]/50 text-sm transition-all duration-300"
-            />
-          </div>
-          <div className="flex flex-col">
-            <label className="text-sm text-[#c199e4]/90 mb-2 font-medium">
-              To Token
-            </label>
-            <input
-              type="text"
-              placeholder="e.g., BTC, ARB"
-              value={toTokenSearch}
-              onChange={(e) => {
-                setToTokenSearch(e.target.value);
-                setPage(1);
-              }}
-              className="px-3 py-2 bg-gradient-to-br from-[#4a2b7a]/80 to-[#341e64]/20 backdrop-blur-lg rounded-xl border border-[#4a2b7a]/80 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-[#c199e4] focus:border-[#c199e4]/50 text-sm transition-all duration-300"
-            />
-          </div>
-          <div className="flex flex-col relative z-[99999]">
-            <label className="text-sm text-[#c199e4]/90 mb-2 font-medium">
-              Status
-            </label>
-            <StatusSelect
-              value={statusFilter}
-              onChange={(val) => {
-                setStatusFilter(val as any);
-                setPage(1);
-              }}
-            />
-          </div>
-          <div className="flex flex-col">
-            <label className="text-sm text-[#c199e4]/90 mb-2 font-medium">
-              Start Date
-            </label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                setPage(1);
-              }}
-              className="px-3 py-2 bg-gradient-to-br from-[#4a2b7a]/80 to-[#341e64]/20 backdrop-blur-lg rounded-xl border border-[#4a2b7a]/80 text-white focus:outline-none focus:ring-2 focus:ring-[#c199e4] focus:border-[#c199e4]/50 text-sm transition-all duration-300"
-            />
-          </div>
-          <div className="flex flex-col">
-            <label className="text-sm text-[#c199e4]/90 mb-2 font-medium">
-              End Date
-            </label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value);
-                setPage(1);
-              }}
-              className="px-3 py-2 bg-gradient-to-br from-[#4a2b7a]/80 to-[#341e64]/20 backdrop-blur-lg rounded-xl border border-[#4a2b7a]/80 text-white focus:outline-none focus:ring-2 focus:ring-[#c199e4] focus:border-[#c199e4]/50 text-sm transition-all duration-300"
-            />
+      {/* Compact toolbar to toggle filters and see quick state */}
+      {!selectedTx && (
+        <div className="sticky top-0 z-[40] -mt-2 mb-4">
+          <div className="flex items-center justify-between bg-gradient-to-r from-[#4a2b7a]/30 to-[#341e64]/20 backdrop-blur-xl border border-white/20 rounded-2xl px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-white/80 font-medium">Filters:</span>
+              <span className="px-2 py-1 rounded-lg border border-[#c199e4]/30 text-white/80">
+                {statusFilter === "All" ? "Any Status" : statusFilter}
+              </span>
+              {fromTokenSearch && (
+                <span className="px-2 py-1 rounded-lg border border-[#c199e4]/30 text-white/80">
+                  From: {fromTokenSearch}
+                </span>
+              )}
+              {toTokenSearch && (
+                <span className="px-2 py-1 rounded-lg border border-[#c199e4]/30 text-white/80">
+                  To: {toTokenSearch}
+                </span>
+              )}
+              {(startDate || endDate) && (
+                <span className="px-2 py-1 rounded-lg border border-[#c199e4]/30 text-white/80">
+                  {startDate || "…"} → {endDate || "…"}
+                </span>
+              )}
+              {!fromTokenSearch && !toTokenSearch && !startDate && !endDate && statusFilter === "All" && (
+                <span className="text-white/50">None</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowFilters((v) => !v)}
+                className="inline-flex items-center gap-2 px-3 py-2 bg-gradient-to-br from-[#c199e4]/20 to-[#b380db]/10 hover:from-[#c199e4]/30 hover:to-[#b380db]/20 text-white text-xs font-medium rounded-xl border border-[#c199e4]/30 hover:border-[#c199e4]/50 transition-all duration-300"
+              >
+                <HiOutlineFilter className="w-4 h-4" /> {showFilters ? "Hide" : "Show"} Filters
+              </button>
+              <button
+                onClick={resetFilters}
+                className="px-3 py-2 bg-white/5 hover:bg-white/10 text-white text-xs font-medium rounded-xl border border-white/20 transition-all duration-300"
+              >
+                Clear
+              </button>
+            </div>
           </div>
         </div>
-        <div className="pt-2">
-          <button
-            onClick={resetFilters}
-            className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#b380db]/10 hover:from-[#c199e4]/30 hover:to-[#b380db]/20 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg"
-          >
-            Clear All Filters
-          </button>
-        </div>
-      </div>
+      )}
+
+      {/* Filters (collapsible) */}
+      {showFilters && !selectedTx && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.25 }}
+          className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl p-6 border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 space-y-4 relative z-[50] mb-4"
+        >
+          <h3 className="text-lg font-bold text-white mb-4">
+            Filter Transactions
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="flex flex-col">
+              <label className="text-sm text-[#c199e4]/90 mb-2 font-medium">
+                From Token
+              </label>
+              <input
+                type="text"
+                placeholder="e.g., USDC, ETH"
+                value={fromTokenSearch}
+                onChange={(e) => {
+                  setFromTokenSearch(e.target.value);
+                  setPage(1);
+                }}
+                className="px-3 py-2 bg-gradient-to-br from-[#4a2b7a]/80 to-[#341e64]/20 backdrop-blur-lg rounded-xl border border-[#4a2b7a]/80 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-[#c199e4] focus:border-[#c199e4]/50 text-sm transition-all duration-300"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-sm text-[#c199e4]/90 mb-2 font-medium">
+                To Token
+              </label>
+              <input
+                type="text"
+                placeholder="e.g., BTC, ARB"
+                value={toTokenSearch}
+                onChange={(e) => {
+                  setToTokenSearch(e.target.value);
+                  setPage(1);
+                }}
+                className="px-3 py-2 bg-gradient-to-br from-[#4a2b7a]/80 to-[#341e64]/20 backdrop-blur-lg rounded-xl border border-[#4a2b7a]/80 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-[#c199e4] focus:border-[#c199e4]/50 text-sm transition-all duration-300"
+              />
+            </div>
+            <div className="flex flex-col relative z-[99999]">
+              <label className="text-sm text-[#c199e4]/90 mb-2 font-medium">
+                Status
+              </label>
+              <StatusSelect
+                value={statusFilter}
+                onChange={(val) => {
+                  setStatusFilter(val as any);
+                  setPage(1);
+                }}
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-sm text-[#c199e4]/90 mb-2 font-medium">
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setPage(1);
+                }}
+                className="px-3 py-2 bg-gradient-to-br from-[#4a2b7a]/80 to-[#341e64]/20 backdrop-blur-lg rounded-xl border border-[#4a2b7a]/80 text-white focus:outline-none focus:ring-2 focus:ring-[#c199e4] focus:border-[#c199e4]/50 text-sm transition-all duration-300"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-sm text-[#c199e4]/90 mb-2 font-medium">
+                End Date
+              </label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setPage(1);
+                }}
+                className="px-3 py-2 bg-gradient-to-br from-[#4a2b7a]/80 to-[#341e64]/20 backdrop-blur-lg rounded-xl border border-[#4a2b7a]/80 text-white focus:outline-none focus:ring-2 focus:ring-[#c199e4] focus:border-[#c199e4]/50 text-sm transition-all duration-300"
+              />
+            </div>
+          </div>
+          <div className="pt-2">
+            <button
+              onClick={resetFilters}
+              className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#b380db]/10 hover:from-[#c199e4]/30 hover:to-[#b380db]/20 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg"
+            >
+              Clear All Filters
+            </button>
+          </div>
+        </motion.div>
+      )}
 
       {/* Table */}
       <div className="mt-8 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 overflow-hidden z-[10]">
@@ -490,8 +546,8 @@ export function ContextTab() {
                       Execution Details
                     </h3>
                     <p className="text-sm text-white/70">
-                      {selectedTx.fromToken} → {selectedTx.toToken} • Plan:{" "}
-                      {selectedTx.planId.slice(0, 8)}...
+                      {selectedTx.fromToken} → {selectedTx.toToken} 
+                   
                     </p>
                   </div>
                 </div>
@@ -575,7 +631,7 @@ export function ContextTab() {
                     Plan ID
                   </p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300 font-mono">
-                    {selectedTx.planId.slice(0, 12)}...
+                    {selectedTx.planId.slice(0, 4)}...{selectedTx.planId.slice(-4)}
                   </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">
@@ -615,7 +671,7 @@ export function ContextTab() {
                   <p className="text-sm text-red-100 break-words">
                     {selectedTx.errorMessage}
                   </p>
-                </div>
+                </div>                                                                                                                  
               )}
 
               {/* Timeline Details */}

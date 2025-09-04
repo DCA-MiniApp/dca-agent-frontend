@@ -1,7 +1,6 @@
 "use client";
 
 import { useAccount } from "wagmi";
-import { truncateAddress } from "../../../lib/truncateAddress";
 import { useMiniApp } from "@neynar/react";
 import { useReadContract } from "wagmi";
 import { formatUnits } from "viem";
@@ -76,8 +75,14 @@ const USDC_ABI = [
 ];
 
 export function HomeTab() {
-  const { address,isConnected } = useAccount();
-  const { context, setActiveTab } = useMiniApp();
+  const { address, isConnected } = useAccount();
+  const {
+    context,
+    setActiveTab,
+    notificationDetails,
+    added,
+    /* actions available in SDK */ actions,
+  } = useMiniApp() as any;
   const router = useRouter();
 
   const { data: usdcRawBalance } = useReadContract({
@@ -144,6 +149,35 @@ export function HomeTab() {
       completed: false,
     },
   ]);
+
+  // Request notifications permission from Home tab
+  // const handleEnableNotifications = useCallback(async () => {
+  //   if (!context?.user?.fid) return;
+  //   try {
+  //     setNotifRequesting(true);
+  //     setNotifStatus("");
+  //     // Trigger client permission UI; addMiniApp generally prompts add + notifications
+  //     if (actions?.addMiniApp) {
+  //       await actions.addMiniApp();
+  //     }
+  //     // Send welcome notification explicitly (API also handles Neynar/non-Neynar)
+  //     await fetch("/api/send-notification", {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({
+  //         fid: context.user.fid,
+  //         notificationDetails: notificationDetails || undefined,
+  //         title: "Welcome to DCA Agent",
+  //         body: "Notifications enabled. We'll keep you updated on your plan performance.",
+  //       }),
+  //     });
+  //     setNotifStatus("Enabled");
+  //   } catch (e) {
+  //     setNotifStatus("Failed");
+  //   } finally {
+  //     setNotifRequesting(false);
+  //   }
+  // }, [actions, context?.user?.fid, notificationDetails]);
 
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -345,7 +379,7 @@ export function HomeTab() {
     setCurrentPlanIndex((prev) =>
       prev === 0 ? userPlans.length - 1 : prev - 1
     );
-  };
+  };   
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -852,14 +886,17 @@ export function HomeTab() {
 
       {/* User Greeting */}
       <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20">
-        <h1 className="text-xl font-bold text-white">{isConnected?userGreeting:"Please connect your wallet !"}</h1>
+        <h1 className="text-xl font-bold text-white">
+          {isConnected ? userGreeting : "Please connect your wallet !"}
+        </h1>
         {!isConnected && (
           <div className="mt-3">
             <p className="text-sm text-white/70 mb-2">
-              Connect your wallet to view balances and manage your DCA strategies.
+              Connect your wallet to view balances and manage your DCA
+              strategies.
             </p>
             <button
-              onClick={() => setActiveTab('wallet' as any)}
+              onClick={() => setActiveTab("wallet" as any)}
               className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-[#c199e4]/20 to-[#b380db]/10 hover:from-[#c199e4]/30 hover:to-[#b380db]/20 text-white text-sm font-medium rounded-xl border border-[#c199e4]/30 hover:border-[#c199e4]/50 transition-all duration-300"
             >
               Go to Wallet
@@ -879,7 +916,7 @@ export function HomeTab() {
             </button>
           </div>
         )}
-        {address &&  (
+        {address && (
           <div className="flex items-center gap-1.5 text-white/70 mt-2">
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse aspect-square"></div>
             <span className="text-sm">Connected:</span>
@@ -1028,7 +1065,7 @@ export function HomeTab() {
                 <div className="h-12 bg-white/10 rounded-2xl"></div>
               </div>
             </div>
-          )}          
+          )}
           {/* Show message when no plans */}
           {!isLoading && userPlans.length === 0 && (
             <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl p-8 border border-white/20 text-center">
@@ -1039,40 +1076,41 @@ export function HomeTab() {
                 No Active Strategies
               </h4>
 
-              
-            {isConnected && (<>
+              {isConnected && (
+                <>
+                  <p className="text-white/70 text-sm mb-4">
+                    Create your first DCA strategy to start automated investing
+                  </p>
+                  <div className="text-xs text-white/50">
+                    Use the chat to get started 💡
+                  </div>
+                  <div className="mt-4">
+                    <button
+                      onClick={() => router.push("/chat")}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-[#c199e4]/20 to-[#b380db]/10 hover:from-[#c199e4]/30 hover:to-[#b380db]/20 text-white text-sm font-semibold rounded-2xl border border-[#c199e4]/30 hover:border-[#c199e4]/50 transition-all duration-300"
+                    >
+                      Talk to Agent
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13 7l5 5m0 0l-5 5m5-5H6"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </>
+              )}
               <p className="text-white/70 text-sm mb-4">
-                Create your first DCA strategy to start automated investing
+                {!isConnected &&
+                  "Connect your wallet to create your first DCA strategy."}
               </p>
-              <div className="text-xs text-white/50">
-                Use the chat to get started 💡
-              </div>
-              <div className="mt-4">
-                <button
-                  onClick={() => router.push('/chat')}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-[#c199e4]/20 to-[#b380db]/10 hover:from-[#c199e4]/30 hover:to-[#b380db]/20 text-white text-sm font-semibold rounded-2xl border border-[#c199e4]/30 hover:border-[#c199e4]/50 transition-all duration-300"
-                >
-                  Talk to Agent
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 7l5 5m0 0l-5 5m5-5H6"
-                    />
-                  </svg>
-                </button>
-              </div>
-              </>)}
-            <p className="text-white/70 text-sm mb-4">
-              {!isConnected && "Connect your wallet to create your first DCA strategy."}
-            </p>
-
             </div>
           )}
 
@@ -1294,7 +1332,7 @@ export function HomeTab() {
                 {/* Right: Plan ID value and copy icon */}
                 <div className="flex items-center gap-2">
                   <span className="font-mono font-bold text-white">
-                    {selectedPlan.id}
+                    {selectedPlan.id.slice(0, 6)}...{selectedPlan.id.slice(-4)}
                   </span>
                   <button
                     onClick={handleCopyPlanId}
