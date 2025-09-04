@@ -100,7 +100,7 @@ export function ContextTab() {
         planId: execution.planId,
         fromToken: execution.plan?.fromToken || "UNKNOWN",
         toToken: execution.plan?.toToken || "UNKNOWN",
-        fromAmount: `$${fromAmount.toFixed(2)}`,
+        fromAmount: `${fromAmount.toFixed(5)}`,
         toAmount: `${toAmount.toFixed(6)} ${
           execution.plan?.toToken || "TOKEN"
         }`,
@@ -622,7 +622,7 @@ export function ContextTab() {
                   </p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
                     {selectedTx.gasFee
-                      ? `$${parseFloat(selectedTx.gasFee).toFixed(4)}`
+                      ? `${parseFloat(selectedTx.gasFee).toFixed(6)} ETH`
                       : "N/A"}
                   </p>
                 </div>

@@ -172,8 +172,10 @@ export async function updatePlanStatus(planId: string, status: 'ACTIVE' | 'PAUSE
 export function calculateTotalInvested(plans: DCAPlan[]): number {
   // console.log("Line number 167 plans:", plans)
   return plans.reduce((total, plan) => {
+    console.log("Amount plan:",plan.amount);
     const amount = parseFloat(plan.amount);
-    // console.log("Line number 169 amoutn:",amount)
+    console.log("Line number 169 amoutn:",amount)
+    console.log("Total:",total+(amount*plan.executionCount));
     return total + (amount * plan.executionCount);
   }, 0);
 }

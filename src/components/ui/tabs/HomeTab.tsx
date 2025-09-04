@@ -34,6 +34,7 @@ import {
   type DCAPlan,
   type PlatformStats,
 } from "../../../lib/api";
+import { computePlansInvestedUsd } from "../../../lib/utils";
 
 // Legacy interface for compatibility - will be replaced with DCAPlan
 /**
@@ -102,6 +103,7 @@ export function HomeTab() {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [totalInvested, setTotalInvested] = useState(0);
+  const [portfolioUsd, setPortfolioUsd] = useState<number | null>(null);
 
   // Modal state
   const [selectedPlan, setSelectedPlan] = useState<DCAPlan | null>(null);
@@ -214,6 +216,19 @@ export function HomeTab() {
       console.log("Total Invested line number 173:", totalInvested);
       setTotalInvested(calculateTotalInvested(plans));
       console.log("Total Invested:", totalInvested);
+      // Compute USD value across plans using CoinGecko
+      try {
+        const usd = await computePlansInvestedUsd(
+          plans.map((p) => ({
+            fromToken: p.fromToken,
+            amount: p.amount,
+            executionCount: p.executionCount,
+          }))
+        );
+        setPortfolioUsd(usd);
+      } catch (e) {
+        setPortfolioUsd(null);
+      }
 
       // Reset current plan index if we have fewer plans now
       if (plans.length > 0 && currentPlanIndex >= plans.length) {
@@ -986,15 +1001,12 @@ export function HomeTab() {
               <div>
                 <div className="flex items-baseline gap-2 mb-1">
                   <p className="text-3xl font-bold text-[#c199e4]">
-                    {isLoading
+                    {isLoading || portfolioUsd === null
                       ? "..."
-                      : `$${totalInvested.toLocaleString(undefined, {
-                          minimumFractionDigits: 1,
-                          maximumFractionDigits: 1,
-                        })}`}
+                      : `${portfolioUsd?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                   </p>
                   <span className="text-sm text-white/60 font-medium">
-                    Total Invested
+                    Total Invested{portfolioUsd !== null ? ' (USD)' : ''}
                   </span>
                 </div>
                 <p className="text-sm text-white/70">
@@ -1004,6 +1016,11 @@ export function HomeTab() {
                         userPlans.length === 1 ? "strategy" : "strategies"
                       }`}
                 </p>
+                {/* {portfolioUsd !== null && (
+                  <p className="text-xs text-white/60 mt-1">
+                    Est. USD Value: ${portfolioUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                )} */}
               </div>
 
               <div className="flex items-center gap-6">
@@ -1163,9 +1180,9 @@ export function HomeTab() {
                         Investment Amount
                       </p>
                       <p className="text-2xl font-bold text-white group-hover/item:text-[#c199e4] transition-colors duration-300">
-                        $
+                        
                         {parseFloat(userPlans[currentPlanIndex].amount).toFixed(
-                          2
+                          5
                         )}
                       </p>
                     </div>
@@ -1193,11 +1210,10 @@ export function HomeTab() {
                     </div>
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-2xl font-bold text-[#c199e4]">
-                        $
                         {(
                           parseFloat(userPlans[currentPlanIndex].amount) *
                           userPlans[currentPlanIndex].executionCount
-                        ).toFixed(2)}
+                        ).toFixed(5)}
                       </p>
                     </div>
                     <div className="w-full bg-white/20 rounded-full h-3">
@@ -1411,7 +1427,7 @@ export function HomeTab() {
                     Amount
                   </p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
-                    ${parseFloat(selectedPlan.amount).toFixed(2)}
+                    {parseFloat(selectedPlan.amount).toFixed(5)}
                   </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
@@ -1481,11 +1497,10 @@ export function HomeTab() {
                     Total Invested
                   </p>
                   <p className="text-2xl font-bold text-gray-100">
-                    $
                     {(
                       parseFloat(selectedPlan.amount) *
                       selectedPlan.executionCount
-                    ).toFixed(2)}
+                    ).toFixed(5)} {selectedPlan.fromToken}
                   </p>
                 </div>
               </div>

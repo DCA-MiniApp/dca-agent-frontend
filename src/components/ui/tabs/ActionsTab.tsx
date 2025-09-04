@@ -635,9 +635,7 @@ export function ActionsTab() {
         const approvalMessage: ChatMessage = {
           id: Date.now().toString(),
           role: "assistant",
-          content: `🔐 **Requesting Token Approval**\n\nPlease check your wallet and approve spending of ${totalAmount.toFixed(
-            6
-          )} ${
+          content: `🔐 **Requesting Token Approval**\n\nPlease check your wallet and approve spending of ${
             planData.fromToken
           } tokens. This allows our contract to execute your DCA plan automatically.\n\n*Check your wallet popup...*`,
           timestamp: new Date(),
