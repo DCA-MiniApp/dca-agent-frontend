@@ -91,9 +91,9 @@ export function HomeTab() {
     functionName: "balanceOf",
     args: [address],
   });
-  console.log("User Address:", USDC_ADDRESS);
+  // console.log("User Address:", USDC_ADDRESS);
 
-  console.log("USDC Raw Balance:", usdcRawBalance);
+  // console.log("USDC Raw Balance:", usdcRawBalance);
 
   // Dynamic data state
   const [userPlans, setUserPlans] = useState<DCAPlan[]>([]);

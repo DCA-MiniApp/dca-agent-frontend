@@ -1,6 +1,6 @@
 // API utilities for DCA backend integration
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export interface DCAPlan {
   id: string;
@@ -58,11 +58,17 @@ export interface ApiResponse<T = any> {
  */
 export async function fetchUserDCAPlans(userAddress: string): Promise<DCAPlan[]> {
   if (!userAddress) return [];
-  
+
   try {
-    const response = await fetch(`${API_BASE_URL}/dca/plans/${userAddress}`);
+    // const response = await fetch(`${API_BASE_URL}/api/dca/plans/${userAddress}`)
+    const response = await fetch(`${API_BASE_URL}/api/dca/plans/${userAddress}`, {
+      headers: {
+        "Accept": "application/json"
+      }
+    });
+    console.log("response", response);
     const result: ApiResponse<DCAPlan[]> = await response.json();
-    
+
     if (result.success && result.data) {
       return result.data;
     } else {
@@ -80,11 +86,11 @@ export async function fetchUserDCAPlans(userAddress: string): Promise<DCAPlan[]>
  */
 export async function fetchUserExecutionHistory(userAddress: string, limit = 50, offset = 0): Promise<ExecutionHistory[]> {
   if (!userAddress) return [];
-  
+
   try {
-    const response = await fetch(`${API_BASE_URL}/dca/user/${userAddress}/history?limit=${limit}&offset=${offset}`);
+    const response = await fetch(`${API_BASE_URL}/api/dca/user/${userAddress}/history?limit=${limit}&offset=${offset}`);
     const result: ApiResponse<ExecutionHistory[]> = await response.json();
-    
+
     if (result.success && result.data) {
       return result.data;
     } else {
@@ -102,11 +108,11 @@ export async function fetchUserExecutionHistory(userAddress: string, limit = 50,
  */
 export async function fetchPlanHistory(planId: string): Promise<ExecutionHistory[]> {
   if (!planId) return [];
-  
+
   try {
-    const response = await fetch(`${API_BASE_URL}/dca/history/${planId}`);
+    const response = await fetch(`${API_BASE_URL}/api/dca/history/${planId}`);
     const result: ApiResponse<ExecutionHistory[]> = await response.json();
-    
+
     if (result.success && result.data) {
       return result.data;
     } else {
@@ -124,9 +130,9 @@ export async function fetchPlanHistory(planId: string): Promise<ExecutionHistory
  */
 export async function fetchPlatformStats(): Promise<PlatformStats | null> {
   try {
-    const response = await fetch(`${API_BASE_URL}/dca/stats`);
+    const response = await fetch(`${API_BASE_URL}/api/dca/stats`);
     const result: ApiResponse<PlatformStats> = await response.json();
-    
+
     if (result.success && result.data) {
       return result.data;
     } else {
@@ -144,14 +150,14 @@ export async function fetchPlatformStats(): Promise<PlatformStats | null> {
  */
 export async function updatePlanStatus(planId: string, status: 'ACTIVE' | 'PAUSED' | 'CANCELLED'): Promise<boolean> {
   try {
-    const response = await fetch(`${API_BASE_URL}/dca/plans/${planId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/dca/plans/${planId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ status }),
     });
-    
+
     const result: ApiResponse = await response.json();
     return result.success;
   } catch (error) {
@@ -198,7 +204,7 @@ export function formatDuration(durationWeeks: number): string {
   } else {
     const months = Math.floor(durationWeeks / 4);
     const remainingWeeks = durationWeeks % 4;
-    
+
     let result = `${months} month${months !== 1 ? 's' : ''}`;
     if (remainingWeeks > 0) {
       result += ` ${remainingWeeks} week${remainingWeeks !== 1 ? 's' : ''}`;
