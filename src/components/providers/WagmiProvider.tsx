@@ -1,5 +1,5 @@
 import { createConfig, http, WagmiProvider } from "wagmi";
-import { mainnet, arbitrum } from "wagmi/chains";
+import { arbitrum } from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { farcasterFrame } from "@farcaster/miniapp-wagmi-connector";
 import { coinbaseWallet, metaMask } from "wagmi/connectors";
@@ -43,9 +43,8 @@ function useCoinbaseWalletAutoConnect() {
 }
 
 export const config = createConfig({
-  chains: [mainnet, arbitrum],
+  chains: [arbitrum],
   transports: {
-    [mainnet.id]: http(),
     [arbitrum.id]: http(),
   },
   connectors: [
