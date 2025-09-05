@@ -71,6 +71,13 @@ function formatAddress(
   return `${address.slice(0, prefixLength)}...${address.slice(-suffixLength)}`;
 }
 
+// Helper to format long text for mobile display
+function formatLongText(text: string, maxLength = 20): string {
+  if (!text) return "";
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, 8)}...${text.slice(-6)}`;
+}
+
 export function ActionsTab() {
   // --- Hooks ---
   const { notificationDetails, haptics, context } = useMiniApp();
@@ -88,20 +95,20 @@ export function ActionsTab() {
     {
       id: "1",
       role: "assistant",
-      content: `Hello! I'm your DCA (Dollar Cost Averaging) investment assistant powered by AI. I can help you:\n\n🎯 Create automated investment strategies\n📊 Analyze your portfolio performance\n⚙️ Manage your DCA plans\n${
+      content: `👋 **Hello!** I'm your DCA investment assistant.\n\n🎯 Create automated strategies\n📊 Track portfolio performance\n⚙️ Manage your plans\n\n${
         isConnected
-          ? `I see your wallet is connected (${formatAddress(
+          ? `Wallet connected (${formatAddress(
               address || ""
-            )}) - we're ready to get started!`
-          : "Please connect your wallet to access all features."
-      }\n\nWhat would you like to do today?\n
-      For example you can say "Create a DCA plan with 0.1 USDC into WETH every week for 1 months"`,
+            )}) - ready to go!`
+          : "Connect wallet to access all features."
+      }\n\n**Quick start:** "Create a DCA plan with 0.1 USDC into WETH weekly for 1 month"`,
       timestamp: new Date(),
     },
   ]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isApprovalLoading, setIsApprovalLoading] = useState(false); // Separate loading state for approval
+  const [isPlanCreationLoading, setIsPlanCreationLoading] = useState(false); // Separate loading state for plan creation
   const [connectionStatus, setConnectionStatus] = useState<
     "connecting" | "connected" | "error" | null
   >(null);
@@ -123,6 +130,7 @@ export function ActionsTab() {
   >("summary");
   const [currentPlanData, setCurrentPlanData] = useState<any>(null);
   const [isInPlanCreationFlow, setIsInPlanCreationFlow] = useState(false);
+  const [completedConfirmations, setCompletedConfirmations] = useState<Set<string>>(new Set());
 
   // Contract interactions for token approval
   const {
@@ -152,18 +160,22 @@ export function ActionsTab() {
       const parts = line.split(/(\*\*.*?\*\*)/g);
 
       return (
-        <span key={lineIndex}>
+        <span key={lineIndex} className="block break-words">
           {parts.map((part, partIndex) => {
             if (part.startsWith("**") && part.endsWith("**")) {
               // Bold text
               const boldText = part.slice(2, -2);
               return (
-                <strong key={partIndex} className="font-bold">
+                <strong key={partIndex} className="font-bold break-words">
                   {boldText}
                 </strong>
               );
             }
-            return part;
+            return (
+              <span key={partIndex} className="break-words">
+                {part}
+              </span>
+            );
           })}
           {lineIndex < lines.length - 1 && <br />}
         </span>
@@ -311,6 +323,8 @@ export function ActionsTab() {
     setCurrentPlanData(null);
     setIsInPlanCreationFlow(false);
     setIsApprovalLoading(false);
+    setIsPlanCreationLoading(false);
+    setCompletedConfirmations(new Set());
 
     try {
       // Set connecting status
@@ -476,6 +490,9 @@ export function ActionsTab() {
       setApprovalStatus("approved");
       setIsApprovalLoading(false);
 
+      // Mark this confirmation as completed
+      setCompletedConfirmations(prev => new Set(prev).add(pendingConfirmationId));
+
       // Add success message with transaction hash and copy functionality
       const approvalMessage: ChatMessage = {
         id: Date.now().toString(),
@@ -534,6 +551,8 @@ export function ActionsTab() {
           "[Confirmation] Creating plan after approval:",
           confirmationId
         );
+
+        setIsPlanCreationLoading(true);
 
         // Add loading message for plan creation
         const loadingMessage: ChatMessage = {
@@ -604,7 +623,7 @@ export function ActionsTab() {
         };
         setMessages((prev) => [...prev, errorMessage]);
       } finally {
-        setIsLoading(false);
+        setIsPlanCreationLoading(false);
         setIsApprovalLoading(false);
         setApprovalStatus("idle");
         setCurrentPlanData(null);
@@ -702,7 +721,9 @@ export function ActionsTab() {
     async (confirmationId: string) => {
       if (!confirmationId) return;
 
-      setIsLoading(true);
+      // Mark this confirmation as completed
+      setCompletedConfirmations(prev => new Set(prev).add(confirmationId));
+      setIsPlanCreationLoading(true);
 
       try {
         console.log("[Confirmation] Cancelling plan creation:", confirmationId);
@@ -757,7 +778,7 @@ export function ActionsTab() {
         };
         setMessages((prev) => [...prev, errorMessage]);
       } finally {
-        setIsLoading(false);
+        setIsPlanCreationLoading(false);
         setIsApprovalLoading(false);
         setCurrentPlanData(null);
         setApprovalStatus("idle");
@@ -931,7 +952,7 @@ export function ActionsTab() {
 
         {/* Chat Messages - Scrollable */}
         <div
-          className="flex-1 overflow-y-auto px-3 pb-4 space-y-3"
+          className="flex-1 overflow-y-auto overflow-x-hidden px-3 pb-4 space-y-3"
           style={{
             scrollbarWidth: "thin",
             scrollbarColor: "#c199e4 transparent",
@@ -964,10 +985,10 @@ export function ActionsTab() {
                 className={`rounded-2xl px-3 py-3 ${
                   message.role === "user"
                     ? "max-w-[75%] bg-gradient-to-br from-[#c199e4] to-[#b380db] text-white shadow-lg"
-                    : "bg-gradient-to-br from-white/15 to-white/10 backdrop-blur-sm text-white border border-white/20"
+                    : "max-w-[85%] bg-gradient-to-br from-white/15 to-white/10 backdrop-blur-sm text-white border border-white/20"
                 }`}
               >
-                <div className="text-sm leading-relaxed">
+                <div className="text-sm leading-relaxed break-words overflow-wrap-anywhere">
                   {renderMarkdownText(message.content)}
                   {message.isCreatingPlan && (
                     <div className="mt-2 flex space-x-1">
@@ -992,10 +1013,10 @@ export function ActionsTab() {
                         navigator.clipboard.writeText(message.transactionHash!);
                         // Could add a toast notification here
                       }}
-                      className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors break-all"
                     >
                       <svg
-                        className="w-3 h-3"
+                        className="w-3 h-3 flex-shrink-0"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -1007,13 +1028,13 @@ export function ActionsTab() {
                           d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
                         />
                       </svg>
-                      Copy Full Hash
+                      <span className="break-all">Copy Hash</span>
                     </button>
                   </div>
                 )}
 
                 {/* Confirmation Buttons */}
-                {message.requiresConfirmation && message.confirmationId && (
+                {message.requiresConfirmation && message.confirmationId && !completedConfirmations.has(message.confirmationId) && (
                   <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                     <div className="flex gap-2 justify-center">
                       <button
@@ -1028,7 +1049,7 @@ export function ActionsTab() {
                           }
                         }}
                         disabled={
-                          isLoading ||
+                          isPlanCreationLoading ||
                           isApprovalLoading ||
                           isApprovePending ||
                           isApprovalConfirming
@@ -1049,7 +1070,7 @@ export function ActionsTab() {
                               ? "Starting Approval..."
                               : "Creating Plan..."}
                           </>
-                        ) : isLoading ? (
+                        ) : isPlanCreationLoading ? (
                           <>
                             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                             &apos;Processing...&apos;
@@ -1080,7 +1101,7 @@ export function ActionsTab() {
                           handleCancelPlan(message.confirmationId!)
                         }
                         disabled={
-                          isLoading ||
+                          isPlanCreationLoading ||
                           isApprovalLoading ||
                           isApprovePending ||
                           isApprovalConfirming
@@ -1177,25 +1198,6 @@ export function ActionsTab() {
             </button>
           </div>
 
-          {/* Connection Status Indicator */}
-          {connectionStatus && (
-            <div className="flex items-center gap-2 mb-1 text-xs">
-              <div
-                className={`w-2 h-2 rounded-full ${
-                  connectionStatus === "connected"
-                    ? "bg-green-400"
-                    : connectionStatus === "connecting"
-                    ? "bg-yellow-400 animate-pulse"
-                    : "bg-red-400"
-                }`}
-              />
-              <span className="text-white/70">
-                {connectionStatus === "connected" && "Connected to DCA Backend"}
-                {connectionStatus === "connecting" && "Connecting..."}
-                {connectionStatus === "error" && "Connection Error"}
-              </span>
-            </div>
-          )}
 
           {/* Plan Creation Mode Indicator */}
           {isInPlanCreationFlow && (
@@ -1237,12 +1239,13 @@ export function ActionsTab() {
                 !isConnected ||
                 !inputMessage.trim() ||
                 isLoading ||
-                isApprovalLoading
+                isApprovalLoading ||
+                isPlanCreationLoading
               }
               className="h-11 w-11 p-0 bg-gradient-to-br from-[#c199e4] to-[#b380db] hover:from-[#d9b3ed] hover:to-[#c199e4] disabled:from-white/20 disabled:to-white/10 disabled:cursor-not-allowed text-white rounded-2xl transition-all duration-300 flex items-center justify-center shadow-lg backdrop-blur-sm"
               aria-label="Send message"
             >
-              {isLoading || isApprovalLoading ? (
+              {isLoading || isApprovalLoading || isPlanCreationLoading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <svg

@@ -565,8 +565,8 @@ async function establishSSEConnection(): Promise<{
 }> {
   return new Promise(async (resolve, reject) => {
     const timeout = setTimeout(() => {
-      reject(new Error('SSE connection timeout after 10 seconds'));
-    }, 10000);
+      reject(new Error('SSE connection timeout after 30 seconds'));
+    }, 30000);
 
     try {
       console.log('[SSE] Opening SSE connection...');
@@ -1006,12 +1006,12 @@ function handleGeneralConversation(message: string, userAddress?: string): strin
   
   // Greetings
   if (lowerMessage.includes('hello') || lowerMessage.includes('hi') || lowerMessage.includes('hey')) {
-    return `👋 **Hello there!** I'm your DCA Investment Assistant. I help you create and manage automated cryptocurrency investment strategies.\n\n` +
-           `💡 **Try asking me:**\n` +
-           `• "Create a DCA plan to invest 100 USDC into ETH weekly"\n` +
-           `• "Show my active DCA plans"\n` +
-           `• "What are the platform statistics?"\n\n` +
-           `${userAddress ? `I can see your wallet is connected (${userAddress.slice(0, 6)}...${userAddress.slice(-4)}), so we're ready to go!` : 'Connect your wallet to start creating DCA strategies!'}`;
+    return `👋 **Hello!** I'm your DCA Investment Assistant.\n\n` +
+           `💡 **Quick actions:**\n` +
+           `• "Create a DCA plan"\n` +
+           `• "Show my plans"\n` +
+           `• "Platform stats"\n\n` +
+           `${userAddress ? `Wallet connected (${userAddress.slice(0, 6)}...${userAddress.slice(-4)})` : 'Connect wallet to start!'}`;
   }
 
   // Good morning/afternoon/evening
@@ -1028,27 +1028,25 @@ function handleGeneralConversation(message: string, userAddress?: string): strin
 
   // What can you do
   if (lowerMessage.includes('what can you do') || lowerMessage.includes('capabilities')) {
-    return `🤖 **I'm your DCA Investment Assistant!** Here's what I can help you with:\n\n` +
-           `📈 **Create DCA Plans**: Set up automated investment strategies\n` +
-           `💼 **Manage Plans**: View, pause, resume, or cancel your strategies\n` +
-           `📊 **Track Performance**: Monitor your investment progress\n` +
-           `🎯 **Smart Recommendations**: Get personalized investment advice\n` +
-           `⚙️ **Platform Stats**: View overall platform performance\n\n` +
+    return `🤖 **DCA Investment Assistant**\n\n` +
+           `📈 Create DCA Plans\n` +
+           `💼 Manage Plans\n` +
+           `📊 Track Performance\n` +
+           `⚙️ Platform Stats\n\n` +
            `**Quick Commands:**\n` +
-           `• "Show my plans" - View your DCA strategies\n` +
-           `• "Create plan" - Set up new investment strategy\n` +
-           `• "Platform stats" - See platform statistics\n\n` +
-           `Just ask me anything in natural language!`;
+           `• "Show my plans"\n` +
+           `• "Create plan"\n` +
+           `• "Platform stats"`;
   }
 
   // Who are you / What are you
   if (lowerMessage.includes('who are you') || lowerMessage.includes('what are you')) {
-    return `🤖 I'm your **DCA Investment Assistant** - an AI-powered bot specialized in helping you create and manage Dollar Cost Averaging (DCA) strategies for cryptocurrency investments.\n\n` +
-           `💡 I can understand natural language and help you:\n` +
+    return `🤖 **DCA Investment Assistant**\n\n` +
+           `💡 I help you:\n` +
            `• Set up automated investment plans\n` +
-           `• Monitor your portfolio performance\n` +
+           `• Monitor portfolio performance\n` +
            `• Make smart investment decisions\n\n` +
-           `Think of me as your personal crypto investment advisor that never sleeps! 🚀`;
+           `Your personal crypto advisor! 🚀`;
   }
 
   // Generic fallback for other general messages

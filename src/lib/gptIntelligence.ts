@@ -373,13 +373,20 @@ Extract any new DCA parameters from this message and provide the next question f
     const tokenInfoArray = availableTokens[planData.fromToken];
     const tokenInfo = tokenInfoArray && tokenInfoArray.length > 0 ? tokenInfoArray[0] : undefined;
     
-    return `📊 **DCA Plan Summary:**\n\n` +
-           `• **Investment:** ${planData.amount} ${planData.fromToken}\n` +
-           `• **Target:** ${planData.toToken}\n` +
-           `• **Duration:** ${planData.duration}\n` +
-           `• **Interval:** ${planData.interval}\n` +
-           `• **Slippage:** ${planData.slippage || '2'}%\n\n` +
-           `💰 **Token Address:** ${tokenInfo?.address}\n` +
+    // Format token address for mobile display
+    const formatTokenAddress = (address: string) => {
+      if (!address) return 'N/A';
+      if (address.length <= 20) return address;
+      return `${address.slice(0, 8)}...${address.slice(-6)}`;
+    };
+    
+    return `📊 **DCA Plan Summary:**\n` +
+           `• Investment: ${planData.amount} ${planData.fromToken}\n` +
+           `• Target: ${planData.toToken}\n` +
+           `• Duration: ${planData.duration}\n` +
+           `• Interval: ${planData.interval}\n` +
+           `• Slippage: ${planData.slippage || '2'}%\n\n` +
+           `💰 **Token:** ${formatTokenAddress(tokenInfo?.address || '')}\n` +
            `⚠️ **Note:** You'll need to approve unlimited spending for ${planData.fromToken} tokens to the executor.`;
   }
 
