@@ -17,6 +17,7 @@ import { type AccountAssociation } from '@farcaster/miniapp-core/src/manifest';
  * Used for generating absolute URLs for assets and API endpoints.
  */
 export const APP_URL: string = process.env.NEXT_PUBLIC_URL!;
+console.log('APP_URL:', APP_URL);
 
 /**
  * The name of the mini app as displayed to users.
@@ -28,7 +29,7 @@ export const APP_NAME: string = 'DCA Agent';
  * A brief description of the mini app's functionality.
  * Used in app store listings and metadata.
  */
-export const APP_DESCRIPTION: string = 'A miniapp for daily investment.';
+export const APP_DESCRIPTION: string = 'A miniapp for daily investment power by DCA agent.';
 
 /**
  * The primary category for the mini app.
@@ -40,7 +41,7 @@ export const APP_PRIMARY_CATEGORY: string = 'finance';
  * Tags associated with the mini app.
  * Used for search and discovery in app stores.
  */
-export const APP_TAGS: string[] = ['neynar', 'starter-kit', 'demo'];
+export const APP_TAGS: string[] = ['AI', 'DCA', 'Agent', 'Crypto', 'Investment'];
 
 // --- Asset URLs ---
 /**
@@ -72,8 +73,13 @@ export const APP_SPLASH_BACKGROUND_COLOR: string = '#f7f7f7';
  * Used to associate the mini app with a Farcaster account.
  * If not provided, the mini app will be unsigned and have limited capabilities.
  */
-export const APP_ACCOUNT_ASSOCIATION: AccountAssociation | undefined =
-  undefined;
+export const APP_ACCOUNT_ASSOCIATION: AccountAssociation | undefined = {
+  header:
+    'eyJmaWQiOjcyNzI5MSwidHlwZSI6ImF1dGgiLCJrZXkiOiIweGJiOEJiYzQ1OTlENzcyRjA2Qzc3NjczMTM5NkFEMTk4QzRCRGUxMDUifQ',
+  payload: 'eyJkb21haW4iOiJkY2FhZ2VudC52ZXJjZWwuYXBwIn0',
+  signature:
+    'ebsmK4L7NwJj/wORDBwbNd43OS6oDolD+hbNkdkDek9VIZ6qPe2yducwXjKxCMX0Zu/n6S2WBCNJ80BzoH+NWhs=',
+};
 
 // --- UI Configuration ---
 /**

@@ -4,7 +4,7 @@ import { useAccount } from "wagmi";
 import { useMiniApp } from "@neynar/react";
 import { useReadContract } from "wagmi";
 import { formatUnits } from "viem";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   HiCurrencyDollar,
@@ -20,6 +20,7 @@ import {
   HiOutlineCheckCircle,
   HiOutlineDevicePhoneMobile,
   HiOutlineXMark,
+  HiOutlineBell,
 } from "react-icons/hi2";
 import { HiOutlineArrowNarrowRight } from "react-icons/hi";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
@@ -35,6 +36,7 @@ import {
   type PlatformStats,
 } from "../../../lib/api";
 import { computePlansInvestedUsd } from "../../../lib/utils";
+import { Button } from "../Button";
 
 // Legacy interface for compatibility - will be replaced with DCAPlan
 /**
@@ -85,6 +87,21 @@ export function HomeTab() {
     /* actions available in SDK */ actions,
   } = useMiniApp() as any;
   const router = useRouter();
+
+  // Track latest notificationDetails as it may populate shortly after addMiniApp
+  const latestNotifDetailsRef = useRef(notificationDetails);
+  useEffect(() => {
+    latestNotifDetailsRef.current = notificationDetails;
+  }, [notificationDetails]);
+
+  const waitForNotificationDetails = useCallback(async (timeoutMs = 5000, intervalMs = 200) => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (latestNotifDetailsRef.current) return latestNotifDetailsRef.current;
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+    return null;
+  }, []);
 
   const { data: usdcRawBalance } = useReadContract({
     address: USDC_ADDRESS,
@@ -181,6 +198,99 @@ export function HomeTab() {
   //   }
   // }, [actions, context?.user?.fid, notificationDetails]);
 
+  const handleEnableNotifications = useCallback(async () => {
+    if (!context?.user?.fid) return;
+    try {
+      setNotificationState((prev) => ({ ...prev, sendStatus: "" }));
+      if (actions?.addMiniApp) {
+        await actions.addMiniApp();
+        console.log("Mini app added, waiting for notification details...");
+        const details = await waitForNotificationDetails();
+        console.log("Notification details received:", details);
+        try {
+          console.log("Sending notification to fid:", context.user.fid);
+          const response = await fetch("/api/send-notification", {
+            method: "POST",
+            mode: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fid: context.user.fid,
+              notificationDetails: details || undefined,
+              title: "Welcome to DCA Agent",
+              body: "Notifications enabled. We'll keep you updated on your plan performance.",
+            }),
+          });
+          console.log("Notification API response:", response);
+          const json = await response.json().catch(() => null);
+          if (json) console.log("Notification API json:", json);
+          if (response.status === 200) {
+            setNotificationState((prev) => ({
+              ...prev,
+              sendStatus: "Success",
+            }));
+            return;
+          } else if (response.status === 429) {
+            setNotificationState((prev) => ({
+              ...prev,
+              sendStatus: "Rate limited",
+            }));
+            return;
+          }
+          const responseText = json ? JSON.stringify(json) : await response.text();
+          setNotificationState((prev) => ({
+            ...prev,
+            sendStatus: `Error: ${responseText}`,
+          }));
+        } catch (error) {
+          setNotificationState((prev) => ({
+            ...prev,
+            sendStatus: `Error: ${error}`,
+          }));
+        }
+      }
+    } catch (e) {
+      setNotificationState((prev) => ({ ...prev, sendStatus: "Failed" }));
+    }
+  }, [actions, context, waitForNotificationDetails]);
+
+  // const sendFarcasterNotification = useCallback(async () => {
+  //   setNotificationState((prev) => ({ ...prev, sendStatus: "" }));
+  //   if (!notificationDetails || !context) {
+  //     return;
+  //   }
+  //   try {
+  //     const response = await fetch("/api/send-notification", {
+  //       method: "POST",
+  //       mode: "same-origin",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({
+  //         fid: context.user.fid,
+  //         notificationDetails,
+  //       }),
+  //     });
+  //     if (response.status === 200) {
+  //       setNotificationState((prev) => ({ ...prev, sendStatus: "Success" }));
+  //       return;
+  //     } else if (response.status === 429) {
+  //       setNotificationState((prev) => ({
+  //         ...prev,
+  //         sendStatus: "Rate limited",
+  //       }));
+  //       return;
+  //     }
+  //     const responseText = await response.text();
+  //     setNotificationState((prev) => ({
+  //       ...prev,
+  //       sendStatus: `Error: ${responseText}`,
+  //     }));
+  //   } catch (error) {
+  //     setNotificationState((prev) => ({
+  //       ...prev,
+  //       sendStatus: `Error: ${error}`,
+  //     }));
+  //   }
+  // }, [context, notificationDetails]);
+
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [dontShowAgain, setDontShowAgain] = useState(false);
@@ -193,6 +303,10 @@ export function HomeTab() {
   const [completedStepIndex, setCompletedStepIndex] = useState<number | null>(
     null
   );
+  const [notificationState, setNotificationState] = useState({
+    sendStatus: "",
+    shareUrlCopied: false,
+  });
 
   // Fetch user data when address changes
   const fetchUserData = useCallback(async () => {
@@ -394,7 +508,7 @@ export function HomeTab() {
     setCurrentPlanIndex((prev) =>
       prev === 0 ? userPlans.length - 1 : prev - 1
     );
-  };   
+  };
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -932,12 +1046,41 @@ export function HomeTab() {
           </div>
         )}
         {address && (
-          <div className="flex items-center gap-1.5 text-white/70 mt-2">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse aspect-square"></div>
-            <span className="text-sm">Connected:</span>
-            <code className="text-xs bg-white/20 px-2 py-1 rounded-md">
-              {address.slice(0, 6)}...{address.slice(-4)}
-            </code>
+          <div className="mt-2 space-y-2">
+            <div className="flex items-center gap-1.5 text-white/70">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse aspect-square"></div>
+              <span className="text-sm">Connected:</span>
+              <code className="text-xs bg-white/20 px-2 py-1 rounded-md">
+                {address.slice(0, 6)}...{address.slice(-4)}
+              </code>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 bg-white/5 rounded-xl p-3 border border-white/10">
+              <div className="text-sm text-white/80">
+                <div className="font-semibold">
+                  Never miss any updates on your plan
+                </div>
+              </div>
+              <button
+                onClick={handleEnableNotifications}
+                disabled={added}
+                className={`p-2 rounded-full border ${
+                  added
+                    ? "border-green-400/40 bg-green-500/20 text-green-200"
+                    : "border-[#c199e4]/40 bg-[#c199e4]/20 text-white"
+                } hover:bg-[#c199e4]/30`}
+                aria-label="Enable notifications"
+                title={added ? "Notifications enabled" : "Enable notifications"}
+              >
+                <HiOutlineBell className="w-5 h-5" />
+              </button>
+            </div>
+
+            {notificationState.sendStatus && (
+              <div className="text-xs text-white/70">
+                Notification status: {notificationState.sendStatus}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1003,10 +1146,13 @@ export function HomeTab() {
                   <p className="text-3xl font-bold text-[#c199e4]">
                     {isLoading || portfolioUsd === null
                       ? "..."
-                      : `${portfolioUsd?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                      : `${portfolioUsd?.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}`}
                   </p>
                   <span className="text-sm text-white/60 font-medium">
-                    Total Invested{portfolioUsd !== null ? ' (USD)' : ''}
+                    Total Invested{portfolioUsd !== null ? " (USD)" : ""}
                   </span>
                 </div>
                 <p className="text-sm text-white/70">
@@ -1180,7 +1326,6 @@ export function HomeTab() {
                         Investment Amount
                       </p>
                       <p className="text-2xl font-bold text-white group-hover/item:text-[#c199e4] transition-colors duration-300">
-                        
                         {parseFloat(userPlans[currentPlanIndex].amount).toFixed(
                           5
                         )}
@@ -1500,7 +1645,8 @@ export function HomeTab() {
                     {(
                       parseFloat(selectedPlan.amount) *
                       selectedPlan.executionCount
-                    ).toFixed(5)} {selectedPlan.fromToken}
+                    ).toFixed(5)}{" "}
+                    {selectedPlan.fromToken}
                   </p>
                 </div>
               </div>

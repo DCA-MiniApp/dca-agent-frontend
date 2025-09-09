@@ -7,7 +7,9 @@ import { sendNeynarMiniAppNotification } from "~/lib/neynar";
 
 const requestSchema = z.object({
   fid: z.number(),
-  notificationDetails: notificationDetailsSchema,
+  notificationDetails: notificationDetailsSchema.optional(),
+  title: z.string().optional(),
+  body: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -25,8 +27,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  console.log('Received notification request for fid:', requestBody.data.fid);
+  console.log('Neynar enabled:', neynarEnabled);
+  console.log('Notification details provided:', !!requestBody.data.notificationDetails);
+
   // Only store notification details if not using Neynar
   if (!neynarEnabled) {
+    // When not using Neynar, client must provide notificationDetails once approved on client side
+    if (!requestBody.data.notificationDetails) {
+      return Response.json(
+        {
+          success: false,
+          error:
+            "Missing notificationDetails. Ask client to grant notifications (addMiniApp) first.",
+        },
+        { status: 400 }
+      );
+    }
     await setUserNotificationDetails(
       Number(requestBody.data.fid),
       requestBody.data.notificationDetails
@@ -37,21 +54,25 @@ export async function POST(request: NextRequest) {
   const sendNotification = neynarEnabled ? sendNeynarMiniAppNotification : sendMiniAppNotification;
   const sendResult = await sendNotification({
     fid: Number(requestBody.data.fid),
-    title: "Test notification",
-    body: "Sent at " + new Date().toISOString(),
+    title: requestBody.data.title ?? "Welcome to DCA Agent",
+    body:
+      requestBody.data.body ??
+      "Notifications enabled. We'll keep you updated on your plan performance.",
   });
+
+  console.log('Notification send result:', sendResult);
 
   if (sendResult.state === "error") {
     return Response.json(
-      { success: false, error: sendResult.error },
+      { success: false, neynarEnabled: !!neynarEnabled, result: sendResult },
       { status: 500 }
     );
   } else if (sendResult.state === "rate_limit") {
     return Response.json(
-      { success: false, error: "Rate limited" },
+      { success: false, neynarEnabled: !!neynarEnabled, result: sendResult },
       { status: 429 }
     );
   }
 
-  return Response.json({ success: true });
+  return Response.json({ success: true, neynarEnabled: !!neynarEnabled, result: sendResult });
 }
