@@ -54,10 +54,10 @@ export async function POST(request: NextRequest) {
   const sendNotification = neynarEnabled ? sendNeynarMiniAppNotification : sendMiniAppNotification;
   const sendResult = await sendNotification({
     fid: Number(requestBody.data.fid),
-    title: requestBody.data.title ?? "Welcome to DCA Agent",
+    title: requestBody.data.title ?? "",
     body:
       requestBody.data.body ??
-      "Notifications enabled. We'll keep you updated on your plan performance.",
+      "",
   });
 
   console.log('Notification send result:', sendResult);

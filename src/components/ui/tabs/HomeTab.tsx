@@ -201,7 +201,7 @@ export function HomeTab() {
   const handleEnableNotifications = useCallback(async () => {
     if (!context?.user?.fid) return;
     try {
-      setNotificationState((prev) => ({ ...prev, sendStatus: "" }));
+      setNotificationState((prev) => ({ ...prev, sendStatus: "", isEnabling: true }));
       if (actions?.addMiniApp) {
         await actions.addMiniApp();
         console.log("Mini app added, waiting for notification details...");
@@ -216,8 +216,8 @@ export function HomeTab() {
             body: JSON.stringify({
               fid: context.user.fid,
               notificationDetails: details || undefined,
-              title: "Welcome to DCA Agent",
-              body: "Notifications enabled. We'll keep you updated on your plan performance.",
+              title: "Welcome to DCA Agent 🥳",
+              body: "We'll keep you updated on your plan performance.🔔",
             }),
           });
           console.log("Notification API response:", response);
@@ -227,12 +227,14 @@ export function HomeTab() {
             setNotificationState((prev) => ({
               ...prev,
               sendStatus: "Success",
+              isEnabling: false,
             }));
             return;
           } else if (response.status === 429) {
             setNotificationState((prev) => ({
               ...prev,
               sendStatus: "Rate limited",
+              isEnabling: false,
             }));
             return;
           }
@@ -240,16 +242,18 @@ export function HomeTab() {
           setNotificationState((prev) => ({
             ...prev,
             sendStatus: `Error: ${responseText}`,
+            isEnabling: false,
           }));
         } catch (error) {
           setNotificationState((prev) => ({
             ...prev,
             sendStatus: `Error: ${error}`,
+            isEnabling: false,
           }));
         }
       }
     } catch (e) {
-      setNotificationState((prev) => ({ ...prev, sendStatus: "Failed" }));
+      setNotificationState((prev) => ({ ...prev, sendStatus: "Failed", isEnabling: false }));
     }
   }, [actions, context, waitForNotificationDetails]);
 
@@ -306,7 +310,11 @@ export function HomeTab() {
   const [notificationState, setNotificationState] = useState({
     sendStatus: "",
     shareUrlCopied: false,
+    isEnabling: false,
   });
+
+  // Consider notifications enabled if hook provides details, app is added, or we already succeeded
+  const isNotificationsEnabled = !!notificationDetails || !!added || notificationState.sendStatus === "Success";
 
   // Fetch user data when address changes
   const fetchUserData = useCallback(async () => {
@@ -1055,26 +1063,35 @@ export function HomeTab() {
               </code>
             </div>
 
-            <div className="flex items-center justify-between gap-3 bg-white/5 rounded-xl p-3 border border-white/10">
-              <div className="text-sm text-white/80">
-                <div className="font-semibold">
-                  Never miss any updates on your plan
+            {!isNotificationsEnabled ? (
+              <div className="flex items-center justify-between gap-3 bg-white/5 rounded-xl p-3 border border-white/10">
+                <div className="text-sm text-white/80">
+                  <div className="font-semibold">Never miss any updates on your plan</div>
                 </div>
+                <button
+                  onClick={handleEnableNotifications}
+                  disabled={notificationState.isEnabling}
+                  className={`p-2 rounded-full border ${
+                    notificationState.isEnabling
+                      ? "border-white/30 bg-white/10 text-white/60"
+                      : "border-[#c199e4]/40 bg-[#c199e4]/20 text-white hover:bg-[#c199e4]/30"
+                  }`}
+                  aria-label="Enable notifications"
+                  title={notificationState.isEnabling ? "Enabling..." : "Enable notifications"}
+                >
+                  {notificationState.isEnabling ? (
+                    <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <HiOutlineBell className="w-5 h-5" />
+                  )}
+                </button>
               </div>
-              <button
-                onClick={handleEnableNotifications}
-                disabled={added}
-                className={`p-2 rounded-full border ${
-                  added
-                    ? "border-green-400/40 bg-green-500/20 text-green-200"
-                    : "border-[#c199e4]/40 bg-[#c199e4]/20 text-white"
-                } hover:bg-[#c199e4]/30`}
-                aria-label="Enable notifications"
-                title={added ? "Notifications enabled" : "Enable notifications"}
-              >
-                <HiOutlineBell className="w-5 h-5" />
-              </button>
-            </div>
+            ) : (
+              <div className="flex items-center gap-2 bg-green-500/10 text-green-200 border border-green-400/30 rounded-xl px-3 py-2">
+                <HiOutlineCheck className="w-4 h-4" />
+                <span className="text-xs font-medium">Notifications enabled</span>
+              </div>
+            )}
 
             {notificationState.sendStatus && (
               <div className="text-xs text-white/70">
