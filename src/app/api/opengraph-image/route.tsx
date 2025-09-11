@@ -5,6 +5,7 @@ import { APP_NAME } from "~/lib/constants";
 
 export const dynamic = 'force-dynamic';
 
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const fid = searchParams.get('fid');
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
           <div tw="w-20 h-20 rounded-2xl" style={{
             background: "linear-gradient(135deg, #c199e4 0%, #b380db 100%)",
           }} />
-          <div tw="ml-6">
+          <div tw="ml-6 flex flex-col">
             <div tw="text-5xl text-white font-bold">{APP_NAME}</div>
             <div tw="text-2xl text-white/80">AI-powered DCA on Arbitrum</div>
           </div>
@@ -34,16 +35,16 @@ export async function GET(request: NextRequest) {
         {/* Center */}
         <div tw="flex flex-col items-center justify-center">
           {user?.pfp_url && (
-            <div tw="flex w-80 h-80 rounded-full overflow-hidden mb-8 border-8 border-white/90 shadow-2xl">
+            <div tw="flex w-80 h-80 rounded-full overflow-hidden mb-8 border-8 border-white/90 shadow-2xl" style={{ display: 'flex' }}>
               <img src={user.pfp_url} alt="Profile" tw="w-full h-full object-cover" />
             </div>
           )}
-          <h1 tw="text-7xl text-white font-bold tracking-tight">
+          <h1 tw="text-7xl text-white font-bold tracking-tight" style={{ display: 'flex' }}>
             {user?.display_name
               ? `Welcome, ${user.display_name ?? user.username}`
               : "DCA Agent"}
           </h1>
-          <p tw="text-4xl mt-6 text-white/85">
+          <p tw="text-4xl mt-6 text-white/85" style={{ display: 'flex' }}>
             • Talk to DCA agent • Create plans • Track executions 
           </p>
         </div>
