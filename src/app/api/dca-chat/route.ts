@@ -725,7 +725,7 @@ function enhanceResponseWithData(responseText: string, data: any): string {
            `💰 Amount: ${data.amount} ${data.fromToken}\n` +
            `⏱️ Interval: Every ${data.intervalMinutes} minutes\n` +
            `📅 Duration: ${data.durationWeeks} weeks\n` +
-           `📊 Status: ${data.status}`;
+           `📊 Status: ${data.status}\n\n⚡ **Next Steps:**\nTriggerX will automatically handle the execution schedule. Your plan is now ready for automated execution at the specified intervals.`;
   }
   
   // If data looks like user plans array

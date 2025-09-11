@@ -584,6 +584,56 @@ export function ActionsTab() {
 
         const result = await response.json();
         console.log("Plan confirmation response:", result);
+
+        // Check if plan was created successfully
+        if (result.success && result.data) {
+          const planId = result.data.id;
+          console.log("Plan created successfully:", planId);
+
+          // TODO: Integrate with TriggerX SDK for job creation
+          // Uncomment when ready to integrate
+          /*
+          try {
+            const { createDCAJobInput, createTriggerXJobForPlan } = await import('../../../lib/triggerXIntegration');
+
+            // Create minimal job input using SDK types
+            const jobInput = createDCAJobInput({
+              planId,
+              contractAddress: '0x...', // DCA contract address
+              contractABI: '[...]', // Contract ABI
+              intervalMinutes: 10080, // Get from plan data
+              durationWeeks: 4, // Get from plan data
+            });
+
+            // Get signer from user's wallet
+            const signer = await getSignerFromWallet();
+
+            // Create the job and update plan
+            const jobResult = await createTriggerXJobForPlan({
+              planId,
+              jobInput,
+              ipfsMetadata: {
+                planId,
+                userAddress: address || '',
+                fromToken: 'USDC',
+                toToken: 'ETH',
+                amount: '100',
+                intervalMinutes: 10080,
+                durationWeeks: 4,
+                slippage: '2',
+                createdAt: new Date().toISOString(),
+              },
+              signer,
+            });
+
+            console.log("TriggerX job created successfully:", jobResult);
+
+          } catch (jobError) {
+            console.error("Failed to create TriggerX job:", jobError);
+            // Continue with plan creation success message
+          }
+          */
+        }
         console.log("Actual response content:", result.response);
 
         if (result.success) {
@@ -1267,80 +1317,7 @@ export function ActionsTab() {
         </div>
       </div>
 
-      {/* Original Actions (Commented out for now) */}
-      {/*
-      <div className="space-y-3 px-6 w-full max-w-md mx-auto">
-        <ShareButton
-          buttonText="Share Mini App"
-          cast={{
-            text: 'Check out this awesome frame @1 @2 @3! 🚀🪐',
-            bestFriends: true,
-            embeds: [`${APP_URL}/share/${context?.user?.fid || ''}`],
-          }}
-          className="w-full"
-        />
-
-        <SignIn />
-
-        <Button
-          onClick={() =>
-            actions.openUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ')
-          }
-          className="w-full"
-        >
-          Open Link
-        </Button>
-
-        <Button onClick={actions.addMiniApp} disabled={added} className="w-full">
-          Add Mini App to Client
-        </Button>
-
-        {notificationState.sendStatus && (
-          <div className="text-sm w-full">
-            Send notification result: {notificationState.sendStatus}
-          </div>
-        )}
-        <Button
-          onClick={sendFarcasterNotification}
-          disabled={!notificationDetails}
-          className="w-full"
-        >
-          Send notification
-        </Button>
-
-        <Button
-          onClick={copyUserShareUrl}
-          disabled={!context?.user?.fid}
-          className="w-full"
-        >
-          {notificationState.shareUrlCopied ? 'Copied!' : 'Copy share URL'}
-        </Button>
-
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Haptic Intensity
-          </label>
-          <select
-            value={selectedHapticIntensity}
-            onChange={(e) =>
-              setSelectedHapticIntensity(
-                e.target.value as Haptics.ImpactOccurredType
-              )
-            }
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value={'light'}>Light</option>
-            <option value={'medium'}>Medium</option>
-            <option value={'heavy'}>Heavy</option>
-            <option value={'soft'}>Soft</option>
-            <option value={'rigid'}>Rigid</option>
-          </select>
-          <Button onClick={triggerHapticFeedback} className="w-full">
-            Trigger Haptic Feedback
-          </Button>
-        </div>
-      </div>
-      */}
+     
     </div>
   );
 }
