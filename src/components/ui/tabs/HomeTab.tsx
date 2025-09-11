@@ -84,6 +84,7 @@ export function HomeTab() {
     setActiveTab,
     notificationDetails,
     added,
+    isSDKLoaded,
     /* actions available in SDK */ actions,
   } = useMiniApp() as any;
   const router = useRouter();
@@ -132,6 +133,9 @@ export function HomeTab() {
 
   // Slider state
   const [currentPlanIndex, setCurrentPlanIndex] = useState(0);
+  
+  // Notification state
+  const [hasNotifications, setHasNotifications] = useState(false);
 
   // Onboarding state
   const [onboardingSteps, setOnboardingSteps] = useState([
@@ -220,9 +224,7 @@ export function HomeTab() {
               body: "We'll keep you updated on your plan performance.🔔",
             }),
           });
-          console.log("Notification API response:", response);
           const json = await response.json().catch(() => null);
-          if (json) console.log("Notification API json:", json);
           if (response.status === 200) {
             setNotificationState((prev) => ({
               ...prev,
@@ -313,8 +315,30 @@ export function HomeTab() {
     isEnabling: false,
   });
 
-  // Consider notifications enabled if hook provides details, app is added, or we already succeeded
-  const isNotificationsEnabled = !!notificationDetails || !!added || notificationState.sendStatus === "Success";
+  // Derive notifications availability defensively (covers browser vs client)
+  const hasNotificationsDerived = !!notificationDetails || !!context?.notificationDetails || !!added;
+
+ 
+  useEffect(() => {
+    if (!isSDKLoaded) return;
+
+    // Check if the mini app is already added
+    if (added) {
+      console.log("Mini app has been added.");
+
+      // Check if notifications are enabled
+      if (notificationDetails) {
+        console.log("Notifications are enabled.");
+        console.log("Notification token:", notificationDetails.token);
+        console.log("Notification URL:", notificationDetails.url);
+        setHasNotifications(true);
+      } else {
+        console.log("Notifications are NOT enabled.");
+      }
+    } else {
+      console.log("Mini app is NOT added yet.");
+    }
+  }, [isSDKLoaded, added, notificationDetails]);
 
   // Fetch user data when address changes
   const fetchUserData = useCallback(async () => {
@@ -335,9 +359,7 @@ export function HomeTab() {
       setUserPlans(plans);
       setPlatformStats(stats);
       const totalInvested = calculateTotalInvested(plans);
-      console.log("Total Invested line number 173:", totalInvested);
       setTotalInvested(calculateTotalInvested(plans));
-      console.log("Total Invested:", totalInvested);
       // Compute USD value across plans using CoinGecko
       try {
         const usd = await computePlansInvestedUsd(
@@ -1063,7 +1085,7 @@ export function HomeTab() {
               </code>
             </div>
 
-            {!isNotificationsEnabled ? (
+            {!(hasNotifications || hasNotificationsDerived) ? (
               <div className="flex items-center justify-between gap-3 bg-white/5 rounded-xl p-3 border border-white/10">
                 <div className="text-sm text-white/80">
                   <div className="font-semibold">Never miss any updates on your plan</div>
