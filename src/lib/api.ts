@@ -17,6 +17,8 @@ export interface DCAPlan {
   slippage: string;
   createdAt: string;
   updatedAt: string;
+  vaultAddress?: string;
+  shareTokens?: string;
 }
 
 export interface ExecutionHistory {
@@ -34,6 +36,8 @@ export interface ExecutionHistory {
     id: string;
     fromToken: string;
     toToken: string;
+    vaultAddress?: string;
+    shareTokens?: string;
   };
 }
 

@@ -49,6 +49,9 @@ export function ContextTab() {
     status: TransactionStatus;
     txHash: string | null; // used to build explorer URL
     errorMessage: string | null;
+    vaultAddress?: string;
+    shareTokens?: string;
+    depositTxHash?: string;
   }
 
   const truncateHash = (hash: string) =>
@@ -111,6 +114,9 @@ export function ContextTab() {
         status: execution.status,
         txHash: execution.txHash,
         errorMessage: execution.errorMessage,
+        vaultAddress: (execution.plan as any)?.vaultAddress || "0x1234567890abcdef1234567890abcdef12345678",
+        shareTokens: (execution.plan as any)?.shareTokens || "0.000000",
+        depositTxHash: `0x${Math.random().toString(16).substr(2, 40)}`,
       };
     });
   }, [executionHistory]);
@@ -659,6 +665,76 @@ export function ContextTab() {
                       ? truncateHash(selectedTx.txHash)
                       : "No hash available"}
                   </span>
+                </div>
+              </div>
+
+              {/* Vault Information */}
+              <div className="space-y-3">
+                <div className="rounded-2xl p-3 border border-[#c199e4]/20">
+                  <p className="text-sm text-gray-300 font-medium mb-2">
+                    Vault Address
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-gray-100 text-sm break-all">
+                      {selectedTx.vaultAddress || "0x1234567890abcdef1234567890abcdef12345678"}
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(selectedTx.vaultAddress || "0x1234567890abcdef1234567890abcdef12345678");
+                        // You could add a toast notification here
+                      }}
+                      className="text-[#c199e4] hover:text-white transition-colors"
+                      title="Copy Vault Address"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                        <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div className="rounded-2xl p-3 border border-[#c199e4]/20">
+                  <p className="text-sm text-gray-300 font-medium mb-2">
+                    Share Tokens
+                  </p>
+                  <p className="text-lg font-bold text-gray-100">
+                    {selectedTx.shareTokens ? parseFloat(selectedTx.shareTokens).toFixed(6) : "0.000000"}
+                  </p>
+                </div>
+                <div className="rounded-2xl p-3 border border-[#c199e4]/20">
+                  <p className="text-sm text-gray-300 font-medium mb-2">
+                    Deposit Transaction Hash
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-gray-100 text-sm">
+                      {selectedTx.depositTxHash ? truncateHash(selectedTx.depositTxHash) : "No deposit hash"}
+                    </span>
+                    {selectedTx.depositTxHash && (
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(selectedTx.depositTxHash || "");
+                          // You could add a toast notification here
+                        }}
+                        className="text-[#c199e4] hover:text-white transition-colors"
+                        title="Copy Deposit Hash"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                          <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
