@@ -31,8 +31,12 @@ import {
   calculateTotalInvested,
   formatInterval,
   formatDuration,
+  fetchUserVaultHoldings,
+  withdrawFromVaults,
   type DCAPlan,
   type PlatformStats,
+  type VaultHolding,
+  type VaultWithdrawalResponse,
 } from "../../../lib/api";
 import { computePlansInvestedUsd } from "../../../lib/utils";
 
@@ -104,6 +108,10 @@ export function HomeTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [totalInvested, setTotalInvested] = useState(0);
   const [portfolioUsd, setPortfolioUsd] = useState<number | null>(null);
+
+  // Vault state
+  const [vaultHoldings, setVaultHoldings] = useState<VaultHolding[]>([]);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   // Modal state
   const [selectedPlan, setSelectedPlan] = useState<DCAPlan | null>(null);
@@ -199,19 +207,22 @@ export function HomeTab() {
     if (!address) {
       setUserPlans([]);
       setTotalInvested(0);
+      setVaultHoldings([]);
       setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
     try {
-      const [plans, stats] = await Promise.all([
+      const [plans, stats, vaults] = await Promise.all([
         fetchUserDCAPlans(address),
         fetchPlatformStats(),
+        fetchUserVaultHoldings(address).catch(() => []), // Don't fail if vault API is unavailable
       ]);
 
       setUserPlans(plans);
       setPlatformStats(stats);
+      setVaultHoldings(vaults);
       const totalInvested = calculateTotalInvested(plans);
       console.log("Total Invested line number 173:", totalInvested);
       setTotalInvested(calculateTotalInvested(plans));
@@ -370,6 +381,38 @@ export function HomeTab() {
     } catch (error) {
       setIsResuming(false);
       console.error("❌ Error resuming plan:", error);
+    }
+  };
+
+  // Vault withdrawal handler
+  const handleVaultWithdrawal = async () => {
+    if (!address) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    if (vaultHoldings.length === 0) {
+      alert('No vault holdings found to withdraw');
+      return;
+    }
+
+    try {
+      setIsWithdrawing(true);
+      console.log("🔄 Starting vault withdrawal for user:", address);
+      
+      const result = await withdrawFromVaults(address);
+      
+      console.log("✅ Vault withdrawal completed:", result);
+      alert(`Successfully withdrew from ${result.vaultsProcessed} vault(s). Check your wallet for the tokens.`);
+      
+      // Refresh data to update vault holdings
+      await fetchUserData();
+      
+    } catch (error) {
+      console.error("❌ Error during vault withdrawal:", error);
+      alert(`Withdrawal failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsWithdrawing(false);
     }
   };
 
@@ -1460,78 +1503,99 @@ export function HomeTab() {
 
               {/* Vault Information */}
               <div className="grid grid-cols-1 gap-4">
-                <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20">
-                  <p className="text-sm text-gray-300 font-medium mb-2">
-                    Vault Address
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-mono text-gray-100 break-all">
-                      {selectedPlan.vaultAddress || "0x1234567890abcdef1234567890abcdef12345678"}
-                    </p>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(selectedPlan.vaultAddress || "0x1234567890abcdef1234567890abcdef12345678");
-                        // You could add a toast notification here
-                      }}
-                      className="text-[#c199e4] hover:text-white transition-colors"
-                      title="Copy Vault Address"
-                    >
-                      <HiOutlineClipboard className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20">
-                  <p className="text-sm text-gray-300 font-medium mb-2">
-                    Share Tokens
-                  </p>
-                  <p className="text-lg font-bold text-gray-100">
-                    {selectedPlan.shareTokens ? parseFloat(selectedPlan.shareTokens).toFixed(6) : "0.000000"}
-                  </p>
-                </div>
+                {(() => {
+                  // Find vault holdings for this plan's token pair
+                  const planVaults = vaultHoldings.filter(vault => 
+                    vault.tokenSymbol === selectedPlan.toToken
+                  );
+                  
+                  if (planVaults.length === 0) {
+                    return (
+                      <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20">
+                        <p className="text-sm text-gray-300 font-medium mb-2">
+                          Vault Holdings
+                        </p>
+                        <p className="text-sm text-gray-400">
+                          No vault holdings found for {selectedPlan.toToken}
+                        </p>
+                      </div>
+                    );
+                  }
+                  
+                  return planVaults.map((vault, index) => (
+                    <div key={vault.id} className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm text-gray-300 font-medium">
+                          Vault #{index + 1} ({vault.tokenSymbol})
+                        </p>
+                        <span className="text-xs text-gray-400">
+                          {new Date(vault.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs text-gray-400">Address:</p>
+                          <p className="text-xs font-mono text-gray-100 break-all">
+                            {vault.vaultAddress}
+                          </p>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(vault.vaultAddress);
+                            }}
+                            className="text-[#c199e4] hover:text-white transition-colors"
+                            title="Copy Vault Address"
+                          >
+                            <HiOutlineClipboard className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-gray-400">Share Tokens:</p>
+                          <p className="text-lg font-bold text-gray-100">
+                            {parseFloat(vault.shareTokens).toFixed(6)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ));
+                })()}
               </div>
 
               {/* Withdraw Button */}
               <div className="pt-2">
                 <button
-                  onClick={async () => {
-                    try {
-                      console.log("Withdraw button clicked for plan:", selectedPlan.id);
-                      
-                      // Check if MetaMask is available
-                      if (typeof window.ethereum !== 'undefined') {
-                        // Request account access if needed
-                        await window.ethereum.request({ method: 'eth_requestAccounts' });
-                        
-                        // TODO: Implement withdraw functionality
-                        // This would typically involve calling a smart contract method
-                        // to withdraw funds from the vault
-                        console.log("MetaMask connected, ready to withdraw funds");
-                        
-                        // You can add the actual withdrawal logic here
-                        // For example: call a withdraw function from your smart contract
-                      } else {
-                        alert('Please install MetaMask to withdraw funds');
-                      }
-                    } catch (error) {
-                      console.error("Error during withdrawal:", error);
-                      alert('Failed to connect to MetaMask');
-                    }
-                  }}
-                  className="w-full bg-gradient-to-r from-red-500/30 to-red-400/20 hover:from-red-500/40 hover:to-red-400/30 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-red-400/40 hover:border-red-400/60 hover:shadow-lg hover:scale-[1.02] flex items-center justify-center gap-2"
+                  onClick={handleVaultWithdrawal}
+                  disabled={isWithdrawing || vaultHoldings.length === 0}
+                  className={`w-full bg-gradient-to-r from-red-500/30 to-red-400/20 hover:from-red-500/40 hover:to-red-400/30 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-red-400/40 hover:border-red-400/60 hover:shadow-lg hover:scale-[1.02] flex items-center justify-center gap-2 ${
+                    isWithdrawing || vaultHoldings.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  <span>Withdraw from Vault</span>
+                  {isWithdrawing ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Withdrawing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      <span>
+                        {vaultHoldings.length === 0 
+                          ? 'No Vault Holdings' 
+                          : `Withdraw from ${vaultHoldings.length} Vault${vaultHoldings.length !== 1 ? 's' : ''}`
+                        }
+                      </span>
+                    </>
+                  )}
                 </button>
               </div>
 

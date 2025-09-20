@@ -95,7 +95,7 @@ export function ActionsTab() {
     {
       id: "1",
       role: "assistant",
-      content: `👋 **Hello!** I'm your DCA investment assistant.\n\n🎯 Create automated strategies\n📊 Track portfolio performance\n⚙️ Manage your plans\n\n${
+      content: `👋 **Hello!** I'm your DCA investment assistant.\n\n🎯 Create automated strategies\n📊 Track portfolio performance\n⚙️ Manage your plans\n💰 **NEW: Vault Strategy Support!**\n\n✨ **Enhanced Returns:** Your DCA investments now utilize advanced vault strategies to maximize returns while maintaining automated dollar-cost averaging.\n\n🔒 **Secure & Optimized:** Funds are deposited into yield-generating vaults within the DCA Agent ecosystem for better performance.\n\n${
         isConnected
           ? `Wallet connected (${formatAddress(
               address || ""

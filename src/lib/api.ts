@@ -50,6 +50,30 @@ export interface PlatformStats {
   last7dExecutions: number;
 }
 
+export interface VaultHolding {
+  id: string;
+  vaultAddress: string;
+  shareTokens: string;
+  tokenSymbol: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WithdrawalResult {
+  vaultAddress: string;
+  tokenSymbol: string;
+  sharesWithdrawn: string;
+  assetsReceived: string;
+  withdrawTxHash: string;
+  transferTxHash: string;
+}
+
+export interface VaultWithdrawalResponse {
+  vaultsProcessed: number;
+  totalVaults: number;
+  withdrawals: WithdrawalResult[];
+}
+
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
@@ -218,3 +242,42 @@ export function formatDuration(durationWeeks: number): string {
     return result;
   }
 }
+
+// Vault API functions
+export const fetchUserVaultHoldings = async (userAddress: string): Promise<VaultHolding[]> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/vault/holdings/${userAddress}`);
+    const result: ApiResponse<VaultHolding[]> = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to fetch vault holdings');
+    }
+    
+    return result.data || [];
+  } catch (error) {
+    console.error('Error fetching vault holdings:', error);
+    throw error;
+  }
+};
+
+export const withdrawFromVaults = async (userAddress: string): Promise<VaultWithdrawalResponse> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/vault/withdraw/${userAddress}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    const result: ApiResponse<VaultWithdrawalResponse> = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to withdraw from vaults');
+    }
+    
+    return result.data!;
+  } catch (error) {
+    console.error('Error withdrawing from vaults:', error);
+    throw error;
+  }
+};
