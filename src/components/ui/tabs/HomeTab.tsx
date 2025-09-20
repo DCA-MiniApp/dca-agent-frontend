@@ -31,11 +31,11 @@ import {
   calculateTotalInvested,
   formatInterval,
   formatDuration,
-  fetchUserExecutionHistory,
+  fetchUserVaultHoldings,
   withdrawFromVaults,
   type DCAPlan,
   type PlatformStats,
-  type ExecutionHistory,
+  type VaultHolding,
   type VaultWithdrawalResponse,
 } from "../../../lib/api";
 import { computePlansInvestedUsd } from "../../../lib/utils";
@@ -109,8 +109,8 @@ export function HomeTab() {
   const [totalInvested, setTotalInvested] = useState(0);
   const [portfolioUsd, setPortfolioUsd] = useState<number | null>(null);
 
-  // Execution history state (contains vault data)
-  const [executionHistory, setExecutionHistory] = useState<ExecutionHistory[]>([]);
+  // Vault state
+  const [vaultHoldings, setVaultHoldings] = useState<VaultHolding[]>([]);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   // Modal state
@@ -207,22 +207,22 @@ export function HomeTab() {
     if (!address) {
       setUserPlans([]);
       setTotalInvested(0);
-      setExecutionHistory([]);
+      setVaultHoldings([]);
       setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
     try {
-      const [plans, stats, history] = await Promise.all([
+      const [plans, stats, vaults] = await Promise.all([
         fetchUserDCAPlans(address),
         fetchPlatformStats(),
-        fetchUserExecutionHistory(address, 100).catch(() => []), // Don't fail if history API is unavailable
+        fetchUserVaultHoldings(address).catch(() => []), // Don't fail if vault API is unavailable
       ]);
 
       setUserPlans(plans);
       setPlatformStats(stats);
-      setExecutionHistory(history);
+      setVaultHoldings(vaults);
       const totalInvested = calculateTotalInvested(plans);
       console.log("Total Invested line number 173:", totalInvested);
       setTotalInvested(calculateTotalInvested(plans));
@@ -391,12 +391,7 @@ export function HomeTab() {
       return;
     }
 
-    // Check if there are any executions with vault data
-    const executionsWithVaults = executionHistory.filter(exec => 
-      (exec as any).vaultAddress && (exec as any).shareTokens && parseFloat((exec as any).shareTokens) > 0
-    );
-
-    if (executionsWithVaults.length === 0) {
+    if (vaultHoldings.length === 0) {
       alert('No vault holdings found to withdraw');
       return;
     }
@@ -410,7 +405,7 @@ export function HomeTab() {
       console.log("✅ Vault withdrawal completed:", result);
       alert(`Successfully withdrew from ${result.vaultsProcessed} vault(s). Check your wallet for the tokens.`);
       
-      // Refresh data to update execution history
+      // Refresh data to update vault holdings
       await fetchUserData();
       
     } catch (error) {
@@ -1509,15 +1504,12 @@ export function HomeTab() {
               {/* Vault Information */}
               <div className="grid grid-cols-1 gap-4">
                 {(() => {
-                  // Find executions with vault data for this plan's token pair
-                  const planExecutions = executionHistory.filter(exec => 
-                    exec.plan?.toToken === selectedPlan.toToken && 
-                    (exec as any).vaultAddress && 
-                    (exec as any).shareTokens && 
-                    parseFloat((exec as any).shareTokens) > 0
+                  // Find vault holdings for this plan's token pair
+                  const planVaults = vaultHoldings.filter(vault => 
+                    vault.tokenSymbol === selectedPlan.toToken
                   );
                   
-                  if (planExecutions.length === 0) {
+                  if (planVaults.length === 0) {
                     return (
                       <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20">
                         <p className="text-sm text-gray-300 font-medium mb-2">
@@ -1530,33 +1522,25 @@ export function HomeTab() {
                     );
                   }
                   
-                  // Group executions by vault address to avoid duplicates
-                  const uniqueVaults = planExecutions.reduce((acc, exec) => {
-                    if (!acc[exec.vaultAddress!]) {
-                      acc[exec.vaultAddress!] = exec;
-                    }
-                    return acc;
-                  }, {} as Record<string, ExecutionHistory>);
-                  
-                  return Object.values(uniqueVaults).map((execution, index) => (
-                    <div key={execution.id} className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20">
+                  return planVaults.map((vault, index) => (
+                    <div key={vault.id} className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20">
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-sm text-gray-300 font-medium">
-                          Vault #{index + 1} ({execution.plan?.toToken})
+                          Vault #{index + 1} ({vault.tokenSymbol})
                         </p>
                         <span className="text-xs text-gray-400">
-                          {new Date(execution.executedAt).toLocaleDateString()}
+                          {new Date(vault.createdAt).toLocaleDateString()}
                         </span>
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <p className="text-xs text-gray-400">Address:</p>
                           <p className="text-xs font-mono text-gray-100 break-all">
-                            {execution.vaultAddress}
+                            {vault.vaultAddress}
                           </p>
                           <button
                             onClick={() => {
-                              navigator.clipboard.writeText(execution.vaultAddress!);
+                              navigator.clipboard.writeText(vault.vaultAddress);
                             }}
                             className="text-[#c199e4] hover:text-white transition-colors"
                             title="Copy Vault Address"
@@ -1567,26 +1551,9 @@ export function HomeTab() {
                         <div className="flex items-center justify-between">
                           <p className="text-sm text-gray-400">Share Tokens:</p>
                           <p className="text-lg font-bold text-gray-100">
-                            {parseFloat(execution.shareTokens!).toFixed(6)}
+                            {parseFloat(vault.shareTokens).toFixed(6)}
                           </p>
                         </div>
-                        {execution.depositTxHash && (
-                          <div className="flex items-center gap-2">
-                            <p className="text-xs text-gray-400">Deposit TX:</p>
-                            <p className="text-xs font-mono text-gray-100">
-                              {execution.depositTxHash.slice(0, 6)}...{execution.depositTxHash.slice(-4)}
-                            </p>
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(execution.depositTxHash!);
-                              }}
-                              className="text-[#c199e4] hover:text-white transition-colors"
-                              title="Copy Deposit Hash"
-                            >
-                              <HiOutlineClipboard className="w-3 h-3" />
-                            </button>
-                          </div>
-                        )}
                       </div>
                     </div>
                   ));
@@ -1597,13 +1564,9 @@ export function HomeTab() {
               <div className="pt-2">
                 <button
                   onClick={handleVaultWithdrawal}
-                  disabled={isWithdrawing || executionHistory.filter(exec => 
-                    exec.vaultAddress && exec.shareTokens && parseFloat(exec.shareTokens) > 0
-                  ).length === 0}
+                  disabled={isWithdrawing || vaultHoldings.length === 0}
                   className={`w-full bg-gradient-to-r from-red-500/30 to-red-400/20 hover:from-red-500/40 hover:to-red-400/30 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-red-400/40 hover:border-red-400/60 hover:shadow-lg hover:scale-[1.02] flex items-center justify-center gap-2 ${
-                    isWithdrawing || executionHistory.filter(exec => 
-                      exec.vaultAddress && exec.shareTokens && parseFloat(exec.shareTokens) > 0
-                    ).length === 0 ? 'opacity-50 cursor-not-allowed' : ''
+                    isWithdrawing || vaultHoldings.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 >
                   {isWithdrawing ? (
@@ -1626,15 +1589,9 @@ export function HomeTab() {
                         />
                       </svg>
                       <span>
-                        {executionHistory.filter(exec => 
-                          exec.vaultAddress && exec.shareTokens && parseFloat(exec.shareTokens) > 0
-                        ).length === 0 
+                        {vaultHoldings.length === 0 
                           ? 'No Vault Holdings' 
-                          : `Withdraw from ${executionHistory.filter(exec => 
-                              exec.vaultAddress && exec.shareTokens && parseFloat(exec.shareTokens) > 0
-                            ).length} Vault${executionHistory.filter(exec => 
-                              exec.vaultAddress && exec.shareTokens && parseFloat(exec.shareTokens) > 0
-                            ).length !== 1 ? 's' : ''}`
+                          : `Withdraw from ${vaultHoldings.length} Vault${vaultHoldings.length !== 1 ? 's' : ''}`
                         }
                       </span>
                     </>
