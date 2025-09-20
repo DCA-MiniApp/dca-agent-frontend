@@ -8,9 +8,7 @@ import { StatusSelect } from "./StatusSelect";
 import { useAccount } from "wagmi";
 import {
   fetchUserExecutionHistory,
-  fetchUserVaultHoldings,
   type ExecutionHistory,
-  type VaultHolding,
 } from "../../../lib/api";
 
 /**
@@ -33,7 +31,6 @@ export function ContextTab() {
   const [executionHistory, setExecutionHistory] = useState<ExecutionHistory[]>(
     []
   );
-  const [vaultHoldings, setVaultHoldings] = useState<VaultHolding[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -68,27 +65,21 @@ export function ContextTab() {
     return `${from} 1 = ${value} ${to}`;
   };
 
-  // Fetch user execution history and vault holdings
+  // Fetch user execution history
   const fetchUserHistory = useCallback(async () => {
     if (!address) {
       setExecutionHistory([]);
-      setVaultHoldings([]);
       setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
     try {
-      const [history, vaults] = await Promise.all([
-        fetchUserExecutionHistory(address, 100), // Fetch up to 100 records
-        fetchUserVaultHoldings(address).catch(() => []), // Don't fail if vault API is unavailable
-      ]);
+      const history = await fetchUserExecutionHistory(address, 100); // Fetch up to 100 records
       setExecutionHistory(history);
-      setVaultHoldings(vaults);
     } catch (error) {
-      console.error("Error fetching user data:", error);
+      console.error("Error fetching execution history:", error);
       setExecutionHistory([]);
-      setVaultHoldings([]);
     } finally {
       setIsLoading(false);
     }
@@ -107,11 +98,6 @@ export function ContextTab() {
       const toAmount = parseFloat(execution.toAmount);
       const exchangeRate = parseFloat(execution.exchangeRate);
 
-      // Find vault holdings for this execution's token
-      const relatedVaults = vaultHoldings.filter(vault => 
-        vault.tokenSymbol === execution.plan?.toToken
-      );
-
       return {
         id: execution.id,
         planId: execution.planId,
@@ -128,12 +114,12 @@ export function ContextTab() {
         status: execution.status,
         txHash: execution.txHash,
         errorMessage: execution.errorMessage,
-        vaultAddress: relatedVaults.length > 0 ? relatedVaults[0].vaultAddress : "No vault found",
-        shareTokens: relatedVaults.length > 0 ? relatedVaults[0].shareTokens : "0.000000",
-        depositTxHash: execution.txHash || undefined, // Use the execution tx hash as deposit hash for now
+        vaultAddress: execution.vaultAddress || "No vault found",
+        shareTokens: execution.shareTokens || "0.000000",
+        depositTxHash: execution.depositTxHash || undefined,
       };
     });
-  }, [executionHistory, vaultHoldings]);
+  }, [executionHistory]);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<"All" | TransactionStatus>(
@@ -685,43 +671,39 @@ export function ContextTab() {
               {/* Vault Information */}
               <div className="space-y-3">
                 {(() => {
-                  // Find vault holdings for this transaction's token
-                  const relatedVaults = vaultHoldings.filter(vault => 
-                    vault.tokenSymbol === selectedTx.toToken
-                  );
-                  
-                  if (relatedVaults.length === 0) {
+                  // Check if this transaction has vault data
+                  if (!selectedTx.vaultAddress || selectedTx.vaultAddress === "No vault found") {
                     return (
                       <div className="rounded-2xl p-3 border border-[#c199e4]/20">
                         <p className="text-sm text-gray-300 font-medium mb-2">
-                          Vault Holdings
+                          Vault Information
                         </p>
                         <p className="text-sm text-gray-400">
-                          No vault holdings found for {selectedTx.toToken}
+                          No vault data available for this transaction
                         </p>
                       </div>
                     );
                   }
                   
-                  return relatedVaults.map((vault, index) => (
-                    <div key={vault.id} className="rounded-2xl p-3 border border-[#c199e4]/20">
+                  return (
+                    <div className="rounded-2xl p-3 border border-[#c199e4]/20">
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-sm text-gray-300 font-medium">
-                          Vault #{index + 1} ({vault.tokenSymbol})
+                          Vault Details
                         </p>
                         <span className="text-xs text-gray-400">
-                          {new Date(vault.createdAt).toLocaleDateString()}
+                          {new Date(selectedTx.executedAtISO).toLocaleDateString()}
                         </span>
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <p className="text-xs text-gray-400">Address:</p>
                           <p className="text-xs font-mono text-gray-100 break-all">
-                            {vault.vaultAddress}
+                            {selectedTx.vaultAddress}
                           </p>
                           <button
                             onClick={() => {
-                              navigator.clipboard.writeText(vault.vaultAddress);
+                              navigator.clipboard.writeText(selectedTx.vaultAddress!);
                             }}
                             className="text-[#c199e4] hover:text-white transition-colors"
                             title="Copy Vault Address"
@@ -740,43 +722,38 @@ export function ContextTab() {
                         <div className="flex items-center justify-between">
                           <p className="text-sm text-gray-400">Share Tokens:</p>
                           <p className="text-lg font-bold text-gray-100">
-                            {parseFloat(vault.shareTokens).toFixed(6)}
+                            {parseFloat(selectedTx.shareTokens!).toFixed(6)}
                           </p>
                         </div>
+                        {selectedTx.depositTxHash && (
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-gray-400">Deposit TX:</p>
+                            <p className="text-xs font-mono text-gray-100">
+                              {truncateHash(selectedTx.depositTxHash)}
+                            </p>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(selectedTx.depositTxHash!);
+                              }}
+                              className="text-[#c199e4] hover:text-white transition-colors"
+                              title="Copy Deposit Hash"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-3 w-3"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                              >
+                                <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                                <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                              </svg>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  ));
+                  );
                 })()}
-                
-                <div className="rounded-2xl p-3 border border-[#c199e4]/20">
-                  <p className="text-sm text-gray-300 font-medium mb-2">
-                    Transaction Hash
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-gray-100 text-sm">
-                      {selectedTx.depositTxHash ? truncateHash(selectedTx.depositTxHash) : "No transaction hash"}
-                    </span>
-                    {selectedTx.depositTxHash && (
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(selectedTx.depositTxHash || "");
-                        }}
-                        className="text-[#c199e4] hover:text-white transition-colors"
-                        title="Copy Transaction Hash"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                        >
-                          <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-                          <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                </div>
               </div>
 
               {/* Error Message (if failed) */}

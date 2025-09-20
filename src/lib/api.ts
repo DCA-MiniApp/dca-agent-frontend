@@ -32,6 +32,9 @@ export interface ExecutionHistory {
   txHash: string | null;
   status: 'SUCCESS' | 'FAILED' | 'PENDING';
   errorMessage: string | null;
+  vaultAddress?: string;
+  shareTokens?: string;
+  depositTxHash?: string;
   plan?: {
     id: string;
     fromToken: string;
