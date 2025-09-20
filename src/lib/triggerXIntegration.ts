@@ -7,6 +7,23 @@
 
 import { TriggerXClient, createJob, JobType, ArgType, type TimeBasedJobInput, type CreateJobInput } from 'sdk-triggerx';
 import { BrowserProvider } from 'ethers';
+import {
+  SWAP_EXECUTOR_ABI,
+  EXECUTOR_CONTRACT_ADDRESS,
+  TARGET_FUNCTION_NAME,
+  DCA_JOB_CONFIG
+} from './abi/SwapExecutor';
+import tokenMapData from '../tokenMap_arbitrum.json';
+import {
+  generateDCAScript,
+  generateDCAScriptMetadata,
+  validateDCAScriptParams,
+  type DCAScriptParams
+} from './dcaScriptGenerator';
+import {
+  uploadDCAScriptToIPFS,
+  getPinataService
+} from './services/pinataService';
 
 // Type declaration for window.ethereum
 declare global {
@@ -35,60 +52,168 @@ export interface IPFSMetadata {
 
 export interface CreateTriggerXJobParams {
   planId: string;
-  jobInput: CreateJobInput;
-  ipfsMetadata?: IPFSMetadata;
+  userAddress: string;
+  fromToken: string;
+  toToken: string;
+  amount: string;
+  intervalMinutes: number;
+  durationWeeks: number;
+  slippage: string;
+  createdAt: string;
   signer: any; // ethers.Signer instance
 }
 
+export interface TriggerXJobCreationResult {
+  success: boolean;
+  jobId?: string;
+  ipfsLink?: string;
+  scriptIpfsUrl?: string;
+  metadataIpfsUrl?: string;
+  planId: string;
+  data?: any;
+  error?: string;
+}
+
 /**
- * Create a TriggerX job for DCA plan execution
+ * Get token address from token map by symbol
  */
-export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams) {
-  const { planId, jobInput, ipfsMetadata, signer } = params;
+function getTokenAddress(symbol: string): string | null {
+  try {
+    const upperSymbol = symbol.toUpperCase();
+    const tokenEntries = (tokenMapData.tokenMap as any)[upperSymbol];
+
+    if (tokenEntries && tokenEntries.length > 0) {
+      // Return the first matching token address for the symbol
+      return tokenEntries[0].address;
+    }
+
+    console.warn(`Token address not found for symbol: ${symbol}`);
+    return null;
+  } catch (error) {
+    console.error('Error getting token address:', error);
+    return null;
+  }
+}
+
+/**
+ * Get both token symbol and address
+ */
+function getTokenInfo(symbol: string): { symbol: string; address: string | null } {
+  return {
+    symbol: symbol.toUpperCase(),
+    address: getTokenAddress(symbol)
+  };
+}
+
+/**
+ * Create a complete TriggerX job for DCA plan with dynamic script
+ */
+export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams): Promise<TriggerXJobCreationResult> {
+  const {
+    planId,
+    userAddress,
+    fromToken,
+    toToken,
+    amount,
+    intervalMinutes,
+    durationWeeks,
+    slippage,
+    createdAt,
+    signer
+  } = params;
 
   try {
-    console.log('[TriggerX] Creating job for plan:', planId);
+    console.log('🚀 Starting TriggerX job creation for plan:', planId);
 
-    // Initialize TriggerX client
+    // Step 1: Get token addresses and validate script parameters
+    const fromTokenInfo = getTokenInfo(fromToken);
+    const toTokenInfo = getTokenInfo(toToken);
+
+    console.log('🔍 Token info - From:', fromTokenInfo, 'To:', toTokenInfo);
+
+    const scriptParams: DCAScriptParams = {
+      planId,
+      userAddress,
+      fromToken: fromTokenInfo.symbol,
+      fromTokenAddress: fromTokenInfo.address || undefined,
+      toToken: toTokenInfo.symbol,
+      toTokenAddress: toTokenInfo.address || undefined,
+      amount,
+      intervalMinutes,
+      durationWeeks,
+      slippage,
+      createdAt,
+    };
+
+    const validation = validateDCAScriptParams(scriptParams);
+    if (!validation.isValid) {
+      throw new Error(`Invalid script parameters: ${validation.errors.join(', ')}`);
+    }
+
+    // Step 2: Generate and upload script to IPFS
+    console.log('📝 Generating DCA script...');
+    const uploadResult = await uploadDCAScriptToIPFS(
+      scriptParams,
+      generateDCAScript,
+      generateDCAScriptMetadata
+    );
+
+    if (!uploadResult.success || !uploadResult.scriptIpfsUrl) {
+      throw new Error(`IPFS upload failed: ${uploadResult.error}`);
+    }
+
+    console.log('✅ Script uploaded to IPFS:', uploadResult.scriptIpfsUrl);
+
+    // Step 3: Create TriggerX job input
+    const jobInput = createDCAJobInput({
+      planId,
+      contractAddress: EXECUTOR_CONTRACT_ADDRESS,
+      contractABI: JSON.stringify(SWAP_EXECUTOR_ABI),
+      intervalMinutes,
+      durationWeeks,
+      userAddress,
+      fromToken,
+      amount,
+      scriptIpfsUrl: uploadResult.scriptIpfsUrl,
+    });
+
+    // Step 4: Create TriggerX job
+    console.log('⚡ Creating TriggerX job...');
     const client = new TriggerXClient(process.env.NEXT_PUBLIC_TRIGGERX_API_KEY || '');
-
-    // Create the job using SDK
     const result = await createJob(client, { jobInput, signer });
 
     if (!result.success || !result.data) {
-      throw new Error(result.error || 'Job creation failed');
+      throw new Error(result.error || 'TriggerX job creation failed');
     }
 
-    console.log('[TriggerX] Job created successfully:', result);
-
-    // Extract job ID from response
     const jobId = result.data.job_id || result.data.id;
+    console.log('✅ TriggerX job created:', jobId);
 
-    // Upload IPFS metadata if provided
-    let ipfsLink: string | null = null;
-    if (ipfsMetadata) {
-      console.log('[TriggerX] Uploading IPFS metadata...');
-      ipfsLink = await uploadPlanMetadataToIPFS({
-        ...ipfsMetadata,
-        jobId: jobId,
-      });
-      console.log('[TriggerX] IPFS metadata uploaded:', ipfsLink);
-    }
-
-    // Update the DCA plan with job details
+    // Step 5: Update plan with job details
+    const ipfsLink = uploadResult.scriptIpfsUrl;
     await updatePlanWithJobDetails(planId, jobId, ipfsLink);
+
+    console.log('🎉 Complete TriggerX job setup finished!');
 
     return {
       success: true,
       jobId,
       ipfsLink,
+      scriptIpfsUrl: uploadResult.scriptIpfsUrl,
+      metadataIpfsUrl: uploadResult.metadataIpfsUrl,
       planId,
       data: result.data,
     };
 
   } catch (error) {
     console.error('[TriggerX] Failed to create job:', error);
-    throw new Error(`TriggerX job creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    return {
+      success: false,
+      planId,
+      error: errorMessage,
+    };
   }
 }
 
@@ -195,7 +320,7 @@ export async function getSignerFromWallet(): Promise<any> {
 }
 
 /**
- * Create a minimal TriggerX job input for DCA plans
+ * Create a complete TriggerX job input for DCA plans with Dynamic arguments
  */
 export function createDCAJobInput(params: {
   planId: string;
@@ -203,23 +328,46 @@ export function createDCAJobInput(params: {
   contractABI: string;
   intervalMinutes: number;
   durationWeeks: number;
-}): TimeBasedJobInput & { jobType: JobType.Time; argType: ArgType.Static } {
-  const { planId, contractAddress, contractABI, intervalMinutes, durationWeeks } = params;
+  userAddress: string;
+  fromToken: string;
+  amount: string;
+  scriptIpfsUrl: string;
+}): TimeBasedJobInput & { jobType: JobType.Time; argType: ArgType.Dynamic } {
+  const {
+    planId,
+    contractAddress,
+    contractABI,
+    intervalMinutes,
+    durationWeeks,
+    userAddress,
+    fromToken,
+    amount,
+    scriptIpfsUrl
+  } = params;
+
+  // Calculate total executions
+  const totalExecutions = Math.floor((durationWeeks * 7 * 24 * 60) / intervalMinutes);
+
+  // Get token address from token map
+  const tokenAddress = getTokenAddress(fromToken);
 
   return {
     jobType: JobType.Time,
-    argType: ArgType.Static,
-    jobTitle: `DCA-${planId}`,
+    argType: ArgType.Dynamic, // Use proper enum from SDK
+    jobTitle: DCA_JOB_CONFIG.jobTitle, // "dca-automate"
     timeFrame: durationWeeks * 7 * 24 * 60 * 60, // weeks to seconds
-    scheduleType: 'interval' as const,
+    scheduleType: DCA_JOB_CONFIG.scheduleType, // "interval"
     timeInterval: intervalMinutes * 60, // minutes to seconds
-    timezone: 'UTC',
-    chainId: '1', // Ethereum mainnet
+    timezone: DCA_JOB_CONFIG.timezone, // "Asia/Calcutta"
+    chainId: DCA_JOB_CONFIG.chainId, // "42161" (Arbitrum)
     targetContractAddress: contractAddress,
-    targetFunction: 'executeSwap',
+    targetFunction: TARGET_FUNCTION_NAME, // "executeSwap"
     abi: contractABI,
-    arguments: [planId],
-    autotopupTG: true,
+    // For Dynamic argType, arguments array is empty - script provides the args
+    arguments: [],
+    // Dynamic arguments script URL from IPFS
+    dynamicArgumentsScriptUrl: scriptIpfsUrl,
+    autotopupTG: DCA_JOB_CONFIG.autotopupTG, // true
   };
 }
 
@@ -237,13 +385,14 @@ export async function createCompleteDCAPlan(params: {
     durationWeeks: number;
     slippage: string;
   };
-  contractAddress: string;
-  contractABI: string;
-}) {
-  const { message, userAddress, planData, contractAddress, contractABI } = params;
+}): Promise<TriggerXJobCreationResult> {
+  const { message, userAddress, planData } = params;
 
   try {
+    console.log('🚀 Starting complete DCA plan creation workflow...');
+
     // 1. Create the DCA plan through chat
+    console.log('📝 Creating DCA plan via chat...');
     const planResponse = await fetch('/api/dca-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -261,18 +410,14 @@ export async function createCompleteDCAPlan(params: {
     }
 
     const planId = planResult.data.id;
+    console.log('✅ DCA plan created:', planId);
 
-    // 2. Create minimal TriggerX job input
-    const jobInput = createDCAJobInput({
-      planId,
-      contractAddress,
-      contractABI,
-      intervalMinutes: planData.intervalMinutes,
-      durationWeeks: planData.durationWeeks,
-    });
+    // 2. Get signer and create complete TriggerX job
+    console.log('🔐 Getting wallet signer...');
+    const signer = await getSignerFromWallet();
 
-    // 3. Create IPFS metadata (optional)
-    const ipfsMetadata: IPFSMetadata = {
+    console.log('⚡ Creating TriggerX job with dynamic script...');
+    const result = await createTriggerXJobForPlan({
       planId,
       userAddress,
       fromToken: planData.fromToken,
@@ -282,22 +427,28 @@ export async function createCompleteDCAPlan(params: {
       durationWeeks: planData.durationWeeks,
       slippage: planData.slippage,
       createdAt: new Date().toISOString(),
-    };
-
-    // 4. Get signer and create job
-    const signer = await getSignerFromWallet();
-    const result = await createTriggerXJobForPlan({
-      planId,
-      jobInput,
-      ipfsMetadata,
       signer,
     });
+
+    if (result.success) {
+      console.log('🎉 Complete DCA workflow finished successfully!');
+      console.log('📊 Job ID:', result.jobId);
+      console.log('🔗 Script IPFS:', result.scriptIpfsUrl);
+    } else {
+      console.error('❌ DCA workflow failed:', result.error);
+    }
 
     return result;
 
   } catch (error) {
-    console.error('Complete DCA plan creation failed:', error);
-    throw error;
+    console.error('❌ Complete DCA plan creation failed:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    return {
+      success: false,
+      planId: '',
+      error: errorMessage,
+    };
   }
 }
 

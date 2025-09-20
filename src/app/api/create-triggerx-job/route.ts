@@ -1,23 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { TriggerXClient, createJob, CreateJobInput } from 'sdk-triggerx';
+import { createTriggerXJobForPlan, type CreateTriggerXJobParams } from '@/lib/triggerXIntegration';
 
-// Request/Response schemas using SDK types
+// Request/Response schemas
 const CreateTriggerXJobSchema = z.object({
   planId: z.string().describe('DCA plan ID to create job for'),
-  jobInput: z.any() as z.ZodType<CreateJobInput>, // Will use CreateJobInput from SDK
-  ipfsMetadata: z.object({
-    planId: z.string(),
-    userAddress: z.string(),
-    fromToken: z.string(),
-    toToken: z.string(),
-    amount: z.string(),
-    intervalMinutes: z.number(),
-    durationWeeks: z.number(),
-    slippage: z.string(),
-    createdAt: z.string(),
-    jobId: z.string().optional(),
-  }).optional(),
+  userAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address').describe('User wallet address'),
+  fromToken: z.string().describe('Source token symbol (e.g., USDC)'),
+  toToken: z.string().describe('Target token symbol (e.g., ETH)'),
+  amount: z.string().regex(/^\d+(\.\d+)?$/, 'Amount must be a valid number').describe('Investment amount per execution'),
+  intervalMinutes: z.number().min(1).describe('Execution interval in minutes'),
+  durationWeeks: z.number().min(1).describe('Total investment duration in weeks'),
+  slippage: z.string().regex(/^\d+(\.\d+)?$/, 'Slippage must be a valid number').describe('Slippage tolerance in percentage'),
+  createdAt: z.string().describe('Plan creation timestamp'),
 });
 
 type CreateTriggerXJobRequest = z.infer<typeof CreateTriggerXJobSchema>;
@@ -26,100 +21,96 @@ type CreateTriggerXJobRequest = z.infer<typeof CreateTriggerXJobSchema>;
 const DCA_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
 
 /**
- * API endpoint to create TriggerX job and update DCA plan details
+ * API endpoint to create complete TriggerX job with dynamic script
  *
  * This endpoint:
- * 1. Creates a TriggerX job using the provided job input
- * 2. Optionally uploads IPFS metadata
- * 3. Updates the DCA plan with jobId and ipfsLink
+ * 1. Validates the request parameters
+ * 2. Generates dynamic DCA script with plan parameters
+ * 3. Uploads script and metadata to IPFS
+ * 4. Creates TriggerX time-based job
+ * 5. Updates DCA plan with jobId and ipfsLink
  */
 export async function POST(request: NextRequest) {
   try {
     // Parse and validate request
     const body = await request.json();
-    const { planId, jobInput, ipfsMetadata } = CreateTriggerXJobSchema.parse(body);
+    const validatedData = CreateTriggerXJobSchema.parse(body);
 
-    console.log('[Create TriggerX Job] Starting job creation for plan:', planId);
+    const {
+      planId,
+      userAddress,
+      fromToken,
+      toToken,
+      amount,
+      intervalMinutes,
+      durationWeeks,
+      slippage,
+      createdAt,
+    } = validatedData;
 
-    let jobId: string | null = null;
-    let ipfsLink: string | null = null;
+    console.log('🚀 [Create TriggerX Job] Starting complete workflow for plan:', planId);
 
-    // Step 1: Create TriggerX job
-    // Note: Signer should be provided from frontend, but for now we'll simulate
-    console.log('[Create TriggerX Job] Creating job with SDK...');
+    // For now, we'll need to get the signer from the request
+    // In production, this should come from the frontend's wallet connection
+    // For API routes, we might need to use a different approach
 
-    // Initialize client
-    const client = new TriggerXClient(process.env.NEXT_PUBLIC_TRIGGERX_API_KEY || '');
+    // TODO: Implement proper signer handling for API routes
+    // This is a temporary workaround - in production, the signer should come from the frontend
+    const signer = null; // This will need to be implemented properly
 
-    // TODO: Get signer from request or implement proper signer handling
-    // For now, this will fail until proper signer implementation
-    try {
-      // This will need the signer to be passed from frontend
-      // const result = await createJob(client, { jobInput, signer: requestSigner });
-      // jobId = result.data?.job_id;
+    if (!signer) {
+      console.warn('[Create TriggerX Job] ⚠️ Signer not available - simulating job creation');
 
-      // Simulate for now
-      jobId = `triggerx-job-${Date.now()}-${planId.slice(-8)}`;
-      console.log('[Create TriggerX Job] Simulated job created with ID:', jobId);
+      // Simulate the complete workflow for now
+      const simulatedResult = await simulateTriggerXJobCreation(validatedData);
 
-    } catch (jobError) {
-      console.error('[Create TriggerX Job] SDK job creation failed:', jobError);
-      // Fallback to simulation
-      jobId = `triggerx-job-${Date.now()}-${planId.slice(-8)}`;
-      console.log('[Create TriggerX Job] Using fallback job ID:', jobId);
-    }
-
-    // Step 2: Upload IPFS metadata (if provided)
-    if (ipfsMetadata) {
-      console.log('[Create TriggerX Job] Uploading IPFS metadata...');
-
-      // TODO: Replace with actual IPFS upload
-      // const ipfsResult = await uploadToIPFS(ipfsMetadata);
-      // ipfsLink = ipfsResult.ipfsLink;
-
-      // For now, simulate IPFS upload
-      ipfsLink = `ipfs://Qm${Date.now().toString(36)}${planId.slice(-16)}`;
-      console.log('[Create TriggerX Job] Simulated IPFS upload:', ipfsLink);
-    }
-
-    // Step 3: Update DCA plan with job details
-    if (jobId || ipfsLink) {
-      console.log('[Create TriggerX Job] Updating DCA plan details...');
-
-      const updateResponse = await fetch(`${DCA_API_URL}/api/dca/plans/${planId}/details`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          jobId: jobId,
-          ipfsLink: ipfsLink,
-        }),
+      return NextResponse.json({
+        success: true,
+        data: simulatedResult,
+        message: 'TriggerX job creation simulated successfully',
+        warning: 'Signer not implemented - using simulation mode',
       });
-
-      if (!updateResponse.ok) {
-        const errorData = await updateResponse.json();
-        throw new Error(`Failed to update plan details: ${errorData.message}`);
-      }
-
-      const updateResult = await updateResponse.json();
-      console.log('[Create TriggerX Job] Plan updated successfully:', updateResult);
     }
+
+    // Create job parameters
+    const jobParams: CreateTriggerXJobParams = {
+      planId,
+      userAddress,
+      fromToken,
+      toToken,
+      amount,
+      intervalMinutes,
+      durationWeeks,
+      slippage,
+      createdAt,
+      signer,
+    };
+
+    // Execute the complete workflow
+    const result = await createTriggerXJobForPlan(jobParams);
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to create TriggerX job');
+    }
+
+    console.log('✅ [Create TriggerX Job] Complete workflow finished successfully');
 
     // Return success response
     return NextResponse.json({
       success: true,
       data: {
-        planId,
-        jobId,
-        ipfsLink,
-        jobInput,
+        planId: result.planId,
+        jobId: result.jobId,
+        ipfsLink: result.ipfsLink,
+        scriptIpfsUrl: result.scriptIpfsUrl,
+        metadataIpfsUrl: result.metadataIpfsUrl,
+        triggerXData: result.data,
       },
-      message: 'TriggerX job created and plan updated successfully',
+      message: 'TriggerX job with dynamic script created successfully',
     });
 
   } catch (error) {
-    console.error('[Create TriggerX Job] Error:', error);
+    console.error('❌ [Create TriggerX Job] Error:', error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -144,10 +135,74 @@ export async function POST(request: NextRequest) {
 }
 
 /**
+ * Simulate TriggerX job creation for development/testing
+ * This will be removed once proper signer handling is implemented
+ */
+async function simulateTriggerXJobCreation(params: CreateTriggerXJobRequest) {
+  const {
+    planId,
+    userAddress,
+    fromToken,
+    toToken,
+    amount,
+    intervalMinutes,
+    durationWeeks,
+    slippage,
+    createdAt,
+  } = params;
+
+  console.log('[Simulation] 🚀 Simulating TriggerX job creation...');
+
+  // Simulate job creation
+  const jobId = `triggerx-job-${Date.now()}-${planId.slice(-8)}`;
+
+  // Simulate IPFS upload
+  const scriptIpfsUrl = `https://gateway.pinata.cloud/ipfs/Qm${Date.now().toString(36)}${planId.slice(-16)}-script`;
+  const metadataIpfsUrl = `https://gateway.pinata.cloud/ipfs/Qm${Date.now().toString(36)}${planId.slice(-16)}-metadata`;
+
+  // Update DCA plan with simulated details
+  try {
+    const updateResponse = await fetch(`${DCA_API_URL}/api/dca/plans/${planId}/details`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        jobId: jobId,
+        ipfsLink: scriptIpfsUrl,
+      }),
+    });
+
+    if (!updateResponse.ok) {
+      console.warn('[Simulation] Failed to update plan details:', await updateResponse.text());
+    } else {
+      console.log('[Simulation] ✅ Plan updated with simulated details');
+    }
+  } catch (updateError) {
+    console.warn('[Simulation] Failed to update plan:', updateError);
+  }
+
+  console.log('[Simulation] ✅ TriggerX job creation simulated');
+
+  return {
+    planId,
+    jobId,
+    ipfsLink: scriptIpfsUrl,
+    scriptIpfsUrl,
+    metadataIpfsUrl,
+    simulated: true,
+    message: 'This is a simulation - implement proper signer handling for production',
+  };
+}
+
+/**
  * Example usage function (for documentation)
+ *
+ * Shows how to call the new API with individual plan parameters
+ * instead of pre-built jobInput objects
  */
 export async function createTriggerXJobExample() {
-  // This is how the frontend should call this API
+  // This is how the frontend should call this API with the new format
   const response = await fetch('/api/create-triggerx-job', {
     method: 'POST',
     headers: {
@@ -155,37 +210,90 @@ export async function createTriggerXJobExample() {
     },
     body: JSON.stringify({
       planId: 'plan-id-from-backend',
-      jobInput: {
-        jobType: 'Time',
-        argType: 'Static',
-        jobTitle: 'DCA Investment Job',
-        timeFrame: 36,
-        scheduleType: 'interval',
-        timeInterval: 33,
-        timezone: 'Asia/Calcutta',
-        chainId: '11155420',
-        targetContractAddress: '0x...',
-        targetFunction: 'incrementBy',
-        abi: '[...]',
-        isImua: false,
-        arguments: ['3'],
-        dynamicArgumentsScriptUrl: '',
-        autotopupTG: true,
-      },
-      ipfsMetadata: {
-        planId: 'plan-id-from-backend',
-        userAddress: '0x123...',
-        fromToken: 'USDC',
-        toToken: 'ETH',
-        amount: '100',
-        intervalMinutes: 1440,
-        durationWeeks: 4,
-        slippage: '2',
-        createdAt: new Date().toISOString(),
-      },
+      userAddress: '0x1234567890123456789012345678901234567890',
+      fromToken: 'USDC',
+      toToken: 'ETH',
+      amount: '100.50',
+      intervalMinutes: 1440, // 1 day
+      durationWeeks: 4,
+      slippage: '2.0',
+      createdAt: new Date().toISOString(),
     }),
   });
 
   const result = await response.json();
+  console.log('TriggerX Job Creation Result:', result);
+
+  /*
+  Expected response format:
+  {
+    success: true,
+    data: {
+      planId: 'plan-id-from-backend',
+      jobId: 'triggerx-job-1234567890-abcdef12',
+      ipfsLink: 'https://gateway.pinata.cloud/ipfs/Qm...',
+      scriptIpfsUrl: 'https://gateway.pinata.cloud/ipfs/Qm...',
+      metadataIpfsUrl: 'https://gateway.pinata.cloud/ipfs/Qm...',
+      triggerXData: { ... } // TriggerX SDK response data
+    },
+    message: 'TriggerX job with dynamic script created successfully'
+  }
+  */
+
   return result;
+}
+
+/**
+ * Frontend integration example
+ *
+ * Shows how to integrate with the new workflow from the frontend
+ */
+export async function frontendIntegrationExample() {
+  // Example of how to call from frontend after DCA plan creation
+
+  // 1. First create DCA plan via chat or direct API call
+  const planCreationResponse = await fetch('/api/dca-chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: 'Create a DCA plan to buy 100 USDC worth of ETH every day for 4 weeks',
+      userAddress: '0x1234567890123456789012345678901234567890',
+      isPlanCreationRequest: true,
+    }),
+  });
+
+  const planResult = await planCreationResponse.json();
+
+  if (!planResult.success) {
+    throw new Error('Failed to create DCA plan');
+  }
+
+  const planId = planResult.data.id;
+
+  // 2. Then create TriggerX job with the plan details
+  const jobResponse = await fetch('/api/create-triggerx-job', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      planId,
+      userAddress: '0x1234567890123456789012345678901234567890',
+      fromToken: 'USDC',
+      toToken: 'ETH',
+      amount: '100',
+      intervalMinutes: 1440,
+      durationWeeks: 4,
+      slippage: '2.0',
+      createdAt: new Date().toISOString(),
+    }),
+  });
+
+  const jobResult = await jobResponse.json();
+
+  if (jobResult.success) {
+    console.log('🎉 DCA plan with TriggerX automation created successfully!');
+    console.log('Job ID:', jobResult.data.jobId);
+    console.log('Script IPFS:', jobResult.data.scriptIpfsUrl);
+  }
+
+  return jobResult;
 }
