@@ -41,7 +41,7 @@ export const APP_PRIMARY_CATEGORY: string = 'finance';
  * Tags associated with the mini app.
  * Used for search and discovery in app stores.
  */
-export const APP_TAGS: string[] = ['AI', 'DCA', 'Agent', 'Crypto', 'Investment'];
+export const APP_TAGS: string[] = ['ai', 'agent', 'investment', 'automate', 'dca'];
 
 // --- Asset URLs ---
 /**
@@ -86,7 +86,7 @@ export const APP_ACCOUNT_ASSOCIATION: AccountAssociation | undefined = {
  * Text displayed on the main action button.
  * Used for the primary call-to-action in the mini app.
  */
-export const APP_BUTTON_TEXT: string = 'Launch Now';
+export const APP_BUTTON_TEXT: string = 'Start Now';
 
 // --- Integration Configuration ---
 /**
