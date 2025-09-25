@@ -57,7 +57,7 @@ export const SWAP_EXECUTOR_ABI = [
 ] as const;
 
 // Executor contract address - from environment variable
-export const EXECUTOR_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_EXECUTOR_ADDRESS || "0x3509f38e10eb3cdce7695743cb7e81446f4d8a337";
+export const EXECUTOR_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_EXECUTOR_ADDRESS || "0x146Ee96520D0468FB601e5E59FdDd6f7044bF829";
 
 // Target function name for TriggerX jobs
 export const TARGET_FUNCTION_NAME = "executeSwap";

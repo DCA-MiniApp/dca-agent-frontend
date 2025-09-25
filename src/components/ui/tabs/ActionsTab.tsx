@@ -21,28 +21,7 @@ import {
 import { useRouter } from "next/navigation";
 import { IoPersonCircle } from "react-icons/io5";
 import { RiRobot2Fill } from "react-icons/ri";
-/**
- * ActionsTab component handles mini app actions like sharing, notifications, and haptic feedback.
- *
- * NEW: Now includes a ChatGPT-style chat interface for DCA agent interactions.
- *
- * This component provides the main interaction interface for users to:
- * - Chat with the DCA agent using natural language
- * - Share the mini app with others
- * - Sign in with Farcaster
- * - Send notifications to their account
- * - Trigger haptic feedback
- * - Add the mini app to their client
- * - Copy share URLs
- *
- * The component uses the useMiniApp hook to access Farcaster context and actions.
- * All state is managed locally within this component.
- *
- * @example
- * ```tsx
- * <ActionsTab />
- * ```
- */
+
 
 // Chat message interface
 interface ChatMessage {
@@ -587,52 +566,75 @@ export function ActionsTab() {
 
         // Check if plan was created successfully
         if (result.success && result.data) {
-          const planId = result.data.id;
+          const planId = result.data.agentResponse.id;
           console.log("Plan created successfully:", planId);
 
-          // TODO: Integrate with TriggerX SDK for job creation
-          // Uncomment when ready to integrate
-          /*
+          // TriggerX Job Creation - Create automated job after plan creation
           try {
-            const { createDCAJobInput, createTriggerXJobForPlan } = await import('../../../lib/triggerXIntegration');
+            const { createTriggerXJobForPlan } = await import('../../../lib/triggerXIntegration');
+            
+            // Get wallet client from window.ethereum (since we can't use hooks here)
+            let walletClient = null;
+            if (typeof window !== 'undefined' && window.ethereum) {
+              const { BrowserProvider } = await import('ethers');
+              const provider = new BrowserProvider(window.ethereum);
+              walletClient = await provider.getSigner();
+            }
+            
+            if (!walletClient) {
+              console.warn('⚠️ Wallet not connected, skipping TriggerX job creation');
+            } else {
+              console.log('🚀 Creating TriggerX job for plan:', planId);
 
-            // Create minimal job input using SDK types
-            const jobInput = createDCAJobInput({
-              planId,
-              contractAddress: '0x...', // DCA contract address
-              contractABI: '[...]', // Contract ABI
-              intervalMinutes: 10080, // Get from plan data
-              durationWeeks: 4, // Get from plan data
-            });
+              // Create TriggerX job with real signer
+              const triggerXResult = await createTriggerXJobForPlan({
+                planId: result.data.agentResponse.id,
+                userAddress: result.data.agentResponse.userAddress,
+                fromToken: result.data.agentResponse.fromToken,
+                toToken: result.data.agentResponse.toToken,
+                amount: result.data.agentResponse.amount,
+                intervalMinutes: result.data.agentResponse.intervalMinutes,
+                durationWeeks: result.data.agentResponse.durationWeeks,
+                slippage: result.data.agentResponse.slippage,
+                signer: walletClient,
+              });
 
-            // Get signer from user's wallet
-            const signer = await getSignerFromWallet();
-
-            // Create the job and update plan
-            const jobResult = await createTriggerXJobForPlan({
-              planId,
-              jobInput,
-              ipfsMetadata: {
-                planId,
-                userAddress: address || '',
-                fromToken: 'USDC',
-                toToken: 'ETH',
-                amount: '100',
-                intervalMinutes: 10080,
-                durationWeeks: 4,
-                slippage: '2',
-                createdAt: new Date().toISOString(),
-              },
-              signer,
-            });
-
-            console.log("TriggerX job created successfully:", jobResult);
-
-          } catch (jobError) {
-            console.error("Failed to create TriggerX job:", jobError);
-            // Continue with plan creation success message
+              if (triggerXResult.success) {
+                console.log('✅ TriggerX job created successfully:', triggerXResult.jobId);
+                
+                // Add success message about automation
+                const automationMessage: ChatMessage = {
+                  id: Date.now().toString(),
+                  role: "assistant", 
+                  content: `🚀 **Automation Setup Complete!**\n\n✅ TriggerX Job ID: ${triggerXResult.jobId}\n📜 Script IPFS: ${triggerXResult.scriptIpfsUrl}\n\nYour DCA plan is now fully automated and will execute according to your schedule.`,
+                  timestamp: new Date(),
+                };
+                setMessages((prev) => [...prev, automationMessage]);
+              } else {
+                console.error('❌ TriggerX job creation failed:', triggerXResult.error);
+                
+                // Add error message about automation failure
+                const automationErrorMessage: ChatMessage = {
+                  id: Date.now().toString(),
+                  role: "assistant",
+                  content: `⚠️ **Plan Created but Automation Failed**\n\nYour DCA plan was created successfully, but we couldn't set up automation:\n${triggerXResult.error}\n\nYou can manually execute swaps or try setting up automation later.`,
+                  timestamp: new Date(),
+                };
+                setMessages((prev) => [...prev, automationErrorMessage]);
+              }
+            }
+          } catch (triggerXError) {
+            console.error('❌ TriggerX integration error:', triggerXError);
+            
+            // Add error message about automation failure  
+            const automationErrorMessage: ChatMessage = {
+              id: Date.now().toString(),
+              role: "assistant",
+              content: `⚠️ **Plan Created but Automation Setup Failed**\n\nYour DCA plan was created successfully, but we encountered an error setting up automation. You can manually execute swaps for now.`,
+              timestamp: new Date(),
+            };
+            setMessages((prev) => [...prev, automationErrorMessage]);
           }
-          */
         }
         console.log("Actual response content:", result.response);
 

@@ -168,66 +168,7 @@ export class PinataService {
     }
   }
 
-  /**
-   * Upload both script and metadata to IPFS
-   */
-  async uploadDCAScriptAndMetadata(
-    scriptContent: string,
-    scriptName: string,
-    metadata: Record<string, any>
-  ): Promise<{
-    scriptResult: PinataUploadResult;
-    metadataResult: PinataUploadResult;
-  }> {
-    try {
-      console.log('📤 Uploading DCA script and metadata to IPFS');
-
-      // Upload script first
-      const scriptResult = await this.uploadFile(scriptContent, scriptName, {
-        name: scriptName,
-        keyvalues: {
-          type: 'dca-script',
-          planId: metadata.planId,
-          uploadedAt: new Date().toISOString(),
-        },
-      });
-
-      if (!scriptResult.success) {
-        throw new Error(`Script upload failed: ${scriptResult.error}`);
-      }
-
-      // Add script IPFS hash to metadata
-      const enhancedMetadata = {
-        ...metadata,
-        scriptIpfsHash: scriptResult.ipfsHash,
-        scriptIpfsUrl: scriptResult.ipfsUrl,
-      };
-
-      // Upload metadata
-      const metadataResult = await this.uploadJSON(enhancedMetadata, {
-        name: `${scriptName}-metadata.json`,
-        keyvalues: {
-          type: 'dca-metadata',
-          planId: metadata.planId,
-          uploadedAt: new Date().toISOString(),
-        },
-      });
-
-      return {
-        scriptResult,
-        metadataResult,
-      };
-
-    } catch (error) {
-      console.error('❌ DCA upload error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown upload error';
-
-      return {
-        scriptResult: { success: false, error: errorMessage },
-        metadataResult: { success: false, error: errorMessage },
-      };
-    }
-  }
+  // Removed uploadDCAScriptAndMetadata method - no longer needed
 
   /**
    * Get file content from IPFS
@@ -285,17 +226,14 @@ export function getPinataService(): PinataService {
   return pinataInstance;
 }
 
-// Utility function to create DCA script and upload to IPFS
+// Simplified utility function to upload DCA script to IPFS (no metadata needed)
 export async function uploadDCAScriptToIPFS(
   scriptParams: any,
-  scriptGenerator: (params: any) => string,
-  metadataGenerator: (params: any) => Record<string, any>
+  scriptGenerator: (params: any) => string
 ): Promise<{
   success: boolean;
   scriptIpfsUrl?: string;
-  metadataIpfsUrl?: string;
   scriptIpfsHash?: string;
-  metadataIpfsHash?: string;
   error?: string;
 }> {
   try {
@@ -305,28 +243,30 @@ export async function uploadDCAScriptToIPFS(
       throw new Error('Pinata service is not properly configured');
     }
 
-    // Generate script and metadata
+    // Generate minimal script
     const scriptContent = scriptGenerator(scriptParams);
-    const metadata = metadataGenerator(scriptParams);
-    const scriptName = `dca-job-${scriptParams.planId}.js`;
+    const scriptName = `dca-script-${Date.now()}.go`; // Use timestamp instead of planId
 
-    // Upload both to IPFS
-    const uploadResult = await pinata.uploadDCAScriptAndMetadata(
+    // Upload only the script to IPFS
+    const uploadResult = await pinata.uploadFile(
       scriptContent,
       scriptName,
-      metadata
+      {
+        name: scriptName,
+        keyvalues: {
+          type: 'application/go',
+        },
+      }
     );
 
-    if (!uploadResult.scriptResult.success) {
-      throw new Error(`Script upload failed: ${uploadResult.scriptResult.error}`);
+    if (!uploadResult.success) {
+      throw new Error(`Script upload failed: ${uploadResult.error}`);
     }
 
     return {
       success: true,
-      scriptIpfsUrl: uploadResult.scriptResult.ipfsUrl,
-      metadataIpfsUrl: uploadResult.metadataResult.success ? uploadResult.metadataResult.ipfsUrl : undefined,
-      scriptIpfsHash: uploadResult.scriptResult.ipfsHash,
-      metadataIpfsHash: uploadResult.metadataResult.success ? uploadResult.metadataResult.ipfsHash : undefined,
+      scriptIpfsUrl: uploadResult.ipfsUrl,
+      scriptIpfsHash: uploadResult.ipfsHash,
     };
 
   } catch (error) {

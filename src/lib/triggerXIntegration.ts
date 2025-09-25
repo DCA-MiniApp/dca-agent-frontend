@@ -16,7 +16,6 @@ import {
 import tokenMapData from '../tokenMap_arbitrum.json';
 import {
   generateDCAScript,
-  generateDCAScriptMetadata,
   validateDCAScriptParams,
   type DCAScriptParams
 } from './dcaScriptGenerator';
@@ -37,18 +36,7 @@ export type TriggerXJobInput = TimeBasedJobInput & {
   argType: ArgType.Static | ArgType.Dynamic;
 };
 
-export interface IPFSMetadata {
-  planId: string;
-  userAddress: string;
-  fromToken: string;
-  toToken: string;
-  amount: string;
-  intervalMinutes: number;
-  durationWeeks: number;
-  slippage: string;
-  createdAt: string;
-  jobId?: string; // Will be added after job creation
-}
+// Removed IPFSMetadata interface - no longer needed
 
 export interface CreateTriggerXJobParams {
   planId: string;
@@ -59,7 +47,6 @@ export interface CreateTriggerXJobParams {
   intervalMinutes: number;
   durationWeeks: number;
   slippage: string;
-  createdAt: string;
   signer: any; // ethers.Signer instance
 }
 
@@ -118,12 +105,12 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
     intervalMinutes,
     durationWeeks,
     slippage,
-    createdAt,
     signer
   } = params;
 
   try {
     console.log('🚀 Starting TriggerX job creation for plan:', planId);
+    console.log("params", params);
 
     // Step 1: Get token addresses and validate script parameters
     const fromTokenInfo = getTokenInfo(fromToken);
@@ -132,17 +119,11 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
     console.log('🔍 Token info - From:', fromTokenInfo, 'To:', toTokenInfo);
 
     const scriptParams: DCAScriptParams = {
-      planId,
       userAddress,
       fromToken: fromTokenInfo.symbol,
-      fromTokenAddress: fromTokenInfo.address || undefined,
       toToken: toTokenInfo.symbol,
-      toTokenAddress: toTokenInfo.address || undefined,
       amount,
-      intervalMinutes,
-      durationWeeks,
       slippage,
-      createdAt,
     };
 
     const validation = validateDCAScriptParams(scriptParams);
@@ -150,19 +131,18 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
       throw new Error(`Invalid script parameters: ${validation.errors.join(', ')}`);
     }
 
-    // Step 2: Generate and upload script to IPFS
-    console.log('📝 Generating DCA script...');
+    // Step 2: Generate and upload minimal script to IPFS
+    console.log('📝 Generating minimal DCA script...');
     const uploadResult = await uploadDCAScriptToIPFS(
       scriptParams,
-      generateDCAScript,
-      generateDCAScriptMetadata
+      generateDCAScript
     );
 
     if (!uploadResult.success || !uploadResult.scriptIpfsUrl) {
       throw new Error(`IPFS upload failed: ${uploadResult.error}`);
     }
 
-    console.log('✅ Script uploaded to IPFS:', uploadResult.scriptIpfsUrl);
+    console.log('✅ Minimal script uploaded to IPFS:', uploadResult.scriptIpfsUrl);
 
     // Step 3: Create TriggerX job input
     const jobInput = createDCAJobInput({
@@ -179,8 +159,26 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
 
     // Step 4: Create TriggerX job
     console.log('⚡ Creating TriggerX job...');
-    const client = new TriggerXClient(process.env.NEXT_PUBLIC_TRIGGERX_API_KEY || '');
-    const result = await createJob(client, { jobInput, signer });
+    const apiKey = process.env.NEXT_PUBLIC_TRIGGERX_API_KEY || '';
+    console.log('🔑 API Key exists:', !!apiKey, 'Length:', apiKey.length);
+    
+    const client = new TriggerXClient(apiKey);
+    console.log("📡 TriggerX Client:", client);
+    console.log("📝 Job Input (full):", JSON.stringify(jobInput, null, 2));
+    console.log("🔗 IPFS URL being passed:", jobInput.dynamicArgumentsScriptUrl);
+    console.log("✍️ Signer:", signer);
+    
+    let result;
+    try {
+      console.log('📤 Calling createJob...');
+      result = await createJob(client, { jobInput, signer });
+      console.log('📥 CreateJob result:', result);
+    } catch (error) {
+      console.error('❌ CreateJob error details:', error);
+      // console.error('❌ Error message:', error.message);
+      // console.error('❌ Error stack:', error.stack);
+      throw error;
+    }
 
     if (!result.success || !result.data) {
       throw new Error(result.error || 'TriggerX job creation failed');
@@ -200,7 +198,6 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
       jobId,
       ipfsLink,
       scriptIpfsUrl: uploadResult.scriptIpfsUrl,
-      metadataIpfsUrl: uploadResult.metadataIpfsUrl,
       planId,
       data: result.data,
     };
@@ -217,32 +214,7 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
   }
 }
 
-/**
- * Upload plan metadata to IPFS
- */
-export async function uploadPlanMetadataToIPFS(metadata: IPFSMetadata): Promise<string> {
-  try {
-    // This is a placeholder for IPFS upload
-    // In a real implementation, you would:
-    // 1. Use a service like Pinata, Web3.Storage, or NFT.Storage
-    // 2. Upload the metadata JSON
-    // 3. Return the IPFS hash
-
-    console.log('[IPFS] Uploading metadata:', metadata);
-
-    // Simulate IPFS upload
-    const ipfsHash = `Qm${Date.now().toString(36)}${metadata.planId.slice(-16)}`;
-    const ipfsLink = `ipfs://${ipfsHash}`;
-
-    console.log('[IPFS] Metadata uploaded to:', ipfsLink);
-
-    return ipfsLink;
-
-  } catch (error) {
-    console.error('[IPFS] Upload failed:', error);
-    throw new Error(`IPFS upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-}
+// Removed uploadPlanMetadataToIPFS function - no longer needed
 
 /**
  * Update DCA plan with job details
@@ -282,7 +254,9 @@ export async function updatePlanWithJobDetails(
 
 /**
  * Get signer from user's wallet
- * Automatically detects and uses the connected wallet via wagmi
+ * 
+ * @deprecated Use triggerXService.ts with useWalletClient hook instead
+ * This function doesn't have access to Wagmi context and should be replaced
  */
 export async function getSignerFromWallet(): Promise<any> {
   try {
@@ -333,23 +307,15 @@ export function createDCAJobInput(params: {
   amount: string;
   scriptIpfsUrl: string;
 }): TimeBasedJobInput & { jobType: JobType.Time; argType: ArgType.Dynamic } {
+
   const {
-    planId,
     contractAddress,
     contractABI,
     intervalMinutes,
     durationWeeks,
-    userAddress,
-    fromToken,
-    amount,
     scriptIpfsUrl
   } = params;
 
-  // Calculate total executions
-  const totalExecutions = Math.floor((durationWeeks * 7 * 24 * 60) / intervalMinutes);
-
-  // Get token address from token map
-  const tokenAddress = getTokenAddress(fromToken);
 
   return {
     jobType: JobType.Time,
@@ -426,7 +392,6 @@ export async function createCompleteDCAPlan(params: {
       intervalMinutes: planData.intervalMinutes,
       durationWeeks: planData.durationWeeks,
       slippage: planData.slippage,
-      createdAt: new Date().toISOString(),
       signer,
     });
 
@@ -510,6 +475,7 @@ export async function minimalTriggerXExample() {
 
   // 4. Create job
   const result = await createJob(client, { jobInput, signer });
+  console.log("result", result);
 
   // 5. Handle response
   if (result.success && result.data) {
