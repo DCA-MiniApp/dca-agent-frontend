@@ -10,6 +10,7 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
   useReadContract,
+  useWalletClient,
 } from "wagmi";
 import { maxUint256 } from "viem";
 import { arbitrum } from "wagmi/chains";
@@ -21,7 +22,6 @@ import {
 import { useRouter } from "next/navigation";
 import { IoPersonCircle } from "react-icons/io5";
 import { RiRobot2Fill } from "react-icons/ri";
-
 
 // Chat message interface
 interface ChatMessage {
@@ -62,6 +62,7 @@ export function ActionsTab() {
   const { notificationDetails, haptics, context } = useMiniApp();
 
   const { address, isConnected } = useAccount();
+  const { data: walletClient } = useWalletClient();
 
   // --- State ---
   const [notificationState, setNotificationState] = useState({
@@ -76,9 +77,7 @@ export function ActionsTab() {
       role: "assistant",
       content: `👋 **Hello!** I'm your DCA investment assistant.\n\n🎯 Create automated strategies\n📊 Track portfolio performance\n⚙️ Manage your plans\n\n${
         isConnected
-          ? `Wallet connected (${formatAddress(
-              address || ""
-            )}) - ready to go!`
+          ? `Wallet connected (${formatAddress(address || "")}) - ready to go!`
           : "Connect wallet to access all features."
       }\n\n**Quick start:** "Create a DCA plan with 0.1 USDC into WETH weekly for 1 month"`,
       timestamp: new Date(),
@@ -109,7 +108,9 @@ export function ActionsTab() {
   >("summary");
   const [currentPlanData, setCurrentPlanData] = useState<any>(null);
   const [isInPlanCreationFlow, setIsInPlanCreationFlow] = useState(false);
-  const [completedConfirmations, setCompletedConfirmations] = useState<Set<string>>(new Set());
+  const [completedConfirmations, setCompletedConfirmations] = useState<
+    Set<string>
+  >(new Set());
 
   // Contract interactions for token approval
   const {
@@ -323,6 +324,7 @@ export function ActionsTab() {
           userAddress: address,
           conversationHistory: messages.slice(-6), // Include last 6 messages for context
           isPlanCreationRequest: isPlanRequest, // Flag to help API determine response type
+          fid: context?.user?.fid,
         }),
       });
 
@@ -470,7 +472,9 @@ export function ActionsTab() {
       setIsApprovalLoading(false);
 
       // Mark this confirmation as completed
-      setCompletedConfirmations(prev => new Set(prev).add(pendingConfirmationId));
+      setCompletedConfirmations((prev) =>
+        new Set(prev).add(pendingConfirmationId)
+      );
 
       // Add success message with transaction hash and copy functionality
       const approvalMessage: ChatMessage = {
@@ -523,6 +527,210 @@ export function ActionsTab() {
   }, [approvalError]);
 
   // Proceed with plan creation after approval
+  // const proceedWithPlanCreation = useCallback(
+  //   async (confirmationId: string) => {
+  //     try {
+  //       console.log(
+  //         "[Confirmation] Creating plan after approval:",
+  //         confirmationId
+  //       );
+
+  //       setIsPlanCreationLoading(true);
+
+  //       // Add loading message for plan creation
+  //       const loadingMessage: ChatMessage = {
+  //         id: Date.now().toString(),
+  //         role: "assistant",
+  //         content: " Creating your DCA plan...",
+  //         timestamp: new Date(),
+  //         isCreatingPlan: true,
+  //       };
+  //       setMessages((prev) => [...prev, loadingMessage]);
+
+  //       // Call the API with confirmation
+  //       const response = await fetch("/api/dca-chat", {
+  //         method: "POST",
+  //         headers: {
+  //           "Content-Type": "application/json",
+  //         },
+  //         body: JSON.stringify({
+  //           message: "", // Empty message for confirmation actions
+  //           userAddress: address,
+  //           confirmationId: confirmationId,
+  //           action: "confirm",
+  //         }),
+  //       });
+
+  //       if (!response.ok) {
+  //         throw new Error(`API error: ${response.status}`);
+  //       }
+
+  //       const result = await response.json();
+  //       console.log("Plan confirmation response:", result);
+
+  //       // Check if plan was created successfully
+  //       if (result.success && result.data) {
+  //         const planId = result.data.agentResponse.id;
+  //         console.log("Plan created successfully:", planId);
+
+  //         // TriggerX Job Creation - Create automated job after plan creation
+  //         try {
+  //           console.log("Come to line number 574...");
+  //           const { createTriggerXJobForPlan } = await import('../../../lib/triggerXIntegration');
+  //           console.log("Imported createTriggerXJobForPlan:", createTriggerXJobForPlan);
+
+  //           // Build ethers signer preferring Wagmi transport (no popup), fallback to window.ethereum
+  //           let ethersSigner: any = null;
+  //           try {
+  //             const { BrowserProvider } = await import('ethers');
+
+  //             // 1) Prefer Wagmi transport if available
+  //             if (walletClient?.transport && (walletClient.transport as any).request) {
+  //               console.log("Creating provider from Wagmi transport");
+  //               const eip1193 = { request: walletClient.transport.request } as any;
+  //               const provider = new BrowserProvider(eip1193, walletClient.chain?.id);
+  //               ethersSigner = await Promise.race([
+  //                 provider.getSigner(walletClient.account?.address),
+  //                 new Promise((_, reject) => setTimeout(() => reject(new Error('getSigner (wagmi) timeout after 10s')), 10000)) as Promise<any>,
+  //               ]);
+  //               console.log("Obtained ethers signer via Wagmi:", await ethersSigner.getAddress());
+  //             }
+
+  //             // 2) Fallback to window.ethereum
+  //             if (!ethersSigner && typeof window !== 'undefined' && (window as any).ethereum) {
+  //               console.log("Creating provider from window.ethereum");
+  //               const provider = new BrowserProvider((window as any).ethereum);
+  //               const accounts: any[] = await Promise.race([
+  //                 provider.send('eth_accounts', []),
+  //                 new Promise((_, reject) => setTimeout(() => reject(new Error('eth_accounts timeout after 5s')), 5000)) as Promise<any>,
+  //               ]).catch(() => []);
+  //               if (!accounts || accounts.length === 0) {
+  //                 console.log("No accounts, requesting via eth_requestAccounts...");
+  //                 await Promise.race([
+  //                   provider.send('eth_requestAccounts', []),
+  //                   new Promise((_, reject) => setTimeout(() => reject(new Error('eth_requestAccounts timeout after 15s')), 15000)) as Promise<any>,
+  //                 ]);
+  //               }
+  //               ethersSigner = await Promise.race([
+  //                 provider.getSigner(0),
+  //                 new Promise((_, reject) => setTimeout(() => reject(new Error('getSigner timeout after 10s')), 10000)) as Promise<any>,
+  //               ]);
+  //               console.log("Obtained ethers signer via window.ethereum:", await ethersSigner.getAddress());
+  //             }
+  //           } catch (walletErr) {
+  //             console.error('Failed to obtain ethers signer:', walletErr);
+  //             ethersSigner = null;
+  //           }
+
+  //           if (!ethersSigner) {
+  //             console.warn('⚠️ Wallet not connected, skipping TriggerX job creation');
+  //           } else {
+  //             console.log('🚀 Creating TriggerX job for plan:', planId);
+  //             console.log("Ethers signer:", ethersSigner);
+
+  //             // Create TriggerX job with real signer
+  //             const triggerXResult = await createTriggerXJobForPlan({
+  //               planId: result.data.agentResponse.id,
+  //               userAddress: result.data.agentResponse.userAddress,
+  //               fromToken: result.data.agentResponse.fromToken,
+  //               toToken: result.data.agentResponse.toToken,
+  //               amount: result.data.agentResponse.amount,
+  //               intervalMinutes: result.data.agentResponse.intervalMinutes,
+  //               durationWeeks: result.data.agentResponse.durationWeeks,
+  //               slippage: result.data.agentResponse.slippage,
+  //               signer: ethersSigner,
+  //             });
+
+  //             console.log("TriggerX result:", triggerXResult);
+
+  //             if (triggerXResult.success) {
+  //               console.log('✅ TriggerX job created successfully:', triggerXResult.jobId);
+
+  //               // Add success message about automation
+  //               const automationMessage: ChatMessage = {
+  //                 id: Date.now().toString(),
+  //                 role: "assistant",
+  //                 content: `🚀 **Automation Setup Complete!**\n\n✅ TriggerX Job ID: ${triggerXResult.jobId}\n📜 Script IPFS: ${triggerXResult.scriptIpfsUrl}\n\nYour DCA plan is now fully automated and will execute according to your schedule.`,
+  //                 timestamp: new Date(),
+  //               };
+  //               setMessages((prev) => [...prev, automationMessage]);
+  //             } else {
+  //               console.error('❌ TriggerX job creation failed:', triggerXResult.error);
+
+  //               // Add error message about automation failure
+  //               const automationErrorMessage: ChatMessage = {
+  //                 id: Date.now().toString(),
+  //                 role: "assistant",
+  //                 content: `⚠️ **Plan Created but Automation Failed**\n\nYour DCA plan was created successfully, but we couldn't set up automation:\n${triggerXResult.error}\n\nYou can manually execute swaps or try setting up automation later.`,
+  //                 timestamp: new Date(),
+  //               };
+  //               setMessages((prev) => [...prev, automationErrorMessage]);
+  //             }
+  //           }
+  //         } catch (triggerXError) {
+  //           console.error('❌ TriggerX integration error:', triggerXError);
+
+  //           // Add error message about automation failure
+  //           const automationErrorMessage: ChatMessage = {
+  //             id: Date.now().toString(),
+  //             role: "assistant",
+  //             content: `⚠️ **Plan Created but Automation Setup Failed**\n\nYour DCA plan was created successfully, but we encountered an error setting up automation. You can manually execute swaps for now.`,
+  //             timestamp: new Date(),
+  //           };
+  //           setMessages((prev) => [...prev, automationErrorMessage]);
+  //         }
+  //       }
+  //       console.log("Actual response content:", result.response);
+
+  //       if (result.success) {
+  //         // Remove loading message and show success
+  //         setMessages((prev) => prev.filter((msg) => !msg.isCreatingPlan));
+
+  //         // Show the actual response from the backend/SSE
+  //         const confirmationMessage: ChatMessage = {
+  //           id: Date.now().toString(),
+  //           role: "assistant",
+  //           content:
+  //             result.response ||
+  //             "🎉 DCA plan created successfully!\n\nYour automated investment strategy is now active and will execute according to your schedule.",
+  //           timestamp: new Date(),
+  //         };
+  //         setMessages((prev) => [...prev, confirmationMessage]);
+
+  //         // Handle action response
+  //         if (result.action) {
+  //           handleChatAction(result.action, result.data);
+  //         }
+  //       } else {
+  //         throw new Error(result.error || "Failed to create plan");
+  //       }
+  //     } catch (error) {
+  //       console.error("Error creating plan:", error);
+
+  //       // Remove loading message
+  //       setMessages((prev) => prev.filter((msg) => !msg.isCreatingPlan));
+
+  //       const errorMessage: ChatMessage = {
+  //         id: Date.now().toString(),
+  //         role: "assistant",
+  //         content:
+  //           "❌ Sorry, I encountered an error while creating your plan. Please try again.",
+  //         timestamp: new Date(),
+  //       };
+  //       setMessages((prev) => [...prev, errorMessage]);
+  //     } finally {
+  //       setIsPlanCreationLoading(false);
+  //       setIsApprovalLoading(false);
+  //       setApprovalStatus("idle");
+  //       setCurrentPlanData(null);
+  //       setIsInPlanCreationFlow(false);
+  //       setPendingConfirmationId(null);
+  //       setConfirmationStep("summary");
+  //     }
+  //   },
+  //   [address, handleChatAction]
+  // );
+
   const proceedWithPlanCreation = useCallback(
     async (confirmationId: string) => {
       try {
@@ -537,7 +745,7 @@ export function ActionsTab() {
         const loadingMessage: ChatMessage = {
           id: Date.now().toString(),
           role: "assistant",
-          content: " Creating your DCA plan...",
+          content: "🔄 Creating your DCA plan...",
           timestamp: new Date(),
           isCreatingPlan: true,
         };
@@ -554,6 +762,7 @@ export function ActionsTab() {
             userAddress: address,
             confirmationId: confirmationId,
             action: "confirm",
+          fid: context?.user?.fid,
           }),
         });
 
@@ -571,22 +780,179 @@ export function ActionsTab() {
 
           // TriggerX Job Creation - Create automated job after plan creation
           try {
-            const { createTriggerXJobForPlan } = await import('../../../lib/triggerXIntegration');
-            
-            // Get wallet client from window.ethereum (since we can't use hooks here)
-            let walletClient = null;
-            if (typeof window !== 'undefined' && window.ethereum) {
-              const { BrowserProvider } = await import('ethers');
-              const provider = new BrowserProvider(window.ethereum);
-              walletClient = await provider.getSigner();
-            }
-            
-            if (!walletClient) {
-              console.warn('⚠️ Wallet not connected, skipping TriggerX job creation');
-            } else {
-              console.log('🚀 Creating TriggerX job for plan:', planId);
+            console.log("Starting TriggerX integration...");
+            const { createTriggerXJobForPlan } = await import(
+              "../../../lib/triggerXIntegration"
+            );
+            console.log("Imported createTriggerXJobForPlan successfully");
 
-              // Create TriggerX job with real signer
+            // Build ethers signer with improved reliability
+            let ethersSigner: any = null;
+
+            try {
+              const { BrowserProvider } = await import("ethers");
+
+              // Strategy 1: Try Wagmi transport first (preferred - no popup)
+              if (walletClient?.account?.address && walletClient?.transport) {
+                console.log(
+                  "Attempting to create signer via Wagmi transport..."
+                );
+
+                try {
+                  const transportRequest = (walletClient.transport as any)
+                    .request;
+
+                  if (transportRequest) {
+                    const eip1193Provider = {
+                      request: transportRequest.bind(walletClient.transport),
+                    };
+
+                    const provider = new BrowserProvider(
+                      eip1193Provider,
+                      walletClient.chain?.id
+                    );
+
+                    // Increased timeout to 30 seconds for better reliability
+                    ethersSigner = await Promise.race([
+                      provider.getSigner(walletClient.account.address),
+                      new Promise((_, reject) =>
+                        setTimeout(
+                          () => reject(new Error("Wagmi signer timeout")),
+                          30000
+                        )
+                      ) as Promise<any>,
+                    ]);
+
+                    const signerAddress = await ethersSigner.getAddress();
+                    console.log(
+                      "✅ Successfully obtained signer via Wagmi:",
+                      signerAddress
+                    );
+                  }
+                } catch (wagmiError) {
+                  console.warn("⚠️ Wagmi transport failed:", wagmiError);
+                  ethersSigner = null;
+                }
+              }
+
+              // Strategy 2: Fallback to window.ethereum if Wagmi failed
+              if (
+                !ethersSigner &&
+                typeof window !== "undefined" &&
+                (window as any).ethereum
+              ) {
+                console.log(
+                  "Attempting to create signer via window.ethereum..."
+                );
+
+                try {
+                  const provider = new BrowserProvider(
+                    (window as any).ethereum
+                  );
+
+                  // Check if accounts are already available
+                  let accounts: string[] = [];
+                  try {
+                    accounts = await Promise.race([
+                      provider.send("eth_accounts", []),
+                      new Promise((_, reject) =>
+                        setTimeout(
+                          () => reject(new Error("eth_accounts timeout")),
+                          8000
+                        )
+                      ) as Promise<string[]>,
+                    ]);
+                  } catch (accountsError) {
+                    console.warn("Failed to get accounts:", accountsError);
+                    accounts = [];
+                  }
+
+                  // Request accounts if not available (this may show popup)
+                  if (!accounts || accounts.length === 0) {
+                    console.log(
+                      "No accounts found, requesting via eth_requestAccounts..."
+                    );
+
+                    // Add user-facing message about wallet approval
+                    const approvalMessage: ChatMessage = {
+                      id: `approval-${Date.now()}`,
+                      role: "assistant",
+                      content:
+                        "🔐 Please approve the wallet connection request...",
+                      timestamp: new Date(),
+                      isCreatingPlan: true,
+                    };
+                    setMessages((prev) => [...prev, approvalMessage]);
+
+                    try {
+                      await Promise.race([
+                        provider.send("eth_requestAccounts", []),
+                        new Promise((_, reject) =>
+                          setTimeout(
+                            () =>
+                              reject(
+                                new Error(
+                                  "User did not approve wallet connection"
+                                )
+                              ),
+                            60000
+                          )
+                        ) as Promise<any>,
+                      ]);
+                    } catch (requestError) {
+                      throw new Error(
+                        "Wallet connection was not approved. Please try again."
+                      );
+                    }
+                  }
+
+                  // Get signer with increased timeout
+                  ethersSigner = await Promise.race([
+                    provider.getSigner(0),
+                    new Promise((_, reject) =>
+                      setTimeout(
+                        () => reject(new Error("getSigner timeout")),
+                        30000
+                      )
+                    ) as Promise<any>,
+                  ]);
+
+                  const signerAddress = await ethersSigner.getAddress();
+                  console.log(
+                    "✅ Successfully obtained signer via window.ethereum:",
+                    signerAddress
+                  );
+                } catch (windowEthereumError) {
+                  console.error(
+                    "❌ window.ethereum failed:",
+                    windowEthereumError
+                  );
+                  throw windowEthereumError;
+                }
+              }
+            } catch (walletErr) {
+              console.error("❌ Failed to obtain ethers signer:", walletErr);
+              ethersSigner = null;
+            }
+
+            // Handle case where no signer could be obtained
+            if (!ethersSigner) {
+              console.warn("⚠️ Could not obtain wallet signer");
+
+              const walletErrorMessage: ChatMessage = {
+                id: Date.now().toString(),
+                role: "assistant",
+                content: `⚠️ **Plan Created Successfully**\n\nHowever, we couldn't connect to your wallet to set up automation. Your plan was created but automation setup was skipped.\n\nYou can manually execute swaps or reconnect your wallet to enable automation.`,
+                timestamp: new Date(),
+              };
+              setMessages((prev) => [
+                ...prev.filter((msg) => !msg.isCreatingPlan),
+                walletErrorMessage,
+              ]);
+            } else {
+              // Signer obtained successfully, create TriggerX job
+              console.log("🚀 Creating TriggerX job for plan:", planId);
+
               const triggerXResult = await createTriggerXJobForPlan({
                 planId: result.data.agentResponse.id,
                 userAddress: result.data.agentResponse.userAddress,
@@ -596,23 +962,34 @@ export function ActionsTab() {
                 intervalMinutes: result.data.agentResponse.intervalMinutes,
                 durationWeeks: result.data.agentResponse.durationWeeks,
                 slippage: result.data.agentResponse.slippage,
-                signer: walletClient,
+                signer: ethersSigner,
               });
 
+              console.log("TriggerX result:", triggerXResult);
+
               if (triggerXResult.success) {
-                console.log('✅ TriggerX job created successfully:', triggerXResult.jobId);
-                
+                console.log(
+                  "✅ TriggerX job created successfully:",
+                  triggerXResult.jobId
+                );
+
                 // Add success message about automation
                 const automationMessage: ChatMessage = {
                   id: Date.now().toString(),
-                  role: "assistant", 
+                  role: "assistant",
                   content: `🚀 **Automation Setup Complete!**\n\n✅ TriggerX Job ID: ${triggerXResult.jobId}\n📜 Script IPFS: ${triggerXResult.scriptIpfsUrl}\n\nYour DCA plan is now fully automated and will execute according to your schedule.`,
                   timestamp: new Date(),
                 };
-                setMessages((prev) => [...prev, automationMessage]);
+                setMessages((prev) => [
+                  ...prev.filter((msg) => !msg.isCreatingPlan),
+                  automationMessage,
+                ]);
               } else {
-                console.error('❌ TriggerX job creation failed:', triggerXResult.error);
-                
+                console.error(
+                  "❌ TriggerX job creation failed:",
+                  triggerXResult.error
+                );
+
                 // Add error message about automation failure
                 const automationErrorMessage: ChatMessage = {
                   id: Date.now().toString(),
@@ -620,26 +997,37 @@ export function ActionsTab() {
                   content: `⚠️ **Plan Created but Automation Failed**\n\nYour DCA plan was created successfully, but we couldn't set up automation:\n${triggerXResult.error}\n\nYou can manually execute swaps or try setting up automation later.`,
                   timestamp: new Date(),
                 };
-                setMessages((prev) => [...prev, automationErrorMessage]);
+                setMessages((prev) => [
+                  ...prev.filter((msg) => !msg.isCreatingPlan),
+                  automationErrorMessage,
+                ]);
               }
             }
           } catch (triggerXError) {
-            console.error('❌ TriggerX integration error:', triggerXError);
-            
-            // Add error message about automation failure  
+            console.error("❌ TriggerX integration error:", triggerXError);
+
+            // Add error message about automation failure
             const automationErrorMessage: ChatMessage = {
               id: Date.now().toString(),
               role: "assistant",
-              content: `⚠️ **Plan Created but Automation Setup Failed**\n\nYour DCA plan was created successfully, but we encountered an error setting up automation. You can manually execute swaps for now.`,
+              content: `⚠️ **Plan Created but Automation Setup Failed**\n\nYour DCA plan was created successfully, but we encountered an error setting up automation:\n${
+                triggerXError instanceof Error
+                  ? triggerXError.message
+                  : "Unknown error"
+              }\n\nYou can manually execute swaps for now.`,
               timestamp: new Date(),
             };
-            setMessages((prev) => [...prev, automationErrorMessage]);
+            setMessages((prev) => [
+              ...prev.filter((msg) => !msg.isCreatingPlan),
+              automationErrorMessage,
+            ]);
           }
         }
+
         console.log("Actual response content:", result.response);
 
         if (result.success) {
-          // Remove loading message and show success
+          // Remove loading messages and show success
           setMessages((prev) => prev.filter((msg) => !msg.isCreatingPlan));
 
           // Show the actual response from the backend/SSE
@@ -663,14 +1051,17 @@ export function ActionsTab() {
       } catch (error) {
         console.error("Error creating plan:", error);
 
-        // Remove loading message
+        // Remove loading messages
         setMessages((prev) => prev.filter((msg) => !msg.isCreatingPlan));
 
         const errorMessage: ChatMessage = {
           id: Date.now().toString(),
           role: "assistant",
           content:
-            "❌ Sorry, I encountered an error while creating your plan. Please try again.",
+            error instanceof Error &&
+            error.message.includes("wallet connection")
+              ? `❌ ${error.message}`
+              : "❌ Sorry, I encountered an error while creating your plan. Please try again.",
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, errorMessage]);
@@ -684,7 +1075,7 @@ export function ActionsTab() {
         setConfirmationStep("summary");
       }
     },
-    [address, handleChatAction]
+    [address, handleChatAction, walletClient, setMessages]
   );
 
   // Start approval process after user confirms the plan summary
@@ -706,9 +1097,7 @@ export function ActionsTab() {
         const approvalMessage: ChatMessage = {
           id: Date.now().toString(),
           role: "assistant",
-          content: `🔐 **Requesting Token Approval**\n\nPlease check your wallet and approve spending of ${
-            planData.fromToken
-          } tokens. This allows our contract to execute your DCA plan automatically.\n\n*Check your wallet popup...*`,
+          content: `🔐 **Requesting Token Approval**\n\nPlease check your wallet and approve spending of ${planData.fromToken} tokens. This allows our contract to execute your DCA plan automatically.\n\n*Check your wallet popup...*`,
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, approvalMessage]);
@@ -774,7 +1163,7 @@ export function ActionsTab() {
       if (!confirmationId) return;
 
       // Mark this confirmation as completed
-      setCompletedConfirmations(prev => new Set(prev).add(confirmationId));
+      setCompletedConfirmations((prev) => new Set(prev).add(confirmationId));
       setIsPlanCreationLoading(true);
 
       try {
@@ -1086,98 +1475,104 @@ export function ActionsTab() {
                 )}
 
                 {/* Confirmation Buttons */}
-                {message.requiresConfirmation && message.confirmationId && !completedConfirmations.has(message.confirmationId) && (
-                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                    <div className="flex gap-2 justify-center">
-                      <button
-                        onClick={() => {
-                          if (message.confirmationId?.startsWith("approve-")) {
-                            handleApproveConfirm(message.confirmationId);
-                          } else {
-                            // This case should ideally not be reached for plan creation requests
-                            // but as a fallback, we can call handleConfirmPlan if it were still here
-                            // For now, we'll just show the cancel button
-                            handleCancelPlan(message.confirmationId as string);
+                {message.requiresConfirmation &&
+                  message.confirmationId &&
+                  !completedConfirmations.has(message.confirmationId) && (
+                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                      <div className="flex gap-2 justify-center">
+                        <button
+                          onClick={() => {
+                            if (
+                              message.confirmationId?.startsWith("approve-")
+                            ) {
+                              handleApproveConfirm(message.confirmationId);
+                            } else {
+                              // This case should ideally not be reached for plan creation requests
+                              // but as a fallback, we can call handleConfirmPlan if it were still here
+                              // For now, we'll just show the cancel button
+                              handleCancelPlan(
+                                message.confirmationId as string
+                              );
+                            }
+                          }}
+                          disabled={
+                            isPlanCreationLoading ||
+                            isApprovalLoading ||
+                            isApprovePending ||
+                            isApprovalConfirming
                           }
-                        }}
-                        disabled={
-                          isPlanCreationLoading ||
-                          isApprovalLoading ||
-                          isApprovePending ||
-                          isApprovalConfirming
-                        }
-                        className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-                      >
-                        {isApprovePending || isApprovalConfirming ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            {isApprovePending
-                              ? "Wallet Approval..."
-                              : "Confirming Approval..."}
-                          </>
-                        ) : isApprovalLoading ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            {message.confirmationId?.startsWith("approve-")
-                              ? "Starting Approval..."
-                              : "Creating Plan..."}
-                          </>
-                        ) : isPlanCreationLoading ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            &apos;Processing...&apos;
-                          </>
-                        ) : (
-                          <>
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M5 13l4 4L19 7"
-                              />
-                            </svg>
-                            {message.confirmationId?.startsWith("approve-")
-                              ? "Proceed with Approval"
-                              : "Review Plan Details"}
-                          </>
-                        )}
-                      </button>
-                      <button
-                        onClick={() =>
-                          handleCancelPlan(message.confirmationId!)
-                        }
-                        disabled={
-                          isPlanCreationLoading ||
-                          isApprovalLoading ||
-                          isApprovePending ||
-                          isApprovalConfirming
-                        }
-                        className="flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
+                          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        </svg>
-                        Cancel
-                      </button>
+                          {isApprovePending || isApprovalConfirming ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              {isApprovePending
+                                ? "Wallet Approval..."
+                                : "Confirming Approval..."}
+                            </>
+                          ) : isApprovalLoading ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              {message.confirmationId?.startsWith("approve-")
+                                ? "Starting Approval..."
+                                : "Creating Plan..."}
+                            </>
+                          ) : isPlanCreationLoading ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              &apos;Processing...&apos;
+                            </>
+                          ) : (
+                            <>
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                              {message.confirmationId?.startsWith("approve-")
+                                ? "Proceed with Approval"
+                                : "Review Plan Details"}
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleCancelPlan(message.confirmationId!)
+                          }
+                          disabled={
+                            isPlanCreationLoading ||
+                            isApprovalLoading ||
+                            isApprovePending ||
+                            isApprovalConfirming
+                          }
+                          className="flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                          Cancel
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 <div
                   className={`text-xs mt-1 ${
@@ -1250,7 +1645,6 @@ export function ActionsTab() {
             </button>
           </div>
 
-
           {/* Plan Creation Mode Indicator */}
           {isInPlanCreationFlow && (
             <div className="flex items-center gap-2 mb-1 text-xs">
@@ -1318,8 +1712,6 @@ export function ActionsTab() {
           </div>
         </div>
       </div>
-
-     
     </div>
   );
 }

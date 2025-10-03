@@ -7,6 +7,7 @@ import { planSessionManager } from '../../../lib/planSessionManager';
 const ChatRequestSchema = z.object({
   message: z.string(),
   userAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address').optional(),
+  fid: z.number().int().positive().optional(),
   conversationHistory: z.array(z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string(),
@@ -55,13 +56,13 @@ export async function POST(request: NextRequest) {
   try {
     // Parse and validate request
     const body = await request.json();
-    const { message, userAddress, conversationHistory, confirmationId, action, isPlanCreationRequest } = ChatRequestSchema.parse(body);
+    const { message, userAddress, conversationHistory, confirmationId, action, isPlanCreationRequest, fid } = ChatRequestSchema.parse(body);
 
     console.log('[DCA Chat API] Received:', { message, userAddress, confirmationId, action, isPlanCreationRequest });
 
     // Handle confirmation actions first
     if (confirmationId && action) {
-      const confirmationResponse = await handleConfirmationAction(confirmationId, action, userAddress);
+      const confirmationResponse = await handleConfirmationAction(confirmationId, action, userAddress, fid);
       return NextResponse.json(confirmationResponse);
     }
 
@@ -154,7 +155,7 @@ export async function POST(request: NextRequest) {
 
     // For non-plan creation messages, send to VibeKit agent
     console.log('[DCA Operation] Sending to VibeKit agent:', message);
-    const vibekitResponse = await sendToVibeKitAgent(message, userAddress, conversationHistory);
+    const vibekitResponse = await sendToVibeKitAgent(message, userAddress, conversationHistory, fid);
     
     return NextResponse.json({
       success: true,
@@ -184,9 +185,10 @@ export async function POST(request: NextRequest) {
  * Handle confirmation actions (confirm/cancel)
  */
 async function handleConfirmationAction(
-  confirmationId: string, 
-  action: 'confirm' | 'cancel', 
-  userAddress?: string
+  confirmationId: string,
+  action: 'confirm' | 'cancel',
+  userAddress?: string,
+  fid?: number
 ): Promise<{
   success: boolean;
   response: string;
@@ -230,7 +232,7 @@ async function handleConfirmationAction(
       
       // Create instruction for VibeKit agent
       const createInstruction = `Create DCA plan: Invest ${planData.amount} ${planData.fromToken} into ${planData.toToken} every ${planData.interval} for ${planData.duration} with ${planData.slippage || 2}% slippage`;
-      const vibekitResponse = await sendToVibeKitAgent(createInstruction, userAddress);
+      const vibekitResponse = await sendToVibeKitAgent(createInstruction, userAddress, [], fid);
       
       return {
         success: true,
@@ -408,7 +410,8 @@ async function handleDCAOperation(message: string, userAddress?: string): Promis
 async function sendToVibeKitAgent(
   message: string, 
   userAddress?: string, 
-  conversationHistory: any[] = []
+  conversationHistory: any[] = [],
+  fid?: number
 ): Promise<{
   response: string;
   action?: string;
@@ -436,7 +439,8 @@ async function sendToVibeKitAgent(
         name: 'dca-swapping',
         arguments: {
           instruction: message,
-          userAddress: userAddress
+          userAddress: userAddress,
+          fid: fid
         }
       }
     };

@@ -175,7 +175,10 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
       console.log('📥 CreateJob result:', result);
     } catch (error) {
       console.error('❌ CreateJob error details:', error);
-      // console.error('❌ Error message:', error.message);
+      console.error('❌ Error message:', (error as any)?.message);
+      console.error('❌ Error response:', (error as any)?.response);
+      console.error('❌ Error status:', (error as any)?.status);
+      console.error('❌ Error data:', (error as any)?.data);
       // console.error('❌ Error stack:', error.stack);
       throw error;
     }
@@ -184,7 +187,15 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
       throw new Error(result.error || 'TriggerX job creation failed');
     }
 
-    const jobId = result.data.job_id || result.data.id;
+    // Normalize jobId to a single string (backend expects string, not array)
+    const jobId = (
+      (Array.isArray((result as any)?.data?.job_id) && (result as any).data.job_id[0]) ||
+      (Array.isArray((result as any)?.data?.job_ids) && (result as any).data.job_ids[0]) ||
+      (result as any)?.data?.job_id ||
+      (result as any)?.data?.job_ids ||
+      (result as any)?.data?.id ||
+      null
+    );
     console.log('✅ TriggerX job created:', jobId);
 
     // Step 5: Update plan with job details
@@ -225,9 +236,10 @@ export async function updatePlanWithJobDetails(
   ipfsLink: string | null
 ): Promise<void> {
   try {
+    const DCA_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3031';
     console.log('[Plan Update] Updating plan:', planId, { jobId, ipfsLink });
 
-    const response = await fetch(`/api/dca/plans/${planId}/details`, {
+    const response = await fetch(`${DCA_API_URL}/api/dca/plans/${planId}/details`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -334,6 +346,7 @@ export function createDCAJobInput(params: {
     // Dynamic arguments script URL from IPFS
     dynamicArgumentsScriptUrl: scriptIpfsUrl,
     autotopupTG: DCA_JOB_CONFIG.autotopupTG, // true
+    isImua: false, // Add missing isImua field
   };
 }
 

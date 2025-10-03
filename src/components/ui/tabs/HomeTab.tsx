@@ -36,6 +36,7 @@ import {
 } from "../../../lib/api";
 import { computePlansInvestedUsd } from "../../../lib/utils";
 
+
 // Legacy interface for compatibility - will be replaced with DCAPlan
 /**
  * HomeTab component displays the main landing content for the mini app.
@@ -1457,84 +1458,6 @@ export function HomeTab() {
                   {parseFloat(selectedPlan.slippage).toFixed(2)}%
                 </p>
               </div>
-
-              {/* Vault Information */}
-              <div className="grid grid-cols-1 gap-4">
-                <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20">
-                  <p className="text-sm text-gray-300 font-medium mb-2">
-                    Vault Address
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-mono text-gray-100 break-all">
-                      {selectedPlan.vaultAddress || "0x1234567890abcdef1234567890abcdef12345678"}
-                    </p>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(selectedPlan.vaultAddress || "0x1234567890abcdef1234567890abcdef12345678");
-                        // You could add a toast notification here
-                      }}
-                      className="text-[#c199e4] hover:text-white transition-colors"
-                      title="Copy Vault Address"
-                    >
-                      <HiOutlineClipboard className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20">
-                  <p className="text-sm text-gray-300 font-medium mb-2">
-                    Share Tokens
-                  </p>
-                  <p className="text-lg font-bold text-gray-100">
-                    {selectedPlan.shareTokens ? parseFloat(selectedPlan.shareTokens).toFixed(6) : "0.000000"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Withdraw Button */}
-              <div className="pt-2">
-                <button
-                  onClick={async () => {
-                    try {
-                      console.log("Withdraw button clicked for plan:", selectedPlan.id);
-                      
-                      // Check if MetaMask is available
-                      if (typeof window.ethereum !== 'undefined') {
-                        // Request account access if needed
-                        await window.ethereum.request({ method: 'eth_requestAccounts' });
-                        
-                        // TODO: Implement withdraw functionality
-                        // This would typically involve calling a smart contract method
-                        // to withdraw funds from the vault
-                        console.log("MetaMask connected, ready to withdraw funds");
-                        
-                        // You can add the actual withdrawal logic here
-                        // For example: call a withdraw function from your smart contract
-                      } else {
-                        alert('Please install MetaMask to withdraw funds');
-                      }
-                    } catch (error) {
-                      console.error("Error during withdrawal:", error);
-                      alert('Failed to connect to MetaMask');
-                    }
-                  }}
-                  className="w-full bg-gradient-to-r from-red-500/30 to-red-400/20 hover:from-red-500/40 hover:to-red-400/30 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-red-400/40 hover:border-red-400/60 hover:shadow-lg hover:scale-[1.02] flex items-center justify-center gap-2"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  <span>Withdraw from Vault</span>
-                </button>
-              </div>
-
               {/* Progress Section */}
               <div className="space-y-4">
                 <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20">
