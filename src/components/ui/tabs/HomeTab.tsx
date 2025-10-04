@@ -28,6 +28,8 @@ import {
   fetchUserDCAPlans,
   fetchPlatformStats,
   updatePlanStatus,
+  deletePlan,
+  updatePlanJobId,
   calculateTotalInvested,
   formatInterval,
   formatDuration,
@@ -35,6 +37,9 @@ import {
   type PlatformStats,
 } from "../../../lib/api";
 import { computePlansInvestedUsd } from "../../../lib/utils";
+import { TriggerXClient } from "sdk-triggerx";
+import { getJobDataById } from "sdk-triggerx/dist/api/getJobDataById.js";
+import { deleteTriggerXJobForPlan } from "../../../lib/triggerXIntegration";
 
 
 // Legacy interface for compatibility - will be replaced with DCAPlan
@@ -111,8 +116,7 @@ export function HomeTab() {
   const [showPlanModal, setShowPlanModal] = useState(false);
 
   //Plan status state
-  const [Ispaushing, setIsPaushing] = useState(false);
-  const [IsResuming, setIsResuming] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Slider state
   const [currentPlanIndex, setCurrentPlanIndex] = useState(0);
@@ -326,8 +330,8 @@ export function HomeTab() {
   };
 
   const handleCopyPlanId = () => {
-    if (selectedPlan?.id) {
-      navigator.clipboard.writeText(selectedPlan.id);
+    if (selectedPlan?.jobId) {
+      navigator.clipboard.writeText(selectedPlan.jobId);
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
     }
@@ -338,39 +342,40 @@ export function HomeTab() {
   const pausedPlans = userPlans.filter((plan) => plan.status === "PAUSED");
 
   // Plan actions with real API calls
-  const handlePausePlan = async (planId: string) => {
+  const handleDeletePlan = async (plan: DCAPlan) => {
     try {
-      setIsPaushing(true);
-      const success = await updatePlanStatus(planId, "PAUSED");
-      if (success) {
-        await fetchUserData(); // Refresh data
-        console.log("✅ Plan paused successfully:", planId);
-        setIsPaushing(false);
+      setIsDeleting(true);
+      
+      // First, delete the TriggerX job if it exists
+      if (plan.jobId) {
+        console.log("🗑️ Deleting TriggerX job:", plan.jobId);
+        const deleteJobResult = await deleteTriggerXJobForPlan(plan.jobId);
+        
+        if (deleteJobResult.success) {
+          console.log("✅ TriggerX job deleted successfully");
+          
+          // Update the plan's jobId to null in the backend
+          const updateSuccess = await updatePlanJobId(plan.userAddress, plan.jobId);
+          if (updateSuccess) {
+            console.log("✅ Plan jobId updated to null successfully");
+            await fetchUserData(); // Refresh data
+            setShowPlanModal(false); // Close modal
+            setIsDeleting(false);
+          } else {
+            console.error("❌ Failed to update plan jobId to null");
+            setIsDeleting(false);
+          }
+        } else {
+          console.error("❌ Failed to delete TriggerX job:", deleteJobResult.error);
+          setIsDeleting(false);
+        }
       } else {
-        setIsPaushing(false);
-        console.error("❌ Failed to pause plan:", planId);
+        console.log("⚠️ No jobId found for plan, skipping TriggerX deletion");
+        setIsDeleting(false);
       }
     } catch (error) {
-      setIsPaushing(false);
-      console.error("❌ Error pausing plan:", error);
-    }
-  };
-
-  const handleResumePlan = async (planId: string) => {
-    try {
-      setIsResuming(true);
-      const success = await updatePlanStatus(planId, "ACTIVE");
-      if (success) {
-        await fetchUserData(); // Refresh data
-        console.log("✅ Plan resumed successfully:", planId);
-        setIsResuming(false);
-      } else {
-        setIsResuming(false);
-        console.error("❌ Failed to resume plan:", planId);
-      }
-    } catch (error) {
-      setIsResuming(false);
-      console.error("❌ Error resuming plan:", error);
+      setIsDeleting(false);
+      console.error("❌ Error deleting plan:", error);
     }
   };
 
@@ -1344,12 +1349,12 @@ export function HomeTab() {
               <div className="flex items-center justify-between p-3 backdrop-blur-lg rounded-2xl border border-[#c199e4]/20">
                 {/* Left: Plan ID label */}
                 <span className="text-sm text-gray-400 font-medium">
-                  Plan ID:
+                  JOB ID (TriggerX):
                 </span>
                 {/* Right: Plan ID value and copy icon */}
                 <div className="flex items-center gap-2">
                   <span className="font-mono font-bold text-white">
-                    {selectedPlan.id.slice(0, 6)}...{selectedPlan.id.slice(-4)}
+                    {selectedPlan.jobId.slice(0, 6)}...{selectedPlan.jobId.slice(-4)}
                   </span>
                   <button
                     onClick={handleCopyPlanId}
@@ -1381,27 +1386,15 @@ export function HomeTab() {
                   </span>
                 </div>
                 <div className="flex gap-2">
-                  {selectedPlan.status === "ACTIVE" && (
-                    <button
-                      onClick={() => handlePausePlan(selectedPlan.id)}
-                      className={`w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-3 px-5 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg group-hover:scale-[1.02] cursor-pointer ${
-                        Ispaushing ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
-                      disabled={Ispaushing}
-                    >
-                      {Ispaushing ? "Pausing..." : "Pause"}
-                    </button>
-                  )}
-                  {selectedPlan.status === "PAUSED" && (
-                    <button
-                      onClick={() => handleResumePlan(selectedPlan.id)}
-                      className={`w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-3 px-5 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg group-hover:scale-[1.02] cursor-pointer ${
-                        IsResuming ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
-                    >
-                      {IsResuming ? "Resuming..." : "Resume"}
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleDeletePlan(selectedPlan)}
+                    className={`w-full bg-gradient-to-r from-red-500/20 to-red-500/10 hover:from-red-500/30 hover:to-red-500/20 text-white font-semibold py-3 px-5 rounded-2xl transition-all duration-300 text-sm border border-red-500/30 hover:border-red-500/50 hover:shadow-lg group-hover:scale-[1.02] cursor-pointer ${
+                      isDeleting ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? "Deleting..." : "Delete Plan"}
+                  </button>
                 </div>
               </div>
 

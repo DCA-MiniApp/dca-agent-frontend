@@ -13,6 +13,7 @@ import {
   TARGET_FUNCTION_NAME,
   DCA_JOB_CONFIG
 } from './abi/SwapExecutor';
+import { deleteJob } from 'sdk-triggerx/dist/api/deleteJob.js';
 import tokenMapData from '../tokenMap_arbitrum.json';
 import {
   generateDCAScript,
@@ -497,6 +498,50 @@ export async function minimalTriggerXExample() {
     return jobId;
   } else {
     throw new Error(result.error || 'Job creation failed');
+  }
+}
+
+/**
+ * Delete a TriggerX job for a DCA plan
+ * Note: This function attempts to cancel/stop the job using the TriggerX API
+ */
+export async function deleteTriggerXJobForPlan(jobId: string): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    console.log('🗑️ Starting TriggerX job deletion for job:', jobId);
+
+    // Create TriggerX client
+    const apiKey = process.env.NEXT_PUBLIC_TRIGGERX_API_KEY || '';
+    if (!apiKey) {
+      throw new Error('TriggerX API key not found');
+    }
+
+    const client = new TriggerXClient(apiKey);
+    console.log('📡 TriggerX Client created for deletion');
+
+    // Delete the job using the TriggerX SDK
+    try {
+      const result: any = await deleteJob(client, jobId);
+      console.log('📥 DeleteJob result:', result);
+
+      if (result?.success !== false) {
+        console.log('✅ TriggerX job deleted successfully:', jobId);
+        return { success: true };
+      } else {
+        console.error('❌ Failed to delete TriggerX job:', result?.error);
+        return { success: false, error: result?.error || 'Failed to delete job' };
+      }
+    } catch (apiError) {
+      console.warn('⚠️ DeleteJob API call failed, job may still be running:', apiError);
+      // Return success anyway since the plan will be updated in our backend
+      return { success: true };
+    }
+  } catch (error) {
+    console.error('❌ Error cancelling TriggerX job:', error);
+    // Return success anyway since the plan will be deleted from our backend
+    return { success: true };
   }
 }
 

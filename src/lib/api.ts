@@ -4,6 +4,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export interface DCAPlan {
   id: string;
+  jobId: string;
   userAddress: string;
   fromToken: string;
   toToken: string;
@@ -166,6 +167,48 @@ export async function updatePlanStatus(planId: string, status: 'ACTIVE' | 'PAUSE
     return result.success;
   } catch (error) {
     console.error('Error updating plan status:', error);
+    return false;
+  }
+}
+
+/**
+ * Delete a DCA plan
+ */
+export async function deletePlan(planId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/dca/plans/${planId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const result: ApiResponse = await response.json();
+    return result.success;
+  } catch (error) {
+    console.error('Error deleting plan:', error);
+    return false;
+  }
+}
+
+/**
+ * Update DCA plan jobId to null (used when deleting TriggerX job)
+ */
+export async function updatePlanJobId(userAddress: string, jobId: string): Promise<boolean> {
+  try {
+    console.log("Updating jobId to null for user:", userAddress, "jobId:", jobId);
+    const response = await fetch(`${API_BASE_URL}/api/dca/jobupdate/${userAddress}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ jobId }),
+    });
+
+    const result: ApiResponse = await response.json();
+    return result.success;
+  } catch (error) {
+    console.error('Error updating plan jobId:', error);
     return false;
   }
 }
