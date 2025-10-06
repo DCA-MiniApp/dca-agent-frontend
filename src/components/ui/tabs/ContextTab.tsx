@@ -6,10 +6,7 @@ import { motion } from "framer-motion";
 import { HiOutlineEye, HiOutlineDocumentText, HiOutlineFilter } from "react-icons/hi";
 import { StatusSelect } from "./StatusSelect";
 import { useAccount } from "wagmi";
-import {
-  fetchUserExecutionHistory,
-  type ExecutionHistory,
-} from "../../../lib/api";
+import { fetchUserExecutionHistory } from "../../../lib/api";
 
 /**
  * ContextTab component displays a transaction history with filters and pagination.
@@ -27,43 +24,43 @@ export function ContextTab() {
   const { address } = useAccount();
   const { setActiveTab } = useMiniApp();
 
+  // Types aligned with new backend response
+  type TaskStatus = string;
+  interface UserHistoryItem {
+    fromToken: string;
+    toToken: string;
+    amount: string;
+    jobId: string;
+    taskId: number;
+    executionTimestamp: string;
+    executionTxHash: string;
+    taskStatus: TaskStatus;
+    txUrl: string;
+  }
+
   // Dynamic data state
-  const [executionHistory, setExecutionHistory] = useState<ExecutionHistory[]>(
-    []
-  );
+  const [executionHistory, setExecutionHistory] = useState<UserHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
 
-  type TransactionStatus = "SUCCESS" | "FAILED" | "PENDING";
   interface TransactionRow {
-    id: string; // execution ID
-    planId: string; // plan ID for reference
+    id: string; // derived: jobId-taskId
+    jobId: string;
+    taskId: number;
     fromToken: string;
     toToken: string;
-    fromAmount: string; // e.g., "$50.00"
-    toAmount: string; // e.g., "0.0012 BTC"
-    exchangeRateNum: number; // numeric rate to format
-    gasFee: string | null;
+    amount: string;
     dateISO: string; // YYYY-MM-DD
     executedAtISO: string; // execution timestamp
-    status: TransactionStatus;
-    txHash: string | null; // used to build explorer URL
-    errorMessage: string | null;
-    vaultAddress?: string;
-    shareTokens?: string;
-    depositTxHash?: string;
+    status: string; // task status
+    txHash: string | null; // optional
+    txUrl: string | null; // optional
   }
 
   const truncateHash = (hash: string) =>
     hash.length > 10 ? `${hash.slice(0, 6)}...${hash.slice(-4)}` : hash;
 
-  const formatShortRate = (from: string, rate: number, to: string) => {
-    const value = rate.toLocaleString(undefined, {
-      maximumSignificantDigits: 6,
-      useGrouping: false,
-    });
-    return `${from} 1 = ${value} ${to}`;
-  };
+  // no rate formatting in the new data shape
 
   // Fetch user execution history
   const fetchUserHistory = useCallback(async () => {
@@ -76,7 +73,7 @@ export function ContextTab() {
     setIsLoading(true);
     try {
       const history = await fetchUserExecutionHistory(address, 100); // Fetch up to 100 records
-      setExecutionHistory(history);
+      setExecutionHistory(history as unknown as UserHistoryItem[]);
     } catch (error) {
       console.error("Error fetching execution history:", error);
       setExecutionHistory([]);
@@ -92,37 +89,26 @@ export function ContextTab() {
 
   // Convert ExecutionHistory to TransactionRow format
   const transactions: TransactionRow[] = useMemo(() => {
-    return executionHistory.map((execution, index) => {
-      const executedAt = new Date(execution.executedAt);
-      const fromAmount = parseFloat(execution.fromAmount);
-      const toAmount = parseFloat(execution.toAmount);
-      const exchangeRate = parseFloat(execution.exchangeRate);
-
+    return executionHistory.map((item) => {
+      const executedAt = new Date(item.executionTimestamp);
       return {
-        id: execution.id,
-        planId: execution.planId,
-        fromToken: execution.plan?.fromToken || "UNKNOWN",
-        toToken: execution.plan?.toToken || "UNKNOWN",
-        fromAmount: `${fromAmount.toFixed(5)}`,
-        toAmount: `${toAmount.toFixed(6)} ${
-          execution.plan?.toToken || "TOKEN"
-        }`,
-        exchangeRateNum: exchangeRate,
-        gasFee: execution.gasFee,
+        id: `${item.jobId}-${item.taskId}`,
+        jobId: item.jobId,
+        taskId: item.taskId,
+        fromToken: item.fromToken,
+        toToken: item.toToken,
+        amount: item.amount,
         dateISO: executedAt.toISOString().slice(0, 10),
-        executedAtISO: execution.executedAt,
-        status: execution.status,
-        txHash: execution.txHash,
-        errorMessage: execution.errorMessage,
-        vaultAddress: (execution.plan as any)?.vaultAddress || "0x1234567890abcdef1234567890abcdef12345678",
-        shareTokens: (execution.plan as any)?.shareTokens || "0.000000",
-        depositTxHash: `0x${Math.random().toString(16).substr(2, 40)}`,
+        executedAtISO: item.executionTimestamp,
+        status: item.taskStatus,
+        txHash: item.executionTxHash || null,
+        txUrl: item.txUrl || null,
       };
     });
   }, [executionHistory]);
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState<"All" | TransactionStatus>(
+  const [statusFilter, setStatusFilter] = useState<"All" | string>(
     "All"
   );
   const [startDate, setStartDate] = useState<string>(""); // YYYY-MM-DD
@@ -167,9 +153,13 @@ export function ContextTab() {
     setPage(1);
   };
 
-  const openTxExternal = (hash: string | null) => {
-    if (!hash) return;
-    const url = `https://arbiscan.io/tx/${hash}`; // Arbitrum explorer (placeholder)
+  const openTxExternal = (txUrl: string | null, fallbackHash?: string | null) => {
+    const url = txUrl && txUrl.length > 0
+      ? txUrl
+      : fallbackHash && fallbackHash.length > 0
+        ? `https://arbiscan.io/tx/${fallbackHash}`
+        : "";
+    if (!url) return;
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
@@ -467,7 +457,7 @@ export function ContextTab() {
                       </div>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-[#c199e4]">
-                      {tx.fromAmount}
+                      {tx.amount}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm">
                       <button
@@ -596,7 +586,7 @@ export function ContextTab() {
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => openTxExternal(selectedTx.txHash)}
+                    onClick={() => openTxExternal(selectedTx.txUrl, selectedTx.txHash)}
                     className="bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-3 px-5 rounded-xl transition-all duration-300 text-xs border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg"
                   >
                     View Explorer
@@ -611,7 +601,7 @@ export function ContextTab() {
                     From Amount
                   </p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
-                    {selectedTx.fromAmount}
+                    {selectedTx.fromToken}
                   </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
@@ -619,37 +609,35 @@ export function ContextTab() {
                     To Amount
                   </p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
-                    {selectedTx.toAmount}
+                    {selectedTx.toToken}
                   </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
                   <p className="text-sm text-gray-400 mb-2 font-medium">
-                    Gas Fee
+                   Job ID (TriggerX)
                   </p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
-                    {selectedTx.gasFee
-                      ? `${parseFloat(selectedTx.gasFee).toFixed(6)} ETH`
-                      : "N/A"}
+                   {selectedTx.jobId.slice(0, 8)}...{selectedTx.jobId.slice(-6)}
                   </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
                   <p className="text-sm text-gray-400 mb-2 font-medium">
-                    Plan ID
+                    Task ID (TriggerX)
                   </p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300 font-mono">
-                    {selectedTx.planId.slice(0, 4)}...{selectedTx.planId.slice(-4)}
+                    {selectedTx.taskId
+                      ? `${selectedTx.taskId}`
+                      : "N/A"}
                   </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">
                   <p className="text-sm text-gray-400 mb-2 font-medium">
-                    Exchange Rate
+                    Transaction Hash
                   </p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
-                    {formatShortRate(
-                      selectedTx.fromToken,
-                      selectedTx.exchangeRateNum,
-                      selectedTx.toToken
-                    )}
+                    {selectedTx.txHash
+                      ? truncateHash(selectedTx.txHash)
+                      : "N/A"}
                   </p>
                 </div>
               </div>
@@ -668,87 +656,18 @@ export function ContextTab() {
                 </div>
               </div>
 
-              {/* Vault Information */}
-              <div className="space-y-3">
-                <div className="rounded-2xl p-3 border border-[#c199e4]/20">
-                  <p className="text-sm text-gray-300 font-medium mb-2">
-                    Vault Address
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-gray-100 text-sm break-all">
-                      {selectedTx.vaultAddress || "0x1234567890abcdef1234567890abcdef12345678"}
-                    </span>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(selectedTx.vaultAddress || "0x1234567890abcdef1234567890abcdef12345678");
-                        // You could add a toast notification here
-                      }}
-                      className="text-[#c199e4] hover:text-white transition-colors"
-                      title="Copy Vault Address"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                      >
-                        <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-                        <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-                <div className="rounded-2xl p-3 border border-[#c199e4]/20">
-                  <p className="text-sm text-gray-300 font-medium mb-2">
-                    Share Tokens
-                  </p>
-                  <p className="text-lg font-bold text-gray-100">
-                    {selectedTx.shareTokens ? parseFloat(selectedTx.shareTokens).toFixed(6) : "0.000000"}
-                  </p>
-                </div>
-                <div className="rounded-2xl p-3 border border-[#c199e4]/20">
-                  <p className="text-sm text-gray-300 font-medium mb-2">
-                    Deposit Transaction Hash
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-gray-100 text-sm">
-                      {selectedTx.depositTxHash ? truncateHash(selectedTx.depositTxHash) : "No deposit hash"}
-                    </span>
-                    {selectedTx.depositTxHash && (
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(selectedTx.depositTxHash || "");
-                          // You could add a toast notification here
-                        }}
-                        className="text-[#c199e4] hover:text-white transition-colors"
-                        title="Copy Deposit Hash"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                        >
-                          <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-                          <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
 
               {/* Error Message (if failed) */}
-              {selectedTx.status === "FAILED" && selectedTx.errorMessage && (
+              {/* {selectedTx.status === "FAILED" && selectedTx.statusMessage && (
                 <div className="rounded-2xl p-3 border border-red-400/20 bg-red-400/5">
                   <p className="text-sm text-red-300 font-medium mb-2">
-                    Error Message
+                    Status Message
                   </p>
                   <p className="text-sm text-red-100 break-words">
-                    {selectedTx.errorMessage}
+                    {selectedTx.statusMessage}
                   </p>
                 </div>                                                                                                                  
-              )}
+              )} */}
 
               {/* Timeline Details */}
               <div className="space-y-3">

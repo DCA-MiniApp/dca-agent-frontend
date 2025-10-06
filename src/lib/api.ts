@@ -58,6 +58,39 @@ export interface ApiResponse<T = any> {
   message: string;
 }
 
+// Store or update user upon wallet connection
+export interface StoreUserPayload {
+  fid: number;
+  userAddress: string;
+  username?: string;
+  pfpUrl?: string;
+  joinedAt?: string | Date;
+  isWelcomed?: boolean;
+  notificationToken?: string;
+  isNotification?: boolean;
+}
+
+export async function storeUser(payload: StoreUserPayload): Promise<boolean> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/dca/user`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const result: ApiResponse = await response.json();
+    if (!result.success) {
+      console.error('Failed to store user:', result.message || result.error);
+    }
+    return !!result.success;
+  } catch (error) {
+    console.error('Error storing user:', error);
+    return false;
+  }
+}
+
 /**
  * Fetch user's DCA plans from the backend
  */

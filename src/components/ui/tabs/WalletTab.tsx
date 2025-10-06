@@ -18,6 +18,7 @@ import { truncateAddress } from "../../../lib/truncateAddress";
 import { renderError } from "../../../lib/errorUtils";
 import { USE_WALLET, APP_NAME } from "../../../lib/constants";
 import { useMiniApp } from "@neynar/react";
+import { storeUser } from "../../../lib/api";
 
 /**
  * WalletTab component for wallet management with manual connect/disconnect.
@@ -440,6 +441,25 @@ export function WalletTab() {
     context: !!context,
     fid: context?.user?.fid,
   });
+
+  // Store user on first connect
+  useEffect(() => {
+    const run = async () => {
+      if (!isConnected || !address) return;
+      const fid = context?.user?.fid;
+      if (!fid) return;
+
+      await storeUser({
+        fid,
+        userAddress: address,
+        username: (context as any)?.user?.username,
+        pfpUrl: (context as any)?.user?.pfpUrl,
+        joinedAt: new Date().toISOString(),
+        isWelcomed: false,
+      });
+    };
+    run();
+  }, [isConnected, address, context]);
 
   // --- Handlers ---
   const handleSwitchToArbitrum = useCallback(() => {
