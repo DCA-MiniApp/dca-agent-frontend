@@ -60,7 +60,7 @@ export interface ApiResponse<T = any> {
 
 // Store or update user upon wallet connection
 export interface StoreUserPayload {
-  fid: number;
+  fid: string;
   userAddress: string;
   username?: string;
   pfpUrl?: string;
@@ -72,6 +72,7 @@ export interface StoreUserPayload {
 
 export async function storeUser(payload: StoreUserPayload): Promise<boolean> {
   try {
+    console.log("Storing user:", payload);
     const response = await fetch(`${API_BASE_URL}/api/dca/user`, {
       method: 'POST',
       headers: {

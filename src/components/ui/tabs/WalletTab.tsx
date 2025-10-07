@@ -447,10 +447,10 @@ export function WalletTab() {
     const run = async () => {
       if (!isConnected || !address) return;
       const fid = context?.user?.fid;
-      if (!fid) return;
+      // if (!fid) return;
 
       await storeUser({
-        fid,
+        fid: String(fid || "727291"),
         userAddress: address,
         username: (context as any)?.user?.username,
         pfpUrl: (context as any)?.user?.pfpUrl,

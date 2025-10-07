@@ -22,6 +22,7 @@ import {
 import { useRouter } from "next/navigation";
 import { IoPersonCircle } from "react-icons/io5";
 import { RiRobot2Fill } from "react-icons/ri";
+import { parseUnits } from "viem";
 
 // Chat message interface
 interface ChatMessage {
@@ -762,7 +763,7 @@ export function ActionsTab() {
             userAddress: address,
             confirmationId: confirmationId,
             action: "confirm",
-          fid: context?.user?.fid,
+            fid: context?.user?.fid,
           }),
         });
 
@@ -1079,6 +1080,264 @@ export function ActionsTab() {
   );
 
   // Start approval process after user confirms the plan summary
+  // const startApprovalProcess = useCallback(
+  //   async (confirmationId: string, planData: any) => {
+  //     const tokenInfo = getTokenInfo(planData.fromToken);
+  //     if (!tokenInfo) {
+  //       console.error("Unsupported token:", planData.fromToken);
+  //       return;
+  //     }
+
+  //     // Minimal coercion helpers
+  //     function coerceNumber(value: any): number {
+  //       // 1) If already numeric, use it
+  //       const direct = Number(value);
+  //       if (Number.isFinite(direct)) return direct;
+
+  //       // 2) Extract first numeric token from any string (e.g., "every 10 mintues", "1 day")
+  //       const m = String(value ?? "").match(/(\d+(?:\.\d+)?)/);
+  //       return m ? Number(m[1]) : NaN;
+  //     }
+
+  //     function coerceIntervalMinutes(src: any): number {
+  //       // Try numeric
+  //       let n = coerceNumber(src);
+  //       if (Number.isFinite(n) && n > 0) return n;
+
+  //       // Fallback to other fields users might send
+  //       const raw = String(
+  //         src ?? planData.interval ?? planData.frequency ?? ""
+  //       ).toLowerCase();
+
+  //       // Very light keyword mapping (no heavy normalization)
+  //       if (raw.includes("hour")) return 60;
+  //       if (raw.includes("day")) return 1440;
+  //       if (raw.includes("week")) return 10080;
+  //       if (raw.includes("month")) return 43200;
+
+  //       // Last chance: extract number and assume minutes
+  //       n = coerceNumber(raw);
+  //       return Number.isFinite(n) && n > 0 ? n : NaN;
+  //     }
+
+  //     function coerceDurationWeeks(src: any): number {
+  //       // Try numeric weeks directly
+  //       let n = coerceNumber(src);
+  //       if (Number.isFinite(n) && n > 0) return n;
+
+  //       const raw = String(src ?? planData.duration ?? "").toLowerCase();
+
+  //       // Units detection with only one pass over the string
+  //       const num = coerceNumber(raw);
+  //       if (!Number.isFinite(num) || num <= 0) return NaN;
+
+  //       if (raw.includes("week")) return num;
+  //       if (raw.includes("month")) return num * 4;
+  //       if (raw.includes("day")) return Math.ceil(num / 7);
+
+  //       // Otherwise treat it as weeks
+  //       return num;
+  //     }
+
+  //     try {
+  //       const totalExecutions = Math.floor(
+  //         (planData.durationWeeks * 7 * 24 * 60) / planData.intervalMinutes
+  //       );
+  //       console.log("totalExecutions", totalExecutions);
+  //       const totalAmount = parseFloat(planData.amount) * totalExecutions;
+  //       console.log("totalAmount", totalAmount);
+  //       const amountInWei = parseUnits(
+  //         totalAmount.toString(),
+  //         tokenInfo.decimals
+  //       );
+  //       console.log("amountInWei", amountInWei);
+
+  //       // Show approval request message
+  //       const approvalMessage: ChatMessage = {
+  //         id: Date.now().toString(),
+  //         role: "assistant",
+  //         content: `🔐 **Requesting Token Approval**\n\nPlease check your wallet and approve spending of ${planData.fromToken} tokens. This allows our contract to execute your DCA plan automatically.\n\n*Check your wallet popup...*`,
+  //         timestamp: new Date(),
+  //       };
+  //       setMessages((prev) => [...prev, approvalMessage]);
+
+  //       setConfirmationStep("approval");
+  //       setApprovalStatus("approving");
+  //       setPendingConfirmationId(confirmationId);
+  //       setIsApprovalLoading(true);
+
+  //       console.log("[Approval] Starting token approval process:", {
+  //         token: tokenInfo.symbol,
+  //         amount: amountInWei,
+  //         totalExecutions,
+  //       });
+
+  //       // Trigger wallet approval popup
+  //       writeContract({
+  //         address: tokenInfo.address as `0x${string}`,
+  //         abi: ERC20_ABI,
+  //         functionName: "approve",
+  //         args: [EXECUTOR_ADDRESS as `0x${string}`, amountInWei],
+  //         chainId: arbitrum.id,
+  //       });
+  //     } catch (error) {
+  //       console.error("Error starting approval process:", error);
+
+  //       const errorMessage: ChatMessage = {
+  //         id: Date.now().toString(),
+  //         role: "assistant",
+  //         content:
+  //           "❌ Failed to start token approval process. Please try again.",
+  //         timestamp: new Date(),
+  //       };
+  //       setMessages((prev) => [...prev, errorMessage]);
+  //       setApprovalStatus("idle");
+  //     }
+  //   },
+  //   [writeContract]
+  // );
+
+  // // --- Confirmation Handlers ---
+  // // Note: handleConfirmPlan is no longer needed since we show approval directly for plan creation requests
+
+  // Replace your existing startApprovalProcess with this version
+
+  // const startApprovalProcess = useCallback(
+  //   async (confirmationId: string, planData: any) => {
+  //     const tokenInfo = getTokenInfo(planData.fromToken);
+  //     if (!tokenInfo) {
+  //       console.error("Unsupported token:", planData.fromToken);
+  //       return;
+  //     }
+
+  //     console.log("Plan data", planData);
+
+  //     // --- Helpers to normalize user-provided interval/duration into numbers ---
+  //     function normalizeIntervalMinutes(v: any, fallback?: any): number {
+  //       if (Number.isFinite(Number(v)) && Number(v) > 0) return Number(v);
+  //       const s = String(
+  //         v ?? fallback ?? planData.interval ?? ""
+  //       ).toLowerCase();
+  //       if (s.includes("hour")) return 60;
+  //       if (s.includes("daily") || s.includes("day")) return 1440;
+  //       if (s.includes("weekly") || s.includes("week")) return 10080;
+  //       if (s.includes("monthly") || s.includes("month")) return 43200;
+  //       return NaN;
+  //     }
+
+  //     function normalizeDurationWeeks(v: any, fallback?: any): number {
+  //       if (Number.isFinite(Number(v)) && Number(v) > 0) return Number(v);
+  //       const s = String(
+  //         v ?? fallback ?? planData.duration ?? ""
+  //       ).toLowerCase();
+  //       const m = s.match(/(\d+)\s*(week|month|day)/i);
+  //       if (m) {
+  //         const n = Number(m[1]);
+  //         if (!Number.isFinite(n)) return NaN;
+  //         if (m[2].startsWith("week")) return n;
+  //         if (m[2].startsWith("month")) return n * 4;
+  //         if (m[2].startsWith("day")) return Math.ceil(n / 7);
+  //       }
+  //       return NaN;
+  //     }
+
+  //     try {
+  //       // Normalize inputs
+  //       const intervalMinutesNum = normalizeIntervalMinutes(
+  //         planData.intervalMinutes
+  //       );
+  //       const durationWeeksNum = normalizeDurationWeeks(planData.durationWeeks);
+
+  //       const amountPerExecutionStr = String(planData.amount ?? "").trim();
+  //       const decimals =
+  //         typeof tokenInfo.decimals === "number" ? tokenInfo.decimals : 18;
+
+  //       // Validate before proceeding
+  //       if (
+  //         !amountPerExecutionStr ||
+  //         isNaN(Number(amountPerExecutionStr)) ||
+  //         !Number.isFinite(intervalMinutesNum) ||
+  //         !Number.isFinite(durationWeeksNum) ||
+  //         intervalMinutesNum <= 0 ||
+  //         durationWeeksNum <= 0
+  //       ) {
+  //         console.error("Invalid planData for approval:", {
+  //           amount: planData.amount,
+  //           intervalMinutes: planData.intervalMinutes,
+  //           durationWeeks: planData.durationWeeks,
+  //         });
+
+  //         const errMsg: ChatMessage = {
+  //           id: Date.now().toString(),
+  //           role: "assistant",
+  //           content:
+  //             "❌ Invalid plan details for approval. Please review your amount, interval, and duration.",
+  //           timestamp: new Date(),
+  //         };
+  //         setMessages((prev) => [...prev, errMsg]);
+  //         return;
+  //       }
+
+  //       const totalExecutions = Math.floor(
+  //         (durationWeeksNum * 7 * 24 * 60) / intervalMinutesNum
+  //       );
+
+  //       // Compute approval amount as (amount per execution) * (total executions)
+  //       // Use bigint math to avoid floats; parseUnits expects a decimal string
+  //       const amountWeiPerExec = parseUnits(amountPerExecutionStr, decimals);
+  //       const totalAmountWei = amountWeiPerExec * BigInt(totalExecutions);
+
+  //       // Show approval request message
+  //       const approvalMessage: ChatMessage = {
+  //         id: Date.now().toString(),
+  //         role: "assistant",
+  //         content: `🔐 **Requesting Token Approval**\n\nPlease approve spending of ${
+  //           planData.fromToken
+  //         } tokens so the contract can execute your plan automatically.\n\n• Amount per execution: ${amountPerExecutionStr} ${
+  //           planData.fromToken
+  //         }\n• Executions: ${totalExecutions}\n• Total approval: ${totalAmountWei.toString()} (wei)\n\n*Check your wallet popup...*`,
+  //         timestamp: new Date(),
+  //       };
+  //       setMessages((prev) => [...prev, approvalMessage]);
+
+  //       setConfirmationStep("approval");
+  //       setApprovalStatus("approving");
+  //       setPendingConfirmationId(confirmationId);
+  //       setIsApprovalLoading(true);
+
+  //       console.log("[Approval] Starting token approval process:", {
+  //         token: tokenInfo.symbol,
+  //         amountPerExecution: amountPerExecutionStr,
+  //         totalExecutions,
+  //         decimals,
+  //         totalAmountWei: totalAmountWei.toString(),
+  //       });
+
+  //       // Trigger wallet approval popup with dynamic total amount
+  //       writeContract({
+  //         address: tokenInfo.address as `0x${string}`,
+  //         abi: ERC20_ABI,
+  //         functionName: "approve",
+  //         args: [EXECUTOR_ADDRESS as `0x${string}`, totalAmountWei], // dynamic approval based on plan
+  //         chainId: arbitrum.id,
+  //       });
+  //     } catch (error) {
+  //       console.error("Error starting approval process:", error);
+
+  //       const errorMessage: ChatMessage = {
+  //         id: Date.now().toString(),
+  //         role: "assistant",
+  //         content:
+  //           "❌ Failed to start token approval process. Please try again.",
+  //         timestamp: new Date(),
+  //       };
+  //       setMessages((prev) => [...prev, errorMessage]);
+  //       setApprovalStatus("idle");
+  //     }
+  //   },
+  //   [writeContract]
+  // );
+
   const startApprovalProcess = useCallback(
     async (confirmationId: string, planData: any) => {
       const tokenInfo = getTokenInfo(planData.fromToken);
@@ -1086,44 +1345,128 @@ export function ActionsTab() {
         console.error("Unsupported token:", planData.fromToken);
         return;
       }
-
+  
+      console.log("Plan data", planData);
+  
+      // --- Helpers to normalize user-provided interval/duration into minutes ---
+      function parseIntervalToMinutes(interval: any): number {
+        const s = String(interval ?? planData.interval ?? "").toLowerCase().trim();
+  
+        // numeric value fallback
+        const num = parseFloat(s);
+        if (!isNaN(num) && num > 0) return num;
+  
+        if (s.includes("minute")) return num || 1; // default 1 min
+        if (s.includes("hour")) return (num || 1) * 60;
+        if (s.includes("day") || s.includes("daily")) return (num || 1) * 24 * 60;
+        if (s.includes("week") || s.includes("weekly")) return (num || 1) * 7 * 24 * 60;
+        if (s.includes("month") || s.includes("monthly")) return (num || 1) * 30 * 24 * 60;
+  
+        return NaN;
+      }
+  
+      function parseDurationToMinutes(duration: any): number {
+        const s = String(duration ?? planData.duration ?? "").toLowerCase().trim();
+  
+        const m = s.match(/(\d+(\.\d+)?)\s*(minute|hour|day|week|month)/i);
+        if (m) {
+          const value = parseFloat(m[1]);
+          const unit = m[3].toLowerCase();
+          if (unit.startsWith("minute")) return value;
+          if (unit.startsWith("hour")) return value * 60;
+          if (unit.startsWith("day")) return value * 24 * 60;
+          if (unit.startsWith("week")) return value * 7 * 24 * 60;
+          if (unit.startsWith("month")) return value * 30 * 24 * 60;
+        }
+  
+        // keywords fallback
+        if (s.includes("day") || s.includes("daily")) return 24 * 60;
+        if (s.includes("week") || s.includes("weekly")) return 7 * 24 * 60;
+        if (s.includes("month") || s.includes("monthly")) return 30 * 24 * 60;
+  
+        return NaN;
+      }
+  
       try {
-        const totalExecutions = Math.floor(
-          (planData.durationWeeks * 7 * 24 * 60) / planData.intervalMinutes
-        );
-        const totalAmount = parseFloat(planData.amount) * totalExecutions;
-
+        const intervalMinutes = parseIntervalToMinutes(planData.interval);
+        console.log("intervalMinutes", intervalMinutes);
+        const durationMinutes = parseDurationToMinutes(planData.duration);
+        console.log("durationMinutes", durationMinutes);  
+        const amountPerExecutionStr = String(planData.amount ?? "").trim();
+        console.log("amountPerExecutionStr", amountPerExecutionStr);
+        const decimals =
+          typeof tokenInfo.decimals === "number" ? tokenInfo.decimals : 18;
+        console.log("decimals", decimals);
+        // Validate before proceeding
+        if (
+          !amountPerExecutionStr ||
+          isNaN(Number(amountPerExecutionStr)) ||
+          !Number.isFinite(intervalMinutes) ||
+          !Number.isFinite(durationMinutes) ||
+          intervalMinutes <= 0 ||
+          durationMinutes <= 0
+        ) {
+          console.error("Invalid planData for approval:", {
+            amount: planData.amount,
+            interval: planData.interval,
+            duration: planData.duration,
+          });
+  
+          const errMsg: ChatMessage = {
+            id: Date.now().toString(),
+            role: "assistant",
+            content:
+              "❌ Invalid plan details for approval. Please review your amount, interval, and duration.",
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, errMsg]);
+          return;
+        }
+  
+        // Compute total executions
+        const totalExecutions = Math.floor(durationMinutes / intervalMinutes);
+        console.log("totalExecutions", totalExecutions);
+        // Compute approval amount
+        const amountWeiPerExec = parseUnits(amountPerExecutionStr, decimals);
+        const totalAmountWei = amountWeiPerExec * BigInt(totalExecutions);
+        console.log("totalAmountWei", totalAmountWei);
         // Show approval request message
         const approvalMessage: ChatMessage = {
           id: Date.now().toString(),
           role: "assistant",
-          content: `🔐 **Requesting Token Approval**\n\nPlease check your wallet and approve spending of ${planData.fromToken} tokens. This allows our contract to execute your DCA plan automatically.\n\n*Check your wallet popup...*`,
+          content: `🔐 **Requesting Token Approval**\n\nPlease approve spending of ${
+            planData.fromToken
+          } tokens so the contract can execute your plan automatically.\n\n• Amount per execution: ${amountPerExecutionStr} ${
+            planData.fromToken
+          }\n• Executions: ${totalExecutions}\n• Total approval: ${totalAmountWei.toString()} (wei)\n\n*Check your wallet popup...*`,
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, approvalMessage]);
-
+  
         setConfirmationStep("approval");
         setApprovalStatus("approving");
         setPendingConfirmationId(confirmationId);
         setIsApprovalLoading(true);
-
+  
         console.log("[Approval] Starting token approval process:", {
           token: tokenInfo.symbol,
-          amount: totalAmount,
+          amountPerExecution: amountPerExecutionStr,
           totalExecutions,
+          decimals,
+          totalAmountWei: totalAmountWei.toString(),
         });
-
-        // Trigger wallet approval popup
+  
+        // Trigger wallet approval popup with dynamic total amount
         writeContract({
           address: tokenInfo.address as `0x${string}`,
           abi: ERC20_ABI,
           functionName: "approve",
-          args: [EXECUTOR_ADDRESS as `0x${string}`, maxUint256],
+          args: [EXECUTOR_ADDRESS as `0x${string}`, totalAmountWei],
           chainId: arbitrum.id,
         });
       } catch (error) {
         console.error("Error starting approval process:", error);
-
+  
         const errorMessage: ChatMessage = {
           id: Date.now().toString(),
           role: "assistant",
@@ -1137,9 +1480,7 @@ export function ActionsTab() {
     },
     [writeContract]
   );
-
-  // --- Confirmation Handlers ---
-  // Note: handleConfirmPlan is no longer needed since we show approval directly for plan creation requests
+  
 
   // Handle the approve confirmation (after summary)
   const handleApproveConfirm = useCallback(
