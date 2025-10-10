@@ -4,7 +4,7 @@ import { useAccount, useWalletClient } from "wagmi";
 import { useMiniApp } from "@neynar/react";
 import { useReadContract } from "wagmi";
 import { formatUnits } from "viem";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   HiCurrencyDollar,
@@ -20,6 +20,7 @@ import {
   HiOutlineCheckCircle,
   HiOutlineDevicePhoneMobile,
   HiOutlineXMark,
+  HiOutlineBell,
 } from "react-icons/hi2";
 import { HiOutlineArrowNarrowRight } from "react-icons/hi";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
@@ -41,6 +42,8 @@ import { TriggerXClient } from "sdk-triggerx";
 import { getJobDataById } from "sdk-triggerx/dist/api/getJobDataById.js";
 import { deleteTriggerXJobForPlan } from "../../../lib/triggerXIntegration";
 
+import { FaSpinner, FaBell } from "react-icons/fa";
+import { Button } from "../Button";
 
 // Legacy interface for compatibility - will be replaced with DCAPlan
 /**
@@ -89,9 +92,28 @@ export function HomeTab() {
     setActiveTab,
     notificationDetails,
     added,
+    isSDKLoaded,
     /* actions available in SDK */ actions,
   } = useMiniApp() as any;
   const router = useRouter();
+
+  // Track latest notificationDetails as it may populate shortly after addMiniApp
+  const latestNotifDetailsRef = useRef(notificationDetails);
+  useEffect(() => {
+    latestNotifDetailsRef.current = notificationDetails;
+  }, [notificationDetails]);
+
+  const waitForNotificationDetails = useCallback(
+    async (timeoutMs = 5000, intervalMs = 200) => {
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        if (latestNotifDetailsRef.current) return latestNotifDetailsRef.current;
+        await new Promise((r) => setTimeout(r, intervalMs));
+      }
+      return null;
+    },
+    []
+  );
 
   const { data: usdcRawBalance } = useReadContract({
     address: USDC_ADDRESS,
@@ -121,6 +143,9 @@ export function HomeTab() {
 
   // Slider state
   const [currentPlanIndex, setCurrentPlanIndex] = useState(0);
+
+  // Notification state
+  const [hasNotifications, setHasNotifications] = useState(false);
 
   // Onboarding state
   const [onboardingSteps, setOnboardingSteps] = useState([
@@ -158,34 +183,223 @@ export function HomeTab() {
     },
   ]);
 
-  // Request notifications permission from Home tab
-  // const handleEnableNotifications = useCallback(async () => {
+  // Control whether to show the notification enable UI
+  const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
+  const [notificationsEnabledBadge, setNotificationsEnabledBadge] =
+    useState(false);
+  const autoRequestRef = useRef(false);
+  const [isNotificationResolving, setIsNotificationResolving] = useState(true);
+
+  // Keep live refs to SDK notification state so we can poll after user confirms
+  const addedRef = useRef(added);
+  const detailsRef = useRef(notificationDetails);
+  useEffect(() => {
+    addedRef.current = added;
+  }, [added]);
+  useEffect(() => {
+    detailsRef.current = notificationDetails;
+  }, [notificationDetails]);
+
+  // Check notification status when SDK is ready
+  useEffect(() => {
+    if (!isSDKLoaded) {
+      setIsNotificationResolving(true);
+      return;
+    }
+    const enabledNow = !!(added && notificationDetails);
+    setShowNotificationPrompt(!enabledNow);
+    setNotificationsEnabledBadge(enabledNow);
+    setIsNotificationResolving(false);
+    // If user disabled/removed app later, allow auto-request again
+    if (!enabledNow) {
+      autoRequestRef.current = false;
+    }
+  }, [isSDKLoaded, added, notificationDetails]);
+
+  // Helper: wait until SDK reflects enabled notifications
+  const waitForNotificationEnablement = async (timeoutMs = 10000) => {
+    const start = Date.now();
+    console.log(
+      "Waiting up to",
+      timeoutMs,
+      "ms for notification enablement..."
+    );
+    while (Date.now() - start < timeoutMs) {
+      if (addedRef.current && detailsRef.current) return true;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    return false;
+  };
+
+  // Auto-request addMiniApp on mount when in miniapp and not enabled yet
+  useEffect(() => {
+    if (!isSDKLoaded) return;
+    if (autoRequestRef.current) return;
+    // Skip if already enabled
+    if (added && notificationDetails) return;
+    // Trigger once per disabled stint
+    autoRequestRef.current = true;
+    (async () => {
+      try {
+        setIsNotificationResolving(true);
+        if (actions?.addMiniApp) {
+          await actions.addMiniApp();
+          if (context?.client.added === false) {
+            console.log("Context details:", context);
+            await handleNotification();
+          } else {
+            console.log("Mini app already added per context.");
+            setIsNotificationResolving(false);
+          }
+        }
+        setIsNotificationResolving(false);
+      } catch (err) {
+        console.log("Error auto-adding mini app:", err);
+        setIsNotificationResolving(false);
+      }
+    })();
+  }, [isSDKLoaded, added, notificationDetails, actions, context?.user?.fid]);
+
+  // const handleNotification = useCallback(async () => {
   //   if (!context?.user?.fid) return;
   //   try {
-  //     setNotifRequesting(true);
-  //     setNotifStatus("");
-  //     // Trigger client permission UI; addMiniApp generally prompts add + notifications
+  //     setNotificationState((prev) => ({ ...prev, sendStatus: "", isEnabling: true }));
   //     if (actions?.addMiniApp) {
   //       await actions.addMiniApp();
+  //       console.log("Mini app added, waiting for notification details...");
+  //       const details = await waitForNotificationDetails();
+  //       console.log("Notification details received:", details);
+  //       try {
+  //         console.log("Sending notification to fid:", context.user.fid);
+  //         const response = await fetch("/api/send-notification", {
+  //           method: "POST",
+  //           mode: "same-origin",
+  //           headers: { "Content-Type": "application/json" },
+  //           body: JSON.stringify({
+  //             fid: context.user.fid,
+  //             notificationDetails: details || undefined,
+  //             title: "Welcome to DCA Agent 🥳",
+  //             body: "We'll keep you updated on your plan performance.🔔",
+  //           }),
+  //         });
+  //         const json = await response.json().catch(() => null);
+  //         if (response.status === 200) {
+  //           setNotificationState((prev) => ({
+  //             ...prev,
+  //             sendStatus: "Success",
+  //             isEnabling: false,
+  //           }));
+  //           return;
+  //         } else if (response.status === 429) {
+  //           setNotificationState((prev) => ({
+  //             ...prev,
+  //             sendStatus: "Rate limited",
+  //             isEnabling: false,
+  //           }));
+  //           return;
+  //         }
+  //         const responseText = json ? JSON.stringify(json) : await response.text();
+  //         setNotificationState((prev) => ({
+  //           ...prev,
+  //           sendStatus: `Error: ${responseText}`,
+  //           isEnabling: false,
+  //         }));
+  //       } catch (error) {
+  //         setNotificationState((prev) => ({
+  //           ...prev,
+  //           sendStatus: `Error: ${error}`,
+  //           isEnabling: false,
+  //         }));
+  //       }
   //     }
-  //     // Send welcome notification explicitly (API also handles Neynar/non-Neynar)
-  //     await fetch("/api/send-notification", {
+  //   } catch (e) {
+  //     setNotificationState((prev) => ({ ...prev, sendStatus: "Failed", isEnabling: false }));
+  //   }
+  // }, [actions, context, waitForNotificationDetails]);
+
+  // const sendFarcasterNotification = useCallback(async () => {
+  //   setNotificationState((prev) => ({ ...prev, sendStatus: "" }));
+  //   if (!notificationDetails || !context) {
+  //     return;
+  //   }
+  //   try {
+  //     const response = await fetch("/api/send-notification", {
   //       method: "POST",
+  //       mode: "same-origin",
   //       headers: { "Content-Type": "application/json" },
   //       body: JSON.stringify({
   //         fid: context.user.fid,
-  //         notificationDetails: notificationDetails || undefined,
-  //         title: "Welcome to DCA Agent",
-  //         body: "Notifications enabled. We'll keep you updated on your plan performance.",
+  //         notificationDetails,
   //       }),
   //     });
-  //     setNotifStatus("Enabled");
-  //   } catch (e) {
-  //     setNotifStatus("Failed");
-  //   } finally {
-  //     setNotifRequesting(false);
+  //     if (response.status === 200) {
+  //       setNotificationState((prev) => ({ ...prev, sendStatus: "Success" }));
+  //       return;
+  //     } else if (response.status === 429) {
+  //       setNotificationState((prev) => ({
+  //         ...prev,
+  //         sendStatus: "Rate limited",
+  //       }));
+  //       return;
+  //     }
+  //     const responseText = await response.text();
+  //     setNotificationState((prev) => ({
+  //       ...prev,
+  //       sendStatus: `Error: ${responseText}`,
+  //     }));
+  //   } catch (error) {
+  //     setNotificationState((prev) => ({
+  //       ...prev,
+  //       sendStatus: `Error: ${error}`,
+  //     }));
   //   }
-  // }, [actions, context?.user?.fid, notificationDetails]);
+  // }, [context, notificationDetails]);
+
+  const handleNotification = async () => {
+    // rely solely on SDK state
+
+    // Farcaster SDK logic
+    if (!isSDKLoaded) {
+      console.log("SDK not loaded yet.");
+      return;
+    }
+    if (!context?.user?.fid) return;
+
+    try {
+      setIsNotificationResolving(true);
+      if (actions?.addMiniApp) {
+        await actions.addMiniApp();
+        console.log("Mini app add requested, waiting for enablement...");
+      }
+      // Wait until SDK reflects enabled state, then send notification once
+      const ready = await waitForNotificationEnablement();
+      console.log("Notification enablement status:", ready);
+      if (!ready) {
+        console.log("Notifications not confirmed within timeout.");
+      }
+      console.log("Sending notification to fid:", context.user.fid);
+      const details = await waitForNotificationDetails();
+      console.log("Using details:", details);
+      const response = await fetch("/api/send-notification", {
+        method: "POST",
+        mode: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fid: context.user.fid,
+          notificationDetails: details,
+          title: "Welcome to DCA Agent 🥳",
+          body: "We'll keep you updated on your plan performance.🔔",
+        }),
+      });
+      await response.json().catch(() => null);
+      setShowNotificationPrompt(false);
+      setNotificationsEnabledBadge(true);
+      setIsNotificationResolving(false);
+    } catch (err) {
+      console.log("Error enabling notifications:", err);
+      setIsNotificationResolving(false);
+    }
+  };
 
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -199,6 +413,36 @@ export function HomeTab() {
   const [completedStepIndex, setCompletedStepIndex] = useState<number | null>(
     null
   );
+  const [notificationState, setNotificationState] = useState({
+    sendStatus: "",
+    shareUrlCopied: false,
+    isEnabling: false,
+  });
+
+  // Derive notifications availability defensively (covers browser vs client)
+  const hasNotificationsDerived =
+    !!notificationDetails || !!context?.notificationDetails || !!added;
+
+  useEffect(() => {
+    if (!isSDKLoaded) return;
+
+    // Check if the mini app is already added
+    if (added) {
+      console.log("Mini app has been added.");
+
+      // Check if notifications are enabled
+      if (notificationDetails) {
+        console.log("Notifications are enabled.");
+        console.log("Notification token:", notificationDetails.token);
+        console.log("Notification URL:", notificationDetails.url);
+        setHasNotifications(true);
+      } else {
+        console.log("Notifications are NOT enabled.");
+      }
+    } else {
+      console.log("Mini app is NOT added yet.");
+    }
+  }, [isSDKLoaded, added, notificationDetails]);
 
   // Fetch user data when address changes
   const fetchUserData = useCallback(async () => {
@@ -219,9 +463,7 @@ export function HomeTab() {
       setUserPlans(plans);
       setPlatformStats(stats);
       const totalInvested = calculateTotalInvested(plans);
-      console.log("Total Invested line number 173:", totalInvested);
       setTotalInvested(calculateTotalInvested(plans));
-      console.log("Total Invested:", totalInvested);
       // Compute USD value across plans using CoinGecko
       try {
         const usd = await computePlansInvestedUsd(
@@ -437,7 +679,7 @@ export function HomeTab() {
     setCurrentPlanIndex((prev) =>
       prev === 0 ? userPlans.length - 1 : prev - 1
     );
-  };   
+  };
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -975,12 +1217,38 @@ export function HomeTab() {
           </div>
         )}
         {address && (
-          <div className="flex items-center gap-1.5 text-white/70 mt-2">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse aspect-square"></div>
-            <span className="text-sm">Connected:</span>
-            <code className="text-xs bg-white/20 px-2 py-1 rounded-md">
-              {address.slice(0, 6)}...{address.slice(-4)}
-            </code>
+          <div className="mt-2 space-y-2">
+            <div className="flex items-center gap-1.5 text-white/70">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse aspect-square"></div>
+              <span className="text-sm">Connected:</span>
+              <code className="text-xs bg-white/20 px-2 py-1 rounded-md">
+                {address.slice(0, 6)}...{address.slice(-4)}
+              </code>
+            </div>
+
+            {/* Notification Status UI */}
+            {isNotificationResolving && (
+              <div className="flex items-center gap-2 mt-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-500/10 border border-gray-400/30">
+                  <FaSpinner className="text-gray-300 text-xs animate-spin" />
+                  <span className="text-gray-200 text-[11px] font-saira">
+                    Checking notifications...
+                  </span>
+                </div>
+              </div>
+            )}
+            {context?.client.added === false && isNotificationResolving && (
+              <div className="flex items-center gap-2 mt-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-400/20 shadow-sm cursor-pointer hover:bg-cyan-500/20 transition">
+                  <span className="text-cyan-200 text-xs font-saira">
+                    Enable notifications for new updates
+                  </span>
+                  <button className="cursor-pointer" onClick={handleNotification}>
+                    <FaBell className="text-yellow-300 text-base" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1046,10 +1314,13 @@ export function HomeTab() {
                   <p className="text-3xl font-bold text-[#c199e4]">
                     {isLoading || portfolioUsd === null
                       ? "..."
-                      : `${portfolioUsd?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                      : `${portfolioUsd?.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}`}
                   </p>
                   <span className="text-sm text-white/60 font-medium">
-                    Total Invested{portfolioUsd !== null ? ' (USD)' : ''}
+                    Total Invested{portfolioUsd !== null ? " (USD)" : ""}
                   </span>
                 </div>
                 <p className="text-sm text-white/70">
@@ -1223,7 +1494,6 @@ export function HomeTab() {
                         Investment Amount
                       </p>
                       <p className="text-2xl font-bold text-white group-hover/item:text-[#c199e4] transition-colors duration-300">
-                        
                         {parseFloat(userPlans[currentPlanIndex].amount).toFixed(
                           5
                         )}
@@ -1530,7 +1800,8 @@ export function HomeTab() {
                     {(
                       parseFloat(selectedPlan.amount) *
                       selectedPlan.executionCount
-                    ).toFixed(5)} {selectedPlan.fromToken}
+                    ).toFixed(5)}{" "}
+                    {selectedPlan.fromToken}
                   </p>
                 </div>
               </div>

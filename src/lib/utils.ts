@@ -59,9 +59,12 @@ export async function getFarcasterDomainManifest(): Promise<Manifest> {
       webhookUrl: APP_WEBHOOK_URL,
     },
   };
+  
+  // Add accountAssociation at the top level if available
   if (APP_ACCOUNT_ASSOCIATION) {
     manifest.accountAssociation = APP_ACCOUNT_ASSOCIATION;
   }
+  
   return manifest as Manifest;
 }
 
