@@ -1,6 +1,6 @@
 "use client";
 
-import { useAccount } from "wagmi";
+import { useAccount, useWalletClient } from "wagmi";
 import { useMiniApp } from "@neynar/react";
 import { useReadContract } from "wagmi";
 import { formatUnits } from "viem";
@@ -83,6 +83,7 @@ const USDC_ABI = [
 
 export function HomeTab() {
   const { address, isConnected } = useAccount();
+  const { data: wagmiWalletClient } = useWalletClient();
   const {
     context,
     setActiveTab,
@@ -349,7 +350,43 @@ export function HomeTab() {
       // First, delete the TriggerX job if it exists
       if (plan.jobId) {
         console.log("🗑️ Deleting TriggerX job:", plan.jobId);
-        const deleteJobResult = await deleteTriggerXJobForPlan(plan.jobId);
+        // Obtain ethers signer (prefer Wagmi transport, fallback to window.ethereum)
+        let signer: any = null;
+        try {
+          const { BrowserProvider } = await import('ethers');
+
+          if (wagmiWalletClient?.transport && (wagmiWalletClient.transport as any).request) {
+            console.log('Using Wagmi transport to create provider for deletion');
+            const provider: any = new BrowserProvider(wagmiWalletClient.transport as any);
+            const addr = wagmiWalletClient?.account?.address;
+            signer = addr ? await provider.getSigner(addr) : await provider.getSigner();
+          } else if (typeof window !== 'undefined' && (window as any).ethereum) {
+            console.log('Using window.ethereum to create provider for deletion');
+            const provider = new BrowserProvider((window as any).ethereum);
+            // Ensure at least one account is available
+            try {
+              const accounts = await provider.send('eth_accounts', []);
+              if (!accounts || accounts.length === 0) {
+                await provider.send('eth_requestAccounts', []);
+              }
+            } catch {}
+            signer = await provider.getSigner();
+          } else {
+            console.warn('No wallet provider available to obtain signer for deletion');
+          }
+        } catch (e) {
+          console.error('Failed to create signer for deletion:', e);
+        }
+
+        if (!signer) {
+          console.error('❌ Could not obtain signer; aborting TriggerX job deletion');
+          setIsDeleting(false);
+          return;
+        }
+        console.log("Signer obtained for deletion:", signer);
+
+        // Use Arbitrum chainId by default
+        const deleteJobResult = await deleteTriggerXJobForPlan(plan.jobId, signer, '42161');
         
         if (deleteJobResult.success) {
           console.log("✅ TriggerX job deleted successfully");

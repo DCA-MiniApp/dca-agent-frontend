@@ -763,7 +763,7 @@ export function ActionsTab() {
             userAddress: address,
             confirmationId: confirmationId,
             action: "confirm",
-            fid: context?.user?.fid,
+            fid: context?.user?.fid || 727291,
           }),
         });
 
@@ -953,6 +953,7 @@ export function ActionsTab() {
             } else {
               // Signer obtained successfully, create TriggerX job
               console.log("🚀 Creating TriggerX job for plan:", planId);
+              console.log("Agent response:", result.data.agentResponse);
 
               const triggerXResult = await createTriggerXJobForPlan({
                 planId: result.data.agentResponse.id,

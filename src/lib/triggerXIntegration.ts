@@ -5,7 +5,7 @@
  * DCA plans with job details and IPFS metadata.
  */
 
-import { TriggerXClient, createJob, JobType, ArgType, type TimeBasedJobInput, type CreateJobInput } from 'sdk-triggerx';
+import { TriggerXClient, createJob, JobType, ArgType, type TimeBasedJobInput, type CreateJobInput, deleteJob } from 'sdk-triggerx';
 import { BrowserProvider } from 'ethers';
 import {
   SWAP_EXECUTOR_ABI,
@@ -13,7 +13,7 @@ import {
   TARGET_FUNCTION_NAME,
   DCA_JOB_CONFIG
 } from './abi/SwapExecutor';
-import { deleteJob } from 'sdk-triggerx/dist/api/deleteJob.js';
+// import { deleteJob } from 'sdk-triggerx/dist/api/deleteJob.js';
 import tokenMapData from '../tokenMap_arbitrum.json';
 import {
   generateDCAScript,
@@ -334,9 +334,10 @@ export function createDCAJobInput(params: {
     jobType: JobType.Time,
     argType: ArgType.Dynamic, // Use proper enum from SDK
     jobTitle: DCA_JOB_CONFIG.jobTitle, // "dca-automate"
-    timeFrame: durationWeeks * 7 * 24 * 60 * 60, // weeks to seconds
+    // Ensure integer seconds for SDK
+    timeFrame: Math.round(durationWeeks * 7 * 24 * 60 * 60), // weeks to seconds
     scheduleType: DCA_JOB_CONFIG.scheduleType, // "interval"
-    timeInterval: intervalMinutes * 60, // minutes to seconds
+    timeInterval: Math.round(intervalMinutes * 60), // minutes to seconds
     timezone: DCA_JOB_CONFIG.timezone, // "Asia/Calcutta"
     chainId: DCA_JOB_CONFIG.chainId, // "42161" (Arbitrum)
     targetContractAddress: contractAddress,
@@ -505,7 +506,7 @@ export async function minimalTriggerXExample() {
  * Delete a TriggerX job for a DCA plan
  * Note: This function attempts to cancel/stop the job using the TriggerX API
  */
-export async function deleteTriggerXJobForPlan(jobId: string): Promise<{
+export async function deleteTriggerXJobForPlan(jobId: string, signer: any, chainId: string = '42161'): Promise<{
   success: boolean;
   error?: string;
 }> {
@@ -521,27 +522,25 @@ export async function deleteTriggerXJobForPlan(jobId: string): Promise<{
     const client = new TriggerXClient(apiKey);
     console.log('📡 TriggerX Client created for deletion');
 
-    // Delete the job using the TriggerX SDK
+    // Delete the job using the TriggerX SDK (requires signer and chainId)
     try {
-      const result: any = await deleteJob(client, jobId);
-      console.log('📥 DeleteJob result:', result);
-
-      if (result?.success !== false) {
-        console.log('✅ TriggerX job deleted successfully:', jobId);
-        return { success: true };
-      } else {
-        console.error('❌ Failed to delete TriggerX job:', result?.error);
-        return { success: false, error: result?.error || 'Failed to delete job' };
-      }
-    } catch (apiError) {
-      console.warn('⚠️ DeleteJob API call failed, job may still be running:', apiError);
-      // Return success anyway since the plan will be updated in our backend
+      await deleteJob(client, jobId, signer, chainId);
+      console.log('✅ TriggerX job deleted successfully:', jobId, signer, chainId);
       return { success: true };
+    } catch (apiError: any) {
+      console.error('❌ Error deleting job via SDK:', apiError);
+      const msg = (apiError?.message || '').toString();
+      const code = apiError?.code || apiError?.error?.code || apiError?.info?.error?.code;
+      // Propagate user rejection distinctly so UI does NOT update backend
+      if (code === 'ACTION_REJECTED' || code === 4001 || /rejected/i.test(msg)) {
+        return { success: false, error: 'user_rejected' };
+      }
+      return { success: false, error: msg || 'delete_failed' };
     }
   } catch (error) {
     console.error('❌ Error cancelling TriggerX job:', error);
-    // Return success anyway since the plan will be deleted from our backend
-    return { success: true };
+    const msg = (error as any)?.message || 'delete_failed';
+    return { success: false, error: msg };
   }
 }
 
