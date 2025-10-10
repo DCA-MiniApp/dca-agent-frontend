@@ -24,6 +24,7 @@ export async function sendMiniAppNotification({
   body: string;
 }): Promise<SendMiniAppNotificationResult> {
   const notificationDetails = await getUserNotificationDetails(fid);
+  console.log("notificationDetails", notificationDetails);
   if (!notificationDetails) {
     return { state: "no_token" };
   }
@@ -46,6 +47,30 @@ export async function sendMiniAppNotification({
 
   if (response.status === 200) {
     const responseBody = sendNotificationResponseSchema.safeParse(responseJson);
+    console.log("responseBody", responseBody);
+    console.log("Saving notification token and flag calling..");
+
+    // Call your API to persist notification details
+    const saveRes = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/dca/token-notification`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fid, // string
+          notificationtoken: notificationDetails.token, // string
+          notificationurl: notificationDetails.url, // string
+        }),
+      }
+    );
+
+    if (!saveRes.ok) {
+      const err = await saveRes.text().catch(() => "");
+      console.warn("Failed to save notification details:", err);
+    } else {
+      console.log("Notification details saved.",notificationDetails.token);
+    }
+
     if (responseBody.success === false) {
       // Malformed response
       return { state: "error", error: responseBody.error.errors };

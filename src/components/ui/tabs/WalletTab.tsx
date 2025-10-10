@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect, use } from "react";
 import {
   useAccount,
   useSendTransaction,
@@ -17,8 +17,9 @@ import { Button } from "../Button";
 import { truncateAddress } from "../../../lib/truncateAddress";
 import { renderError } from "../../../lib/errorUtils";
 import { USE_WALLET, APP_NAME } from "../../../lib/constants";
-import { useMiniApp } from "@neynar/react";
+// import { useMiniApp } from "@neynar/react";
 import { storeUser } from "../../../lib/api";
+import { sdk } from "@farcaster/miniapp-sdk";
 
 /**
  * WalletTab component for wallet management with manual connect/disconnect.
@@ -38,6 +39,12 @@ interface WalletStatusProps {
   username?: string;
   fid?: number;
   isConnected: boolean;
+}
+interface UserInfo {
+  fid: number;
+  username?: string;
+  displayName?: string;
+  pfpUrl?: string;
 }
 
 /**
@@ -62,6 +69,9 @@ function WalletStatus({
     }
   };
 
+  const [user, setUser] = useState<UserInfo | null>(null);
+  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
+
   const getChainColor = (chainId?: number) => {
     switch (chainId) {
       case mainnet.id:
@@ -79,6 +89,41 @@ function WalletStatus({
       // Optional: Add toast notification here
     }
   };
+
+  useEffect(() => {
+    // Wait for SDK to initialize / ready if needed
+    const init = async () => {
+      try {
+        // Optionally, ensure SDK is ready (hide splash etc.)
+        await sdk.actions.ready();
+      } catch (err) {
+        console.error("Failed to ready SDK:", err);
+      }
+
+      const context = await sdk.context;
+      const ctxUser = context?.user;
+      // const ctxUser = (await sdk.context).user;
+      if (ctxUser && typeof ctxUser.fid === "number") {
+        setUser({
+          fid: ctxUser.fid,
+          username: ctxUser.username,
+          displayName: ctxUser.displayName,
+          pfpUrl: ctxUser.pfpUrl,
+        });
+        if (sdk && !isSDKLoaded) {
+          setIsSDKLoaded(true);
+          // load();
+          return () => {
+            sdk.removeAllListeners();
+          };
+        }
+      } else {
+        console.warn("User info missing in sdk.context.user");
+      }
+    };
+
+    init();
+  }, []);
 
   return (
     <div className="space-y-6 mb-6">
@@ -132,9 +177,7 @@ function WalletStatus({
           {typeof fid === "number" && (
             <div className="flex justify-between text-sm bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-xl p-3 border border-white/20">
               <span className="text-white/70">FID:</span>
-              <span className="text-white font-medium">
-                {fid}
-              </span>
+              <span className="text-white font-medium">{fid}</span>
             </div>
           )}
           {address && (
@@ -199,8 +242,18 @@ function ConnectionControls({
       <div className="p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 mb-6">
         <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
           <div className="w-8 h-8 bg-gradient-to-br from-green-400/20 to-green-400/10 rounded-xl flex items-center justify-center border border-green-400/30">
-            <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            <svg
+              className="w-5 h-5 text-green-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
             </svg>
           </div>
           Wallet Connected
@@ -219,14 +272,24 @@ function ConnectionControls({
     <div className="p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500">
       <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
         <div className="w-8 h-8 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-xl flex items-center justify-center border border-[#c199e4]/30">
-          <svg className="w-5 h-5 text-[#c199e4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          <svg
+            className="w-5 h-5 text-[#c199e4]"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13 10V3L4 14h7v7l9-11h-7z"
+            />
           </svg>
         </div>
         Connect your wallet
       </h4>
       <div className="space-y-3">
-        {context ? (
+        {context?.user?.fid ? (
           <>
             <Button
               onClick={() => connect({ connector: connectors[0] })}
@@ -282,7 +345,7 @@ interface WalletControlsProps {
  */
 function WalletControls({
   isConnected,
-  context,
+  // context,
   chainId,
   onSwitchToArbitrum,
   isChainSwitchPending,
@@ -300,16 +363,28 @@ function WalletControls({
   return (
     <div className="space-y-6">
       {/* Network Status */}
-      <div className={`p-6 backdrop-blur-lg rounded-3xl border transition-all duration-500 text-sm ${
-        isOnArbitrum 
-          ? "bg-gradient-to-br from-green-400/20 to-green-400/10 border-green-400/30 hover:border-green-400/50" 
-          : "bg-gradient-to-br from-red-400/20 to-red-400/10 border-red-400/30 hover:border-red-400/50"
-      }`}>
+      <div
+        className={`p-6 backdrop-blur-lg rounded-3xl border transition-all duration-500 text-sm ${
+          isOnArbitrum
+            ? "bg-gradient-to-br from-green-400/20 to-green-400/10 border-green-400/30 hover:border-green-400/50"
+            : "bg-gradient-to-br from-red-400/20 to-red-400/10 border-red-400/30 hover:border-red-400/50"
+        }`}
+      >
         {isOnArbitrum ? (
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 bg-gradient-to-br from-green-400/40 to-green-400/30 rounded-xl flex items-center justify-center border border-green-400/40">
-              <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <svg
+                className="w-5 h-5 text-green-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
             </div>
             <div>
@@ -325,12 +400,24 @@ function WalletControls({
           <div className="space-y-6">
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 bg-gradient-to-br from-red-400/40 to-red-400/30 rounded-xl flex items-center justify-center border border-red-400/40">
-                <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                <svg
+                  className="w-5 h-5 text-red-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                  />
                 </svg>
               </div>
               <div>
-                <div className="font-bold text-red-300 text-base">Wrong Network</div>
+                <div className="font-bold text-red-300 text-base">
+                  Wrong Network
+                </div>
                 <div className="text-red-200/80">
                   Please switch to Arbitrum mainnet to continue.
                 </div>
@@ -353,8 +440,18 @@ function WalletControls({
       <div className="p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500">
         <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
           <div className="w-8 h-8 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-xl flex items-center justify-center border border-[#c199e4]/30">
-            <svg className="w-5 h-5 text-[#c199e4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            <svg
+              className="w-5 h-5 text-[#c199e4]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
             </svg>
           </div>
           Wallet Information
@@ -362,9 +459,7 @@ function WalletControls({
         <div className="space-y-3 text-sm">
           <div className="flex justify-between bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-xl p-3 border border-white/20">
             <span className="text-white/70">Status:</span>
-            <span className="text-green-400 font-bold">
-              Connected
-            </span>
+            <span className="text-green-400 font-bold">Connected</span>
           </div>
           <div className="flex justify-between bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-xl p-3 border border-white/20">
             <span className="text-white/70">Type:</span>
@@ -389,9 +484,46 @@ export function WalletTab() {
   >(null);
 
   // --- Hooks ---
-  const { context } = useMiniApp();
+  // const { context } = useMiniApp();
   const { address, isConnected, connector } = useAccount();
+  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
+  const [user, setUser] = useState<UserInfo | null>(null);
   const chainId = useChainId();
+
+  useEffect(() => {
+    // Wait for SDK to initialize / ready if needed
+    const init = async () => {
+      try {
+        // Optionally, ensure SDK is ready (hide splash etc.)
+        await sdk.actions.ready();
+      } catch (err) {
+        console.error("Failed to ready SDK:", err);
+      }
+
+      const context = await sdk.context;
+      const ctxUser = context?.user;
+      // const ctxUser = (await sdk.context).user;
+      if (ctxUser && typeof ctxUser.fid === "number") {
+        setUser({
+          fid: ctxUser.fid,
+          username: ctxUser.username,
+          displayName: ctxUser.displayName,
+          pfpUrl: ctxUser.pfpUrl,
+        });
+        if (sdk && !isSDKLoaded) {
+          setIsSDKLoaded(true);
+          // load();
+          return () => {
+            sdk.removeAllListeners();
+          };
+        }
+      } else {
+        console.warn("User info missing in sdk.context.user");
+      }
+    };
+
+    init();
+  }, []);
 
   // --- Wagmi Hooks ---
   const {
@@ -438,28 +570,28 @@ export function WalletTab() {
     connectorName: connector?.name,
     isFarcasterWallet,
     isCustodyWallet,
-    context: !!context,
-    fid: context?.user?.fid,
+    // context: !!context,
+    fid: user?.fid,
   });
 
   // Store user on first connect
   useEffect(() => {
     const run = async () => {
       if (!isConnected || !address) return;
-      const fid = context?.user?.fid;
+      const fid = user?.fid;
       // if (!fid) return;
 
       await storeUser({
         fid: String(fid || "727291"),
         userAddress: address,
-        username: (context as any)?.user?.username,
-        pfpUrl: (context as any)?.user?.pfpUrl,
+        username: user?.username,
+        pfpUrl: user?.pfpUrl,
         joinedAt: new Date().toISOString(),
         isWelcomed: false,
       });
     };
     run();
-  }, [isConnected, address, context]);
+  }, [isConnected, address, user?.fid]);
 
   // --- Handlers ---
   const handleSwitchToArbitrum = useCallback(() => {
@@ -479,14 +611,22 @@ export function WalletTab() {
       <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20 mb-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center border border-[#c199e4]/20">
-            <svg className="w-6 h-6 text-[#c199e4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            <svg
+              className="w-6 h-6 text-[#c199e4]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+              />
             </svg>
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white">
-              Wallet Management
-            </h2>
+            <h2 className="text-xl font-bold text-white">Wallet Management</h2>
             <p className="text-sm text-white/70">
               Connect and manage your crypto wallet
             </p>
@@ -494,38 +634,38 @@ export function WalletTab() {
         </div>
       </div>
 
-        {/* Profile Section */}
-        <WalletStatus
-          address={address}
-          chainId={chainId}
-          pfpUrl={context?.user?.pfpUrl}
-          username={context?.user?.username}
-          fid={context?.user?.fid}
-          isConnected={isConnected}
-        />
+      {/* Profile Section */}
+      <WalletStatus
+        address={address}
+        chainId={chainId}
+        pfpUrl={user?.pfpUrl}
+        username={user?.username}
+        fid={user?.fid}
+        isConnected={isConnected}
+      />
 
-        {/* Connection Controls */}
-        <ConnectionControls
-          isConnected={isConnected}
-          context={context}
-          connect={connect}
-          connectors={connectors}
-          disconnect={disconnect}
-        />
+      {/* Connection Controls */}
+      <ConnectionControls
+        isConnected={isConnected}
+        context={user ? { user: { fid: user.fid }, client: null } : null}
+        connect={connect}
+        connectors={connectors}
+        disconnect={disconnect}
+      />
 
-        {/* Wallet Controls (only when connected) */}
-        <WalletControls
-          isConnected={isConnected}
-          context={context}
-          chainId={chainId}
-          onSwitchToArbitrum={handleSwitchToArbitrum}
-          isChainSwitchPending={isChainSwitchPending}
-          isChainSwitchError={isChainSwitchError}
-          chainSwitchError={chainSwitchError}
-          isFarcasterWallet={isFarcasterWallet}
-          isCustodyWallet={isCustodyWallet}
-        />
-      </div>
+      {/* Wallet Controls (only when connected) */}
+      <WalletControls
+        isConnected={isConnected}
+        context={user ? { user: { fid: user.fid }, client: null } : null}
+        chainId={chainId}
+        onSwitchToArbitrum={handleSwitchToArbitrum}
+        isChainSwitchPending={isChainSwitchPending}
+        isChainSwitchError={isChainSwitchError}
+        chainSwitchError={chainSwitchError}
+        isFarcasterWallet={isFarcasterWallet}
+        isCustodyWallet={isCustodyWallet}
+      />
+    </div>
     // </div>
   );
 }
