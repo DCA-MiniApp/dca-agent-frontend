@@ -10,7 +10,7 @@ const CreateTriggerXJobSchema = z.object({
   toToken: z.string().describe('Target token symbol (e.g., ETH)'),
   amount: z.string().regex(/^\d+(\.\d+)?$/, 'Amount must be a valid number').describe('Investment amount per execution'),
   intervalMinutes: z.number().min(1).describe('Execution interval in minutes'),
-  durationWeeks: z.number().min(1).describe('Total investment duration in weeks'),
+  durationWeeks: z.number().min(0.006).max(260).describe('Total investment duration in weeks (supports fractional values like 0.5, 1.25, etc.)'),
   slippage: z.string().regex(/^\d+(\.\d+)?$/, 'Slippage must be a valid number').describe('Slippage tolerance in percentage'),
 });
 

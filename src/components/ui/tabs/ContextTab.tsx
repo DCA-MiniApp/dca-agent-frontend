@@ -617,7 +617,7 @@ export function ContextTab() {
                    Job ID (TriggerX)
                   </p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
-                   {selectedTx.jobId.slice(0, 8)}...{selectedTx.jobId.slice(-6)}
+                   {selectedTx.jobId.slice(0, 8)}...{selectedTx.jobId.slice(-3)}
                   </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
