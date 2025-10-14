@@ -281,7 +281,15 @@ export function ActionsTab() {
 
   // --- Chat Handlers ---
   const handleSendMessage = useCallback(async () => {
-    if (!inputMessage.trim() || isLoading) return;
+    const canSend =
+      isConnected &&
+      !isLoading &&
+      !isApprovalLoading &&
+      !isApprovePending &&
+      !isApprovalConfirming &&
+      !isPlanCreationLoading &&
+      inputMessage.trim().length > 0;
+    if (!canSend) return;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -308,6 +316,7 @@ export function ActionsTab() {
     setCompletedConfirmations(new Set());
 
     try {
+      setIsPlanCreationLoading(isInPlanCreationFlow);
       // Set connecting status
       setConnectionStatus("connecting");
 
@@ -325,7 +334,7 @@ export function ActionsTab() {
           userAddress: address,
           conversationHistory: messages.slice(-6), // Include last 6 messages for context
           isPlanCreationRequest: isPlanRequest, // Flag to help API determine response type
-          fid: context?.user?.fid,
+          fid: context?.user?.fid || 727291,
         }),
       });
 
@@ -393,6 +402,7 @@ export function ActionsTab() {
       setMessages((prev) => [...prev, assistantMessage]);
     } finally {
       setIsLoading(false);
+      setIsPlanCreationLoading(false);
       scrollToBottom(true);
     }
   }, [inputMessage, isLoading, address, messages]);
@@ -965,6 +975,7 @@ export function ActionsTab() {
                 durationWeeks: result.data.agentResponse.durationWeeks,
                 slippage: result.data.agentResponse.slippage,
                 signer: ethersSigner,
+                fid: context?.user?.fid || 727291,
               });
 
               console.log("TriggerX result:", triggerXResult);
@@ -2004,9 +2015,17 @@ export function ActionsTab() {
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyDown={(e) => {
+                  const canSend =
+                    isConnected &&
+                    !isLoading &&
+                    !isApprovalLoading &&
+                    !isApprovePending &&
+                    !isApprovalConfirming &&
+                    !isPlanCreationLoading &&
+                    inputMessage.trim().length > 0;
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    handleSendMessage();
+                    if (canSend) handleSendMessage();
                   }
                 }}
                 onFocus={handleInputFocus}
@@ -2028,6 +2047,8 @@ export function ActionsTab() {
                 !inputMessage.trim() ||
                 isLoading ||
                 isApprovalLoading ||
+                isApprovePending ||
+                isApprovalConfirming ||
                 isPlanCreationLoading
               }
               className="h-11 w-11 p-0 bg-gradient-to-br from-[#c199e4] to-[#b380db] hover:from-[#d9b3ed] hover:to-[#c199e4] disabled:from-white/20 disabled:to-white/10 disabled:cursor-not-allowed text-white rounded-2xl transition-all duration-300 flex items-center justify-center shadow-lg backdrop-blur-sm"

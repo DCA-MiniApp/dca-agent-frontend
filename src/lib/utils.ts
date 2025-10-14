@@ -16,6 +16,7 @@ import {
   APP_WEBHOOK_URL,
   APP_ACCOUNT_ASSOCIATION,
 } from './constants';
+import { fetchJobSuccessCount } from './api';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -69,18 +70,20 @@ export async function getFarcasterDomainManifest(): Promise<Manifest> {
 }
 
 // Portfolio helpers
-type PlanForUsd = { fromToken: string; amount: string; executionCount: number };
+type PlanForUsd = { fromToken: string; amount: string;jobId:string };
 
 // Simple token map import can be added later; use a lightweight fallback resolver for now
 export function getArbitrumAddressBySymbol(symbol: string): string | null {
   const sym = (symbol || '').toUpperCase();
   // Normalize common aliases
   const normalized = sym === 'ETH' ? 'WETH' : sym;
+  console.log('normalized', normalized);
   const tm: any = tokenMapArbitrum as any;
   const entryList: any[] | undefined = tm?.tokenMap?.[normalized];
   if (!entryList || entryList.length === 0) return null;
   // Prefer chainId 42161 and first entry
   const match = entryList.find((e) => e.chainId === 42161) || entryList[0];
+  console.log('match', match);
   return match?.address || null;
 }
 
@@ -88,7 +91,9 @@ export async function fetchArbitrumUsdPrices(addresses: string[]): Promise<Recor
   if (addresses.length === 0) return {};
   const unique = Array.from(new Set(addresses.map((a) => a.toLowerCase())));
   const url = `https://api.coingecko.com/api/v3/simple/token_price/arbitrum-one?contract_addresses=${encodeURIComponent(unique.join(','))}&vs_currencies=usd`;
+  console.log('url', url);
   const res = await fetch(url, { cache: 'no-store' });
+  console.log('res', res);
   if (!res.ok) return {};
   const json = await res.json();
   const out: Record<string, number> = {};
@@ -99,23 +104,31 @@ export async function fetchArbitrumUsdPrices(addresses: string[]): Promise<Recor
 }
 
 export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<number> {
+  console.log('plans in computePlansInvestedUsd file utils...', plans);
   const neededSymbols = Array.from(new Set(plans.map((p) => (p.fromToken || '').toUpperCase()).filter((s) => s && s !== 'USDC')));
+  console.log('neededSymbols', neededSymbols);
   const addresses = neededSymbols.map((s) => getArbitrumAddressBySymbol(s)).filter((a): a is string => !!a);
+  console.log('addresses', addresses);
   const prices = await fetchArbitrumUsdPrices(addresses);
-
+  console.log('prices', prices);
   const symbolToPrice: Record<string, number> = { USDC: 1 };
   for (const sym of neededSymbols) {
     const addr = getArbitrumAddressBySymbol(sym);
     if (addr) symbolToPrice[sym] = prices[addr.toLowerCase()] ?? 0;
   }
 
+  const successCounts = await Promise.all(plans.map((p) => fetchJobSuccessCount(p.jobId)));
+  console.log('successCounts', successCounts);
+
   let total = 0;
-  for (const plan of plans) {
+  for (let i = 0; i < plans.length; i++) {
+    const plan = plans[i];
     const per = parseFloat(plan.amount);
-    if (!isFinite(per) || !plan.executionCount) continue;
+    const successCount = successCounts[i];
+    if (!isFinite(per) || !successCount) continue;
     const sym = (plan.fromToken || 'USDC').toUpperCase();
     const price = symbolToPrice[sym] ?? 0;
-    total += per * price * plan.executionCount;
+    total += per * price * successCount;
   }
   return total;
 }

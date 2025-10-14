@@ -36,6 +36,7 @@ import {
   formatDuration,
   type DCAPlan,
   type PlatformStats,
+  fetchJobSuccessCount,
 } from "../../../lib/api";
 import { computePlansInvestedUsd } from "../../../lib/utils";
 import { deleteTriggerXJobForPlan } from "../../../lib/triggerXIntegration";
@@ -154,6 +155,9 @@ export function HomeTab() {
 
   // Slider state
   const [currentPlanIndex, setCurrentPlanIndex] = useState(0);
+
+  // Success count state
+   const [successCount, setSuccessCount] = useState<number>(0);
 
   // Notification state
   const [hasNotifications, setHasNotifications] = useState(false);
@@ -622,11 +626,12 @@ export function HomeTab() {
       setTotalInvested(calculateTotalInvested(plans));
       // Compute USD value across plans using CoinGecko
       try {
+        console.log('plans in computePlansInvestedUsd', plans);
         const usd = await computePlansInvestedUsd(
           plans.map((p) => ({
             fromToken: p.fromToken,
             amount: p.amount,
-            executionCount: p.executionCount,
+            jobId: p.jobId,
           }))
         );
         setPortfolioUsd(usd);
@@ -1677,7 +1682,7 @@ export function HomeTab() {
                         Total Invested
                       </p>
                       <p className="text-sm text-[#c199e4] font-medium">
-                        {userPlans[currentPlanIndex].executionCount}/
+                        {userPlans[currentPlanIndex].successCount}/
                         {userPlans[currentPlanIndex].totalExecutions} executions
                       </p>
                     </div>
@@ -1685,7 +1690,7 @@ export function HomeTab() {
                       <p className="text-2xl font-bold text-[#c199e4]">
                         {(
                           parseFloat(userPlans[currentPlanIndex].amount) *
-                          userPlans[currentPlanIndex].executionCount
+                          userPlans[currentPlanIndex].successCount || 0
                         ).toFixed(5)}
                       </p>
                     </div>
@@ -1694,13 +1699,13 @@ export function HomeTab() {
                         className="bg-gradient-to-r from-[#c199e4] to-emerald-400 h-3 rounded-full transition-all duration-700 shadow-sm"
                         style={{
                           width: `${
-                            (userPlans[currentPlanIndex].executionCount /
+                            (userPlans[currentPlanIndex].successCount /
                               userPlans[currentPlanIndex].totalExecutions) *
                             100
                           }%`,
                         }}
                       />
-                    </div>
+                    </div>  
                   </div>
                 </div>
 
@@ -1927,7 +1932,7 @@ export function HomeTab() {
                       Execution Progress
                     </p>
                     <p className="text-sm text-gray-200 font-medium">
-                      {selectedPlan.executionCount}/
+                      {selectedPlan.successCount}/
                       {selectedPlan.totalExecutions}
                     </p>
                   </div>
@@ -1936,7 +1941,7 @@ export function HomeTab() {
                       className="bg-gradient-to-r from-[#c199e4]/40 to-[#c199e4]/30 h-3 rounded-full transition-all duration-700 shadow-sm"
                       style={{
                         width: `${
-                          (selectedPlan.executionCount /
+                          (selectedPlan.successCount /
                             selectedPlan.totalExecutions) *
                           100
                         }%`,
@@ -1945,7 +1950,7 @@ export function HomeTab() {
                   </div>
                   <p className="text-xs text-gray-400">
                     {Math.round(
-                      (selectedPlan.executionCount /
+                      (selectedPlan.successCount /
                         selectedPlan.totalExecutions) *
                         100
                     )}
@@ -1960,7 +1965,7 @@ export function HomeTab() {
                   <p className="text-2xl font-bold text-gray-100">
                     {(
                       parseFloat(selectedPlan.amount) *
-                      selectedPlan.executionCount
+                      Number(selectedPlan.successCount || 0)
                     ).toFixed(5)}{" "}
                     {selectedPlan.fromToken}
                   </p>

@@ -49,6 +49,7 @@ export interface CreateTriggerXJobParams {
   durationWeeks: number;
   slippage: string;
   signer: any; // ethers.Signer instance
+  fid?: number; // optional fid for user identification
 }
 
 export interface TriggerXJobCreationResult {
@@ -106,7 +107,8 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
     intervalMinutes,
     durationWeeks,
     slippage,
-    signer
+    signer,
+    fid
   } = params;
 
   try {
@@ -201,7 +203,8 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
 
     // Step 5: Update plan with job details
     const ipfsLink = uploadResult.scriptIpfsUrl;
-    await updatePlanWithJobDetails(planId, jobId, ipfsLink);
+    // Ensure fid is null if undefined, to satisfy type requirements
+    await updatePlanWithJobDetails(planId, jobId, ipfsLink, fid === undefined ? null : fid);
 
     console.log('🎉 Complete TriggerX job setup finished!');
 
@@ -234,7 +237,8 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
 export async function updatePlanWithJobDetails(
   planId: string,
   jobId: string | null,
-  ipfsLink: string | null
+  ipfsLink: string | null,
+  fid: number | null
 ): Promise<void> {
   try {
     const DCA_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3031';
@@ -248,6 +252,7 @@ export async function updatePlanWithJobDetails(
       body: JSON.stringify({
         jobId: jobId,
         ipfsLink: ipfsLink,
+        fid: fid,
       }),
     });
 

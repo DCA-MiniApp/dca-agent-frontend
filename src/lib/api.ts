@@ -20,6 +20,7 @@ export interface DCAPlan {
   updatedAt: string;
   vaultAddress?: string;
   shareTokens?: string;
+  successCount: number;
 }
 
 export interface ExecutionHistory {
@@ -58,7 +59,13 @@ export interface ApiResponse<T = any> {
   message: string;
 }
 
-// Store or update user upon wallet connection
+export interface JobSuccessCountData {
+  jobId: string;
+  successCount: number;
+  totalTasks: number;
+}
+
+
 export interface StoreUserPayload {
   fid: string;
   userAddress: string;
@@ -72,7 +79,6 @@ export interface StoreUserPayload {
 
 export async function storeUser(payload: StoreUserPayload): Promise<boolean> {
   try {
-    console.log("Storing user:", payload);
     const response = await fetch(`${API_BASE_URL}/api/dca/user`, {
       method: 'POST',
       headers: {
@@ -82,16 +88,12 @@ export async function storeUser(payload: StoreUserPayload): Promise<boolean> {
     });
 
     const result: ApiResponse = await response.json();
-    if (!result.success) {
-      console.error('Failed to store user:', result.message || result.error);
-    }
     return !!result.success;
   } catch (error) {
     console.error('Error storing user:', error);
     return false;
   }
 }
-
 /**
  * Fetch user's DCA plans from the backend
  */
@@ -105,10 +107,16 @@ export async function fetchUserDCAPlans(userAddress: string): Promise<DCAPlan[]>
         "Accept": "application/json"
       }
     });
-    console.log("response", response);
+    // console.log("response", await response.json());
     const result: ApiResponse<DCAPlan[]> = await response.json();
 
     if (result.success && result.data) {
+      result.data.forEach((plan: any) => {
+        const taskData = plan?.jobData?.taskData;
+        if (Array.isArray(taskData)) {
+          plan.successCount = taskData.filter((t: any) => t.task_status === 'success').length;
+        }
+      });
       return result.data;
     } else {
       console.error('Failed to fetch DCA plans:', result.message);
@@ -223,6 +231,33 @@ export async function deletePlan(planId: string): Promise<boolean> {
     console.error('Error deleting plan:', error);
     return false;
   }
+}
+
+/**
+ * Fetch number of successful task executions for a given TriggerX jobId.
+ * Tries the path under /api/dca first, then falls back to root /job route.
+ */
+export async function fetchJobSuccessCount(jobId: string): Promise<number | null> {
+  if (!jobId) return null;
+  const paths = [
+    `${API_BASE_URL}/api/dca/job/${jobId}/success-count`,
+    `${API_BASE_URL}/job/${jobId}/success-count`,
+  ];
+  console.log("paths", paths);
+
+  for (const url of paths) {
+    try {
+      const response = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (!response.ok) continue;
+      const result: ApiResponse<JobSuccessCountData> = await response.json();
+      console.log("result", result.data);
+      if (result.success && result.data) return result.data.successCount;
+    } catch (err) {
+      console.log("Error fetching job success count from", url, ":", err);
+    }
+  }
+
+  return null;
 }
 
 /**

@@ -587,7 +587,7 @@ export function ContextTab() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => openTxExternal(selectedTx.txUrl, selectedTx.txHash)}
-                    className="bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-3 px-5 rounded-xl transition-all duration-300 text-xs border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg"
+                    className={`${selectedTx.status === "SUCCESS" ? "bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30" : selectedTx.status === "PENDING" ? "bg-blue-400/20 text-blue-300 border border-blue-400/40 group-hover:bg-blue-400/30" : selectedTx.status === "failed" ? "bg-red-400/20 text-red-300 border border-red-400/40 group-hover:bg-red-400/30 cursor-not-allowed" : "bg-gray-400/20 text-gray-300 border border-gray-400/40 group-hover:bg-gray-400/30"} bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-3 px-5 rounded-xl transition-all duration-300 text-xs border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg`}
                   >
                     View Explorer
                   </button>
