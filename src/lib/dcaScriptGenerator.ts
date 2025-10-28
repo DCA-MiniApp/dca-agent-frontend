@@ -107,12 +107,12 @@ func main() {
     }
     
     // Return the 4 required contract parameters
-    resultPayload := map[string]interface{}{
-        "user": DCA_CONFIG["userAddress"],
-        "token": DCA_CONFIG["fromToken"], // Will be resolved to address by contract
-        "amount": DCA_CONFIG["amount"],
-        "data": transactionData,
-    }
+        resultPayload := []interface{}{
+            DCA_CONFIG["userAddress"],    // user
+            DCA_CONFIG["fromToken"],      // token (will be resolved to address by contract)
+            DCA_CONFIG["amount"],         // amount
+            transactionData,              // data
+        }
 
     jsonValue, _ := json.Marshal(resultPayload)
     fmt.Println("Payload received:", string(jsonValue))
