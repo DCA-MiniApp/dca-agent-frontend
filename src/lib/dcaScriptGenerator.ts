@@ -13,6 +13,45 @@ export interface DCAScriptParams {
   slippage: string;
 }
 
+// Load Arbitrum token map to resolve token symbols to addresses
+// This JSON is large; we only extract the address for provided symbols.
+import tokenMapArbitrum from "../tokenMap_arbitrum.json";
+
+function resolveTokenAddressFromMap(symbol: string): string | null {
+  if (!symbol) return null;
+  const entry = (tokenMapArbitrum as any)?.tokenMap?.[symbol];
+  if (!Array.isArray(entry) || entry.length === 0) return null;
+  // Prefer first entry (token list uses single entry per symbol for Arbitrum)
+  const token = entry[0];
+  return typeof token?.address === "string" ? token.address : null;
+}
+
+function resolveTokenDecimalsFromMap(symbol: string, address?: string | null): number | null {
+  const bySymbol = (tokenMapArbitrum as any)?.tokenMap?.[symbol];
+  if (Array.isArray(bySymbol) && bySymbol[0]?.decimals != null) {
+    console.log('bySymbol', bySymbol[0].decimals);
+    return Number(bySymbol[0].decimals);
+  }
+  return null;
+}
+
+// Convert human-readable decimal amount string into integer string scaled by `decimals`
+function scaleAmountToUint(amountStr: string, decimals: number): string {
+  const trimmed = String(amountStr).trim();
+  if (!/^[0-9]*\.?[0-9]*$/.test(trimmed)) return "0";
+  console.log('trimmed', trimmed);
+  const [intPartRaw, fracPartRaw = ""] = trimmed.split(".");
+  const intPart = intPartRaw.replace(/^0+(?=\d)/, "");
+  console.log('intPart', intPart);
+  const fracPart = (fracPartRaw + "0".repeat(decimals)).slice(0, decimals);
+  console.log('fracPart', fracPart);
+  const combined = (intPart || "0") + fracPart;
+  // Remove leading zeros but keep at least one zero
+  const withoutLeading = combined.replace(/^0+(?=\d)/, "");
+  console.log('withoutLeading', withoutLeading);
+  return withoutLeading === "" ? "0" : withoutLeading;
+}
+
 /**
  * Generate the minimal Go script for DCA job execution
  * Only stores essential parameters and calls API for fresh transaction data
@@ -20,6 +59,11 @@ export interface DCAScriptParams {
 export function generateDCAScript(params: DCAScriptParams): string {
   const { userAddress, fromToken, toToken, amount, slippage } = params;
 
+  // Resolve token addresses from the Arbitrum token map
+  const fromTokenAddress = resolveTokenAddressFromMap(fromToken) ?? "";
+  const fromTokenDecimals = resolveTokenDecimalsFromMap(fromToken, fromTokenAddress) ?? 18;
+  const scaledAmount = scaleAmountToUint(amount, fromTokenDecimals);
+  console.log('scaledAmount', scaledAmount);
   const script = `package main
 
 import (
@@ -65,7 +109,7 @@ func getTransactionData() (string, error) {
         return "0x", err
     }
     
-    client := &http.Client{Timeout: 30 * time.Second}
+    client := &http.Client{Timeout: 60 * time.Second}
     req, err := http.NewRequest("POST", "https://dca-backend.udonswap.org/api/dca/prepare-swap", bytes.NewBuffer(jsonPayload))
     if err != nil {
         return "0x", err
@@ -109,13 +153,13 @@ func main() {
     // Return the 4 required contract parameters
         resultPayload := []interface{}{
             DCA_CONFIG["userAddress"],    // user
-            DCA_CONFIG["fromToken"],      // token (will be resolved to address by contract)
-            DCA_CONFIG["amount"],         // amount
+            "${fromTokenAddress}", // token address
+            "${scaledAmount}",         // amount (uint256 scaled by token decimals)
             transactionData,              // data
         }
 
     jsonValue, _ := json.Marshal(resultPayload)
-    fmt.Println("Payload received:", string(jsonValue))
+    fmt.Println(string(jsonValue))
 }`;
 
   return script;
@@ -124,27 +168,34 @@ func main() {
 /**
  * Validate minimal DCA script parameters
  */
-export function validateDCAScriptParams(params: DCAScriptParams): { isValid: boolean; errors: string[] } {
+export function validateDCAScriptParams(params: DCAScriptParams): {
+  isValid: boolean;
+  errors: string[];
+} {
   const errors: string[] = [];
 
   if (!params.userAddress || !/^0x[a-fA-F0-9]{40}$/.test(params.userAddress)) {
-    errors.push('userAddress is required and must be a valid Ethereum address');
+    errors.push("userAddress is required and must be a valid Ethereum address");
   }
 
-  if (!params.fromToken || typeof params.fromToken !== 'string') {
-    errors.push('fromToken is required and must be a string');
+  if (!params.fromToken || typeof params.fromToken !== "string") {
+    errors.push("fromToken is required and must be a string");
   }
 
-  if (!params.toToken || typeof params.toToken !== 'string') {
-    errors.push('toToken is required and must be a string');
+  if (!params.toToken || typeof params.toToken !== "string") {
+    errors.push("toToken is required and must be a string");
   }
 
-  if (!params.amount || isNaN(parseFloat(params.amount)) || parseFloat(params.amount) <= 0) {
-    errors.push('amount is required and must be a positive number');
+  if (
+    !params.amount ||
+    isNaN(parseFloat(params.amount)) ||
+    parseFloat(params.amount) <= 0
+  ) {
+    errors.push("amount is required and must be a positive number");
   }
 
   if (!params.slippage || isNaN(parseFloat(params.slippage))) {
-    errors.push('slippage is required and must be a valid number');
+    errors.push("slippage is required and must be a valid number");
   }
 
   return {
@@ -158,11 +209,11 @@ export function validateDCAScriptParams(params: DCAScriptParams): { isValid: boo
  */
 export function getExecutionResultExample(): string {
   const example = {
-    "user": '0x3816BA21dCC9dfD3C714fFDB987163695408653F',
-    "token": 'USDC', // Token symbol, resolved to address by contract
-    "amount": '100',
-    "data": '0x04e45aaf000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e5831...' // Real transaction data from API
+    user: "0x3816BA21dCC9dfD3C714fFDB987163695408653F",
+    token: "0xaf88d065e77c8C2239327C5EDb3A432268e5831",
+    amount: "100000000", // 100 USDC with 6 decimals
+    data: "0x04e45aaf000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e5831...", // Real transaction data from API
   };
 
-  return `Payload received: ${JSON.stringify(example)}`;
+  return `${JSON.stringify(example)}`;
 }
