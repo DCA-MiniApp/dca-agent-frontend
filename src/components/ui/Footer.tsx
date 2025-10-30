@@ -49,8 +49,8 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
   };
 
   return (
-    <div className="h-full flex items-center justify-center relative bg-transparent ">
-      <div className="relative">
+    <div className="h-full flex flex-col items-center justify-center relative bg-transparent ">
+      <div className="relative mb-3">
         {/* Central Circle */}
         <div className="size-[70px] rounded-full border-2 border-white/40 bg-transparent relative">
           {/* Animated White Dot Indicator */}
@@ -97,6 +97,14 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
             WALLET
           </button>
         )}
+      </div>
+
+      {/* Attribution under the control cluster */}
+      <div className="pointer-events-auto rounded-full border border-white/15 bg-black/40 backdrop-blur-md text-white/80 text-[11px] sm:text-xs px-3 py-1 shadow-lg mt-4">
+        <span className="whitespace-nowrap">
+          Protected by <span className="font-semibold text-white">TriggerX</span> & Powered by <span className="font-semibold text-white">Vibekit</span>. 
+          <span className="ml-1 text-white/70">Live on </span><a href="https://arbitrum.io/" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#c199e4]">Arbitrum One</a>
+        </span>
       </div>
       
       {/* Chat Animation Overlay */}
