@@ -99,13 +99,7 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
         )}
       </div>
 
-      {/* Attribution under the control cluster */}
-      <div className="pointer-events-auto rounded-full border border-white/15 bg-black/40 backdrop-blur-md text-white/80 text-[11px] sm:text-xs px-3 py-1 shadow-lg mt-4">
-        <span className="whitespace-nowrap">
-          Protected by <span className="font-semibold text-white">TriggerX</span> & Powered by <span className="font-semibold text-white">Vibekit</span>. 
-          <span className="ml-1 text-white/70">Live on </span><a href="https://arbitrum.io/" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#c199e4]">Arbitrum One</a>
-        </span>
-      </div>
+      {/* Attribution moved to Header to ensure visibility in mini app heights */}
       
       {/* Chat Animation Overlay */}
       <AnimatePresence>
