@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation";
 import { IoPersonCircle } from "react-icons/io5";
 import { RiRobot2Fill } from "react-icons/ri";
 import { parseUnits } from "viem";
+import sdk from "@farcaster/miniapp-sdk";
 
 // Chat message interface
 interface ChatMessage {
@@ -38,6 +39,8 @@ interface ChatMessage {
   transactionHash?: string;
   // Loading state for plan creation
   isCreatingPlan?: boolean;
+  // Optional share content to enable a "Share now" button
+  shareText?: string;
 }
 
 // Helper to format addresses nicely (e.g., 0x1234...ABCD)
@@ -162,6 +165,22 @@ export function ActionsTab() {
         </span>
       );
     });
+  }, []);
+
+  // Share handler using Farcaster Miniapp SDK
+  const handleShareNow = useCallback(async (text: string) => {
+    try {
+      if ((sdk as any)?.actions?.composeCast) {
+        await (sdk as any).actions.composeCast({ text });
+      } else if (typeof window !== "undefined") {
+        const url = `https://warpcast.com/~/compose?text=${encodeURIComponent(
+          text
+        )}`;
+        window.open(url, "_blank");
+      }
+    } catch (err) {
+      console.error("Failed to open cast composer:", err);
+    }
   }, []);
 
   // Helper to detect if user is requesting plan creation
@@ -987,11 +1006,16 @@ export function ActionsTab() {
                 );
 
                 // Add success message about automation
+                const shareText = `Just automated my crypto strategy with DCA Agent 🚀  
+                ${result.data.agentResponse.amount} ${result.data.agentResponse.fromToken} → ${result.data.agentResponse.toToken} Protected by TriggerX & Powered by Vibekit on Arbitrum one.  
+                 Set it. Forget it. Grow it. 🌱  
+                ${APP_URL}`;
                 const automationMessage: ChatMessage = {
                   id: Date.now().toString(),
                   role: "assistant",
                   content: `🚀 **Automation Setup Complete!**\n\n✅ TriggerX Job ID: ${triggerXResult.jobId}\n📜 Script IPFS: ${triggerXResult.scriptIpfsUrl}\n\nYour DCA plan is now fully automated and will execute according to your schedule.`,
                   timestamp: new Date(),
+                  shareText,
                 };
                 setMessages((prev) => [
                   ...prev.filter((msg) => !msg.isCreatingPlan),
@@ -1357,29 +1381,36 @@ export function ActionsTab() {
         console.error("Unsupported token:", planData.fromToken);
         return;
       }
-  
+
       console.log("Plan data", planData);
-  
+
       // --- Helpers to normalize user-provided interval/duration into minutes ---
       function parseIntervalToMinutes(interval: any): number {
-        const s = String(interval ?? planData.interval ?? "").toLowerCase().trim();
-  
+        const s = String(interval ?? planData.interval ?? "")
+          .toLowerCase()
+          .trim();
+
         // numeric value fallback
         const num = parseFloat(s);
         if (!isNaN(num) && num > 0) return num;
-  
+
         if (s.includes("minute")) return num || 1; // default 1 min
         if (s.includes("hour")) return (num || 1) * 60;
-        if (s.includes("day") || s.includes("daily")) return (num || 1) * 24 * 60;
-        if (s.includes("week") || s.includes("weekly")) return (num || 1) * 7 * 24 * 60;
-        if (s.includes("month") || s.includes("monthly")) return (num || 1) * 30 * 24 * 60;
-  
+        if (s.includes("day") || s.includes("daily"))
+          return (num || 1) * 24 * 60;
+        if (s.includes("week") || s.includes("weekly"))
+          return (num || 1) * 7 * 24 * 60;
+        if (s.includes("month") || s.includes("monthly"))
+          return (num || 1) * 30 * 24 * 60;
+
         return NaN;
       }
-  
+
       function parseDurationToMinutes(duration: any): number {
-        const s = String(duration ?? planData.duration ?? "").toLowerCase().trim();
-  
+        const s = String(duration ?? planData.duration ?? "")
+          .toLowerCase()
+          .trim();
+
         const m = s.match(/(\d+(\.\d+)?)\s*(minute|hour|day|week|month)/i);
         if (m) {
           const value = parseFloat(m[1]);
@@ -1390,20 +1421,20 @@ export function ActionsTab() {
           if (unit.startsWith("week")) return value * 7 * 24 * 60;
           if (unit.startsWith("month")) return value * 30 * 24 * 60;
         }
-  
+
         // keywords fallback
         if (s.includes("day") || s.includes("daily")) return 24 * 60;
         if (s.includes("week") || s.includes("weekly")) return 7 * 24 * 60;
         if (s.includes("month") || s.includes("monthly")) return 30 * 24 * 60;
-  
+
         return NaN;
       }
-  
+
       try {
         const intervalMinutes = parseIntervalToMinutes(planData.interval);
         console.log("intervalMinutes", intervalMinutes);
         const durationMinutes = parseDurationToMinutes(planData.duration);
-        console.log("durationMinutes", durationMinutes);  
+        console.log("durationMinutes", durationMinutes);
         const amountPerExecutionStr = String(planData.amount ?? "").trim();
         console.log("amountPerExecutionStr", amountPerExecutionStr);
         const decimals =
@@ -1423,7 +1454,7 @@ export function ActionsTab() {
             interval: planData.interval,
             duration: planData.duration,
           });
-  
+
           const errMsg: ChatMessage = {
             id: Date.now().toString(),
             role: "assistant",
@@ -1434,7 +1465,7 @@ export function ActionsTab() {
           setMessages((prev) => [...prev, errMsg]);
           return;
         }
-  
+
         // Compute total executions
         const totalExecutions = Math.floor(durationMinutes / intervalMinutes);
         console.log("totalExecutions", totalExecutions);
@@ -1454,12 +1485,12 @@ export function ActionsTab() {
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, approvalMessage]);
-  
+
         setConfirmationStep("approval");
         setApprovalStatus("approving");
         setPendingConfirmationId(confirmationId);
         setIsApprovalLoading(true);
-  
+
         console.log("[Approval] Starting token approval process:", {
           token: tokenInfo.symbol,
           amountPerExecution: amountPerExecutionStr,
@@ -1467,7 +1498,7 @@ export function ActionsTab() {
           decimals,
           totalAmountWei: totalAmountWei.toString(),
         });
-  
+
         // Trigger wallet approval popup with dynamic total amount
         writeContract({
           address: tokenInfo.address as `0x${string}`,
@@ -1478,7 +1509,7 @@ export function ActionsTab() {
         });
       } catch (error) {
         console.error("Error starting approval process:", error);
-  
+
         const errorMessage: ChatMessage = {
           id: Date.now().toString(),
           role: "assistant",
@@ -1492,7 +1523,6 @@ export function ActionsTab() {
     },
     [writeContract]
   );
-  
 
   // Handle the approve confirmation (after summary)
   const handleApproveConfirm = useCallback(
@@ -1784,6 +1814,31 @@ export function ActionsTab() {
               >
                 <div className="text-sm leading-relaxed break-words overflow-wrap-anywhere">
                   {renderMarkdownText(message.content)}
+                  {message.shareText && (
+                    <div className="mt-3 flex justify-center">
+                      <button
+                        onClick={() =>
+                          handleShareNow(message.shareText as string)
+                        }
+                        className="inline-flex items-center gap-2 px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
+                      >
+                        Share now
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M14 5l7 7m0 0l-7 7m7-7H3"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                   {message.isCreatingPlan && (
                     <div className="mt-2 flex space-x-1">
                       <div className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce"></div>

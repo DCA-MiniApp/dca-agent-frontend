@@ -1642,7 +1642,7 @@ export function HomeTab() {
                           ? "bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30"
                           : userPlans[currentPlanIndex].status === "PAUSED"
                           ? "bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 group-hover:bg-yellow-400/30"
-                          : userPlans[currentPlanIndex].status === "COMPLETED"
+                          : userPlans[currentPlanIndex].status === "completed"
                           ? "bg-blue-400/20 text-blue-300 border border-blue-400/40 group-hover:bg-blue-400/30"
                           : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
                       }`}
@@ -1850,7 +1850,7 @@ export function HomeTab() {
                         ? "bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30"
                         : selectedPlan.status === "PAUSED"
                         ? "bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 group-hover:bg-yellow-400/30"
-                        : selectedPlan.status === "COMPLETED"
+                        : selectedPlan.status === "completed"
                         ? "bg-blue-400/20 text-blue-300 border border-blue-400/40 group-hover:bg-blue-400/30"
                         : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
                     }`}

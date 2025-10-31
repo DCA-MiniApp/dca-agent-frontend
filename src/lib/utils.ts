@@ -105,7 +105,14 @@ export async function fetchArbitrumUsdPrices(addresses: string[]): Promise<Recor
 
 export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<number> {
   console.log('plans in computePlansInvestedUsd file utils...', plans);
-  const neededSymbols = Array.from(new Set(plans.map((p) => (p.fromToken || '').toUpperCase()).filter((s) => s && s !== 'USDC')));
+  // Include USDC too so we can fetch/confirm its price (fallback remains 1 if API misses it)
+  const neededSymbols = Array.from(
+    new Set(
+      plans
+        .map((p) => (p.fromToken || '').trim().toUpperCase())
+        .filter((s) => s)
+    )
+  );
   console.log('neededSymbols', neededSymbols);
   const addresses = neededSymbols.map((s) => getArbitrumAddressBySymbol(s)).filter((a): a is string => !!a);
   console.log('addresses', addresses);
@@ -125,10 +132,15 @@ export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<numb
     const plan = plans[i];
     const per = parseFloat(plan.amount);
     const successCount = successCounts[i];
-    if (!isFinite(per) || !successCount) continue;
+    // if (!isFinite(per) || !successCount) continue;
     const sym = (plan.fromToken || 'USDC').toUpperCase();
+
+    console.log("sym in computePlansInvestedUsd", sym);
     const price = symbolToPrice[sym] ?? 0;
-    total += per * price * successCount;
+    console.log("symbolToPrice in computePlansInvestedUsd", symbolToPrice);
+    console.log("price in computePlansInvestedUsd", price);
+    total += per * price * (successCount ?? 0);
+    console.log("total in computePlansInvestedUsd", total);
   }
   return total;
 }

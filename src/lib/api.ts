@@ -11,7 +11,7 @@ export interface DCAPlan {
   amount: string;
   intervalMinutes: number;
   durationWeeks: number;
-  status: 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+  status: 'ACTIVE' | 'PAUSED' | 'completed' | 'CANCELLED';
   nextExecution: string | null;
   executionCount: number;
   totalExecutions: number;
@@ -109,14 +109,17 @@ export async function fetchUserDCAPlans(userAddress: string): Promise<DCAPlan[]>
     });
     // console.log("response", await response.json());
     const result: ApiResponse<DCAPlan[]> = await response.json();
+    console.log("result in fetchUserDCAPlans", result);
 
     if (result.success && result.data) {
       result.data.forEach((plan: any) => {
-        const taskData = plan?.jobData?.taskData;
+        console.log("plan in fetchUserDCAPlans", plan?.jobData.data.taskData);
+        const taskData =plan?.jobData.data.taskData;
         if (Array.isArray(taskData)) {
-          plan.successCount = taskData.filter((t: any) => t.task_status === 'success').length;
+          plan.successCount = taskData.filter((t: any) => t.task_status === 'completed').length;
         }
       });
+      console.log("result.data in fetchUserDCAPlans", result.data);
       return result.data;
     } else {
       console.error('Failed to fetch DCA plans:', result.message);
