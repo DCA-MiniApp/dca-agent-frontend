@@ -112,14 +112,14 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
   } = params;
 
   try {
-    console.log('🚀 Starting TriggerX job creation for plan:', planId);
-    console.log("params", params);
+    // console.log('🚀 Starting TriggerX job creation for plan:', planId);
+    // console.log("params", params);
 
     // Step 1: Get token addresses and validate script parameters
     const fromTokenInfo = getTokenInfo(fromToken);
     const toTokenInfo = getTokenInfo(toToken);
 
-    console.log('🔍 Token info - From:', fromTokenInfo, 'To:', toTokenInfo);
+    // console.log('🔍 Token info - From:', fromTokenInfo, 'To:', toTokenInfo);
 
     const scriptParams: DCAScriptParams = {
       userAddress,
@@ -135,7 +135,7 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
     }
 
     // Step 2: Generate and upload minimal script to IPFS
-    console.log('📝 Generating minimal DCA script...');
+    // console.log('📝 Generating minimal DCA script...');
     const uploadResult = await uploadDCAScriptToIPFS(
       scriptParams,
       generateDCAScript
@@ -161,15 +161,15 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
     });
 
     // Step 4: Create TriggerX job
-    console.log('⚡ Creating TriggerX job...');
+    // console.log('⚡ Creating TriggerX job...');
     const apiKey = process.env.NEXT_PUBLIC_TRIGGERX_API_KEY || '';
-    console.log('🔑 API Key exists:', !!apiKey, 'Length:', apiKey.length);
+    // console.log('🔑 API Key exists:', !!apiKey, 'Length:', apiKey.length);
     
     const client = new TriggerXClient(apiKey);
-    console.log("📡 TriggerX Client:", client);
+    // console.log("📡 TriggerX Client:", client);
     console.log("📝 Job Input (full):", JSON.stringify(jobInput, null, 2));
     console.log("🔗 IPFS URL being passed:", jobInput.dynamicArgumentsScriptUrl);
-    console.log("✍️ Signer:", signer);
+    // console.log("✍️ Signer:", signer);
     
     let result;
     try {
@@ -206,7 +206,7 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
     // Ensure fid is null if undefined, to satisfy type requirements
     await updatePlanWithJobDetails(planId, jobId, ipfsLink, fid === undefined ? null : fid);
 
-    console.log('🎉 Complete TriggerX job setup finished!');
+    // console.log('🎉 Complete TriggerX job setup finished!');
 
     return {
       success: true,
@@ -302,7 +302,7 @@ export async function getSignerFromWallet(): Promise<any> {
       throw new Error('Failed to get signer from wallet');
     }
 
-    console.log('[Wallet] Signer obtained from wallet:', await signer.getAddress());
+    // console.log('[Wallet] Signer obtained from wallet:', await signer.getAddress());
     return signer;
 
   } catch (error) {
@@ -377,7 +377,7 @@ export async function createCompleteDCAPlan(params: {
   const { message, userAddress, planData } = params;
 
   try {
-    console.log('🚀 Starting complete DCA plan creation workflow...');
+    // console.log('🚀 Starting complete DCA plan creation workflow...');
 
     // 1. Create the DCA plan through chat
     console.log('📝 Creating DCA plan via chat...');
@@ -519,7 +519,7 @@ export async function deleteTriggerXJobForPlan(jobId: string, signer: any, chain
   error?: string;
 }> {
   try {
-    console.log('🗑️ Starting TriggerX job deletion for job:', jobId);
+    // console.log('🗑️ Starting TriggerX job deletion for job:', jobId);
 
     // Create TriggerX client
     const apiKey = process.env.NEXT_PUBLIC_TRIGGERX_API_KEY || '';
@@ -528,12 +528,12 @@ export async function deleteTriggerXJobForPlan(jobId: string, signer: any, chain
     }
 
     const client = new TriggerXClient(apiKey);
-    console.log('📡 TriggerX Client created for deletion');
+    // console.log('📡 TriggerX Client created for deletion');
 
     // Delete the job using the TriggerX SDK (requires signer and chainId)
     try {
       await deleteJob(client, jobId, signer, chainId);
-      console.log('✅ TriggerX job deleted successfully:', jobId, signer, chainId);
+      // console.log('✅ TriggerX job deleted successfully:', jobId, signer, chainId);
       return { success: true };
     } catch (apiError: any) {
       console.error('❌ Error deleting job via SDK:', apiError);

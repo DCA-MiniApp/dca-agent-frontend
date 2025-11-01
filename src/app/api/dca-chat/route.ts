@@ -154,7 +154,6 @@ export async function POST(request: NextRequest) {
     }
 
     // For non-plan creation messages, send to VibeKit agent
-    console.log('[DCA Operation] Sending to VibeKit agent:', message);
     const vibekitResponse = await sendToVibeKitAgent(message, userAddress, conversationHistory, fid);
     
     return NextResponse.json({
@@ -306,7 +305,6 @@ async function handleDCAOperation(message: string, userAddress?: string): Promis
   data?: any;
 }> {
   const lowerMessage = message.toLowerCase();
-  console.log('[DCA Operation] Analyzing message:', message);
 
   try {
     // Check user's DCA plans
@@ -445,7 +443,6 @@ async function sendToVibeKitAgent(
       }
     };
     
-    console.log('[VibeKit Agent] Request body:', JSON.stringify(requestBody, null, 2));
     
     // Send to DCA skill via MCP tool call format using the session ID
     const response = await fetch(`${DCA_BACKEND_URL}/messages?sessionId=${sessionId}`, {
@@ -463,7 +460,6 @@ async function sendToVibeKitAgent(
     }
 
     const initialResponse = await response.text();
-    console.log('[VibeKit Agent] Initial response:', initialResponse);
     
     // The /messages endpoint returns "Accepted" and the real response comes via SSE
     if (initialResponse === 'Accepted' || initialResponse.includes('Accepted')) {
@@ -682,7 +678,6 @@ async function waitForSSEResponseWithReader(
                 
                 // Check if this is the response to our request
                 if (data.id === requestId) {
-                  console.log('[SSE] Found matching response for request ID:', requestId);
                   clearTimeout(timeout);
                   reader.cancel();
                   resolve(data);
@@ -825,7 +820,6 @@ function analyzePlanCreationIntent(userMessage: string, agentResponse: string, i
     } else if (isPlanCreationRequest) {
       // If frontend explicitly flagged this as plan creation but we don't have complete data,
       // still show confirmation with what we have and let user provide more details
-      console.log('[Plan Analysis] Frontend flagged as plan creation but incomplete data, showing confirmation anyway');
       return {
         shouldConfirm: true,
         planData: {

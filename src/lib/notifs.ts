@@ -47,7 +47,7 @@ export async function sendMiniAppNotification({
 
   if (response.status === 200) {
     const responseBody = sendNotificationResponseSchema.safeParse(responseJson);
-    console.log("responseBody", responseBody);
+    // console.log("responseBody", responseBody);
     console.log("Saving notification token and flag calling..");
 
     // Call your API to persist notification details

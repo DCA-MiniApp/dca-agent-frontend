@@ -29,7 +29,7 @@ function resolveTokenAddressFromMap(symbol: string): string | null {
 function resolveTokenDecimalsFromMap(symbol: string, address?: string | null): number | null {
   const bySymbol = (tokenMapArbitrum as any)?.tokenMap?.[symbol];
   if (Array.isArray(bySymbol) && bySymbol[0]?.decimals != null) {
-    console.log('bySymbol', bySymbol[0].decimals);
+    // console.log('bySymbol', bySymbol[0].decimals);
     return Number(bySymbol[0].decimals);
   }
   return null;
@@ -39,16 +39,16 @@ function resolveTokenDecimalsFromMap(symbol: string, address?: string | null): n
 function scaleAmountToUint(amountStr: string, decimals: number): string {
   const trimmed = String(amountStr).trim();
   if (!/^[0-9]*\.?[0-9]*$/.test(trimmed)) return "0";
-  console.log('trimmed', trimmed);
+  // console.log('trimmed', trimmed);
   const [intPartRaw, fracPartRaw = ""] = trimmed.split(".");
   const intPart = intPartRaw.replace(/^0+(?=\d)/, "");
-  console.log('intPart', intPart);
+  // console.log('intPart', intPart);
   const fracPart = (fracPartRaw + "0".repeat(decimals)).slice(0, decimals);
-  console.log('fracPart', fracPart);
+  // console.log('fracPart', fracPart);
   const combined = (intPart || "0") + fracPart;
   // Remove leading zeros but keep at least one zero
   const withoutLeading = combined.replace(/^0+(?=\d)/, "");
-  console.log('withoutLeading', withoutLeading);
+  // console.log('withoutLeading', withoutLeading);
   return withoutLeading === "" ? "0" : withoutLeading;
 }
 

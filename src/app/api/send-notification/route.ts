@@ -27,8 +27,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  console.log('Received notification request for fid:', requestBody.data.fid);
-  console.log('Neynar enabled:', neynarEnabled);
+ 
   console.log('Notification details provided:', !!requestBody.data.notificationDetails);
 
   // Only store notification details if not using Neynar
@@ -60,7 +59,6 @@ export async function POST(request: NextRequest) {
       "",
   });
 
-  console.log('Notification send result:', sendResult);
 
   if (sendResult.state === "error") {
     return Response.json(

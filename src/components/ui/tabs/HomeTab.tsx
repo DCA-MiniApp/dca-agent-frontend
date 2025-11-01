@@ -231,21 +231,6 @@ export function HomeTab() {
     }
   }, [isSDKLoaded, added, notificationDetails]);
 
-  // Helper: wait until SDK reflects enabled notifications
-  const waitForNotificationEnablement = async (timeoutMs = 10000) => {
-    const start = Date.now();
-    console.log(
-      "Waiting up to",
-      timeoutMs,
-      "ms for notification enablement..."
-    );
-    while (Date.now() - start < timeoutMs) {
-      if (addedRef.current && detailsRef.current) return true;
-      await new Promise((r) => setTimeout(r, 250));
-    }
-    return false;
-  };
-
   // Auto-request addMiniApp on mount when in miniapp and not enabled yet
   useEffect(() => {
     if (!isSDKLoaded) return;
@@ -296,9 +281,9 @@ export function HomeTab() {
       sdk.on("miniAppRemoved", () => {
         setLastEvent("miniAppRemoved");
         setAdded(false);
-        console.log(
-          "Call API endpoint to update Isnotification:false and null on the Notificationtoken! when user removes our mini app"
-        );
+        // console.log(
+        //   "Call API endpoint to update Isnotification:false and null on the Notificationtoken! when user removes our mini app"
+        // );
         setNotificationDetails(null);
       });
 
@@ -309,9 +294,9 @@ export function HomeTab() {
       sdk.on("notificationsDisabled", () => {
         setLastEvent("notificationsDisabled");
         setNotificationDetails(null);
-        console.log(
-          "Call API endpoint to update Isnotification:false and null on the Notificationtoken! when user disabled our mini app"
-        );
+        // console.log(
+        //   "Call API endpoint to update Isnotification:false and null on the Notificationtoken! when user disabled our mini app"
+        // );
       });
 
       sdk.on("primaryButtonClicked", () => {
@@ -320,7 +305,7 @@ export function HomeTab() {
 
       const ethereumProvider = await sdk.wallet.getEthereumProvider();
       ethereumProvider?.on("chainChanged", (chainId) => {
-        console.log("[ethereumProvider] chainChanged", chainId);
+        // console.log("[ethereumProvider] chainChanged", chainId);
       });
       ethereumProvider?.on("connect", (connectInfo) => {
         console.log("[ethereumProvider] connect", connectInfo);
@@ -345,11 +330,11 @@ export function HomeTab() {
       if (result.notificationDetails) {
         setNotificationDetails(result.notificationDetails);
       }
-      console.log(
-        "Result of notification:",
-        result.notificationDetails?.token,
-        result.notificationDetails?.url
-      );
+      // console.log(
+      //   "Result of notification:",
+      //   result.notificationDetails?.token,
+      //   result.notificationDetails?.url
+      // );
       setAddFrameResult(
         result.notificationDetails
           ? `Added, got notificaton token ${result.notificationDetails.token} and url ${result.notificationDetails.url}`
@@ -382,147 +367,6 @@ export function HomeTab() {
     }
   }, []);
 
-  // const handleNotification = useCallback(async () => {
-  //   if (!context?.user?.fid) return;
-  //   try {
-  //     setNotificationState((prev) => ({ ...prev, sendStatus: "", isEnabling: true }));
-  //     if (actions?.addMiniApp) {
-  //       await actions.addMiniApp();
-  //       console.log("Mini app added, waiting for notification details...");
-  //       const details = await waitForNotificationDetails();
-  //       console.log("Notification details received:", details);
-  //       try {
-  //         console.log("Sending notification to fid:", context.user.fid);
-  //         const response = await fetch("/api/send-notification", {
-  //           method: "POST",
-  //           mode: "same-origin",
-  //           headers: { "Content-Type": "application/json" },
-  //           body: JSON.stringify({
-  //             fid: context.user.fid,
-  //             notificationDetails: details || undefined,
-  //             title: "Welcome to DCA Agent 🥳",
-  //             body: "We'll keep you updated on your plan performance.🔔",
-  //           }),
-  //         });
-  //         const json = await response.json().catch(() => null);
-  //         if (response.status === 200) {
-  //           setNotificationState((prev) => ({
-  //             ...prev,
-  //             sendStatus: "Success",
-  //             isEnabling: false,
-  //           }));
-  //           return;
-  //         } else if (response.status === 429) {
-  //           setNotificationState((prev) => ({
-  //             ...prev,
-  //             sendStatus: "Rate limited",
-  //             isEnabling: false,
-  //           }));
-  //           return;
-  //         }
-  //         const responseText = json ? JSON.stringify(json) : await response.text();
-  //         setNotificationState((prev) => ({
-  //           ...prev,
-  //           sendStatus: `Error: ${responseText}`,
-  //           isEnabling: false,
-  //         }));
-  //       } catch (error) {
-  //         setNotificationState((prev) => ({
-  //           ...prev,
-  //           sendStatus: `Error: ${error}`,
-  //           isEnabling: false,
-  //         }));
-  //       }
-  //     }
-  //   } catch (e) {
-  //     setNotificationState((prev) => ({ ...prev, sendStatus: "Failed", isEnabling: false }));
-  //   }
-  // }, [actions, context, waitForNotificationDetails]);
-
-  // const sendFarcasterNotification = useCallback(async () => {
-  //   setNotificationState((prev) => ({ ...prev, sendStatus: "" }));
-  //   if (!notificationDetails || !context) {
-  //     return;
-  //   }
-  //   try {
-  //     const response = await fetch("/api/send-notification", {
-  //       method: "POST",
-  //       mode: "same-origin",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify({
-  //         fid: context.user.fid,
-  //         notificationDetails,
-  //       }),
-  //     });
-  //     if (response.status === 200) {
-  //       setNotificationState((prev) => ({ ...prev, sendStatus: "Success" }));
-  //       return;
-  //     } else if (response.status === 429) {
-  //       setNotificationState((prev) => ({
-  //         ...prev,
-  //         sendStatus: "Rate limited",
-  //       }));
-  //       return;
-  //     }
-  //     const responseText = await response.text();
-  //     setNotificationState((prev) => ({
-  //       ...prev,
-  //       sendStatus: `Error: ${responseText}`,
-  //     }));
-  //   } catch (error) {
-  //     setNotificationState((prev) => ({
-  //       ...prev,
-  //       sendStatus: `Error: ${error}`,
-  //     }));
-  //   }
-  // }, [context, notificationDetails]);
-
-  // const handleNotification = async () => {
-  //   // rely solely on SDK state
-
-  //   // Farcaster SDK logic
-  //   if (!isSDKLoaded) {
-  //     console.log("SDK not loaded yet.");
-  //     return;
-  //   }
-  //   if (!context?.user?.fid) return;
-
-  //   try {
-  //     setIsNotificationResolving(true);
-  //     if (actions?.addMiniApp) {
-  //       await actions.addMiniApp();
-  //       console.log("Mini app add requested, waiting for enablement...");
-  //     }
-  //     // Wait until SDK reflects enabled state, then send notification once
-  //     const ready = await waitForNotificationEnablement();
-  //     console.log("Notification enablement status:", ready);
-  //     if (!ready) {
-  //       console.log("Notifications not confirmed within timeout.");
-  //     }
-  //     console.log("Sending notification to fid:", context.user.fid);
-  //     const details = await waitForNotificationDetails();
-  //     console.log("Using details:", details);
-  //     const response = await fetch("/api/send-notification", {
-  //       method: "POST",
-  //       mode: "same-origin",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify({
-  //         fid: context.user.fid,
-  //         notificationDetails: details,
-  //         title: "Welcome to DCA Agent 🥳",
-  //         body: "We'll keep you updated on your plan performance.🔔",
-  //       }),
-  //     });
-  //     await response.json().catch(() => null);
-  //     setShowNotificationPrompt(false);
-  //     setNotificationsEnabledBadge(true);
-  //     setIsNotificationResolving(false);
-  //   } catch (err) {
-  //     console.log("Error enabling notifications:", err);
-  //     setIsNotificationResolving(false);
-  //   }
-  // };
-
     const handleNotification = async (fidParam?: number, detailsParam?: MiniAppNotificationDetails | null) => {
     // rely solely on SDK/context values if params not provided
 
@@ -534,12 +378,12 @@ export function HomeTab() {
       const fid = ctx.user?.fid;
       const details = detailsParam ?? notificationDetails ?? null;
       if (!fid) {
-        console.log("No fid available to send notification.");
+        // console.log("No fid available to send notification.");
         setIsNotificationResolving(false);
         return;
       }
 
-      console.log("Sending notification to fid:", fid);
+      // console.log("Sending notification to fid:", fid);
       const response = await fetch("/api/send-notification", {
         method: "POST",
         mode: "same-origin",
@@ -592,9 +436,9 @@ export function HomeTab() {
 
       // Check if notifications are enabled
       if (notificationDetails) {
-        console.log("Notifications are enabled.");
-        console.log("Notification token:", notificationDetails.token);
-        console.log("Notification URL:", notificationDetails.url);
+        // console.log("Notifications are enabled.");
+        // console.log("Notification token:", notificationDetails.token);
+        // console.log("Notification URL:", notificationDetails.url);
         setHasNotifications(true);
       } else {
         console.log("Notifications are NOT enabled.");
@@ -626,7 +470,7 @@ export function HomeTab() {
       setTotalInvested(calculateTotalInvested(plans));
       // Compute USD value across plans using CoinGecko
       try {
-        console.log('plans in computePlansInvestedUsd', plans);
+        // console.log('plans in computePlansInvestedUsd', plans);
         const usd = await computePlansInvestedUsd(
           plans.map((p) => ({
             fromToken: p.fromToken,
@@ -752,7 +596,7 @@ export function HomeTab() {
 
       // First, delete the TriggerX job if it exists
       if (plan.jobId) {
-        console.log("🗑️ Deleting TriggerX job:", plan.jobId);
+        // console.log("🗑️ Deleting TriggerX job:", plan.jobId);
         // Obtain ethers signer (prefer Wagmi transport, fallback to window.ethereum)
         let signer: any = null;
         try {
@@ -762,9 +606,9 @@ export function HomeTab() {
             wagmiWalletClient?.transport &&
             (wagmiWalletClient.transport as any).request
           ) {
-            console.log(
-              "Using Wagmi transport to create provider for deletion"
-            );
+            // console.log(
+            //   "Using Wagmi transport to create provider for deletion"
+            // );
             const provider: any = new BrowserProvider(
               wagmiWalletClient.transport as any
             );
@@ -804,7 +648,7 @@ export function HomeTab() {
           setIsDeleting(false);
           return;
         }
-        console.log("Signer obtained for deletion:", signer);
+        // console.log("Signer obtained for deletion:", signer);
 
         // Use Arbitrum chainId by default
         const deleteJobResult = await deleteTriggerXJobForPlan(
@@ -814,7 +658,7 @@ export function HomeTab() {
         );
 
         if (deleteJobResult.success) {
-          console.log("✅ TriggerX job deleted successfully");
+          // console.log("✅ TriggerX job deleted successfully");
 
           // Update the plan's jobId to null in the backend
           const updateSuccess = await updatePlanJobId(
@@ -822,7 +666,7 @@ export function HomeTab() {
             plan.jobId
           );
           if (updateSuccess) {
-            console.log("✅ Plan jobId updated to null successfully");
+            // console.log("✅ Plan jobId updated to null successfully");
             await fetchUserData(); // Refresh data
             setShowPlanModal(false); // Close modal
             setIsDeleting(false);

@@ -17,7 +17,6 @@ export function Header({ neynarUser }: HeaderProps) {
   const { context } = useMiniApp();
   const router = useRouter();
   const pathname = usePathname();
-  console.log(context?.user.pfpUrl);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   
   const isOnChatPage = pathname === '/chat';

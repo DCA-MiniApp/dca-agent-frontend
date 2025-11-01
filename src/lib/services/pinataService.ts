@@ -119,7 +119,7 @@ export class PinataService {
     metadata?: PinataMetadata
   ): Promise<PinataUploadResult> {
     try {
-      console.log('📤 Uploading JSON to Pinata IPFS');
+      // console.log('📤 Uploading JSON to Pinata IPFS');
 
       const jsonString = JSON.stringify(jsonData, null, 2);
 

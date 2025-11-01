@@ -110,12 +110,12 @@ export async function fetchUserDCAPlans(userAddress: string): Promise<DCAPlan[]>
     });
     // console.log("response", await response.json());
     const result: ApiResponse<DCAPlan[]> = await response.json();
-    console.log("result in fetchUserDCAPlans", result);
+    // console.log("result in fetchUserDCAPlans", result);
 
     if (result.success && result.data) {
      
       result.data.forEach((plan: any) => {
-        console.log("plan in fetchUserDCAPlans", plan?.jobData?.data?.taskData);
+        // console.log("plan in fetchUserDCAPlans", plan?.jobData?.data?.taskData);
         // Get jobStatus from jobData.data.jobData.status
         plan.jobStatus = plan?.jobData?.data?.jobData?.status || plan?.jobData?.data?.status || null;
         const taskData = plan?.jobData?.data?.taskData;
@@ -123,7 +123,7 @@ export async function fetchUserDCAPlans(userAddress: string): Promise<DCAPlan[]>
           plan.successCount = taskData.filter((t: any) => t.task_status === 'completed').length;
         }
       });
-      console.log("result.data in fetchUserDCAPlans", result.data);
+      // console.log("result.data in fetchUserDCAPlans", result.data);
       return result.data;
     } else {
       console.error('Failed to fetch DCA plans:', result.message);
@@ -250,14 +250,14 @@ export async function fetchJobSuccessCount(jobId: string): Promise<number | null
     `${API_BASE_URL}/api/dca/job/${jobId}/success-count`,
     `${API_BASE_URL}/job/${jobId}/success-count`,
   ];
-  console.log("paths", paths);
+  // console.log("paths", paths);
 
   for (const url of paths) {
     try {
       const response = await fetch(url, { headers: { Accept: 'application/json' } });
       if (!response.ok) continue;
       const result: ApiResponse<JobSuccessCountData> = await response.json();
-      console.log("result", result.data);
+      // console.log("result", result.data);
       if (result.success && result.data) return result.data.successCount;
     } catch (err) {
       console.log("Error fetching job success count from", url, ":", err);
@@ -272,7 +272,7 @@ export async function fetchJobSuccessCount(jobId: string): Promise<number | null
  */
 export async function updatePlanJobId(userAddress: string, jobId: string): Promise<boolean> {
   try {
-    console.log("Updating jobId to null for user:", userAddress, "jobId:", jobId);
+    // console.log("Updating jobId to null for user:", userAddress, "jobId:", jobId);
     const response = await fetch(`${API_BASE_URL}/api/dca/jobupdate/${userAddress}`, {
       method: 'PUT',
       headers: {
@@ -295,10 +295,10 @@ export async function updatePlanJobId(userAddress: string, jobId: string): Promi
 export function calculateTotalInvested(plans: DCAPlan[]): number {
   // console.log("Line number 167 plans:", plans)
   return plans.reduce((total, plan) => {
-    console.log("Amount plan:",plan.amount);
+    // console.log("Amount plan:",plan.amount);
     const amount = parseFloat(plan.amount);
-    console.log("Line number 169 amoutn:",amount)
-    console.log("Total:",total+(amount*plan.executionCount));
+    // console.log("Line number 169 amoutn:",amount)
+    // console.log("Total:",total+(amount*plan.executionCount));
     return total + (amount * plan.executionCount);
   }, 0);
 }

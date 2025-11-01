@@ -207,7 +207,7 @@ Extract any new DCA parameters from this message and provide the next question f
       }
 
       // Clean and parse GPT response
-      console.log("[GPT Intelligence] Raw GPT response:", gptResponse);
+      // console.log("[GPT Intelligence] Raw GPT response:", gptResponse);
 
       let cleanedResponse = gptResponse.trim();
 
@@ -232,7 +232,7 @@ Extract any new DCA parameters from this message and provide the next question f
         }
       }
 
-      console.log("[GPT Intelligence] Cleaned response:", cleanedResponse);
+      // console.log("[GPT Intelligence] Cleaned response:", cleanedResponse);
 
       const parsed = JSON.parse(cleanedResponse);
       const updatedPlanData = { ...currentPlanData, ...parsed.extractedData };

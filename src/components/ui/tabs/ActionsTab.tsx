@@ -171,7 +171,6 @@ export function ActionsTab() {
   const handleShareNow = useCallback(async (text: string) => {
     try {
       if ((sdk as any)?.actions?.composeCast) {
-        console.log("Sharing cast", text);
         await (sdk as any).actions.composeCast({ text });
       } else if (typeof window !== "undefined") {
         const url = `https://warpcast.com/~/compose?text=${encodeURIComponent(
@@ -319,7 +318,6 @@ export function ActionsTab() {
       timestamp: new Date(),
     };
 
-    console.log("userMessage", userMessage);
 
     setMessages((prev) => [...prev, userMessage]);
     const currentInput = inputMessage;
@@ -364,7 +362,6 @@ export function ActionsTab() {
       }
 
       const result = await response.json();
-      console.log("DCA Chat API response:", result);
 
       if (result.success) {
         // Set connected status on successful response
@@ -431,7 +428,7 @@ export function ActionsTab() {
   // --- Chat Action Handlers ---
   const handleChatAction = useCallback(
     (action: string, data?: any, messageId?: string) => {
-      console.log("Handling chat action:", action, data, messageId);
+      // console.log("Handling chat action:", action, data, messageId);
 
       switch (action) {
         case "request_wallet_connection":
@@ -450,7 +447,7 @@ export function ActionsTab() {
         case "collect_plan_data":
           // Plan data collection in progress - no special handling needed
           // The response message already guides the user for next input
-          console.log("Action: Collecting plan data", data);
+          // console.log("Action: Collecting plan data", data);
           break;
 
         case "plan_created":
@@ -558,211 +555,6 @@ export function ActionsTab() {
     }
   }, [approvalError]);
 
-  // Proceed with plan creation after approval
-  // const proceedWithPlanCreation = useCallback(
-  //   async (confirmationId: string) => {
-  //     try {
-  //       console.log(
-  //         "[Confirmation] Creating plan after approval:",
-  //         confirmationId
-  //       );
-
-  //       setIsPlanCreationLoading(true);
-
-  //       // Add loading message for plan creation
-  //       const loadingMessage: ChatMessage = {
-  //         id: Date.now().toString(),
-  //         role: "assistant",
-  //         content: " Creating your DCA plan...",
-  //         timestamp: new Date(),
-  //         isCreatingPlan: true,
-  //       };
-  //       setMessages((prev) => [...prev, loadingMessage]);
-
-  //       // Call the API with confirmation
-  //       const response = await fetch("/api/dca-chat", {
-  //         method: "POST",
-  //         headers: {
-  //           "Content-Type": "application/json",
-  //         },
-  //         body: JSON.stringify({
-  //           message: "", // Empty message for confirmation actions
-  //           userAddress: address,
-  //           confirmationId: confirmationId,
-  //           action: "confirm",
-  //         }),
-  //       });
-
-  //       if (!response.ok) {
-  //         throw new Error(`API error: ${response.status}`);
-  //       }
-
-  //       const result = await response.json();
-  //       console.log("Plan confirmation response:", result);
-
-  //       // Check if plan was created successfully
-  //       if (result.success && result.data) {
-  //         const planId = result.data.agentResponse.id;
-  //         console.log("Plan created successfully:", planId);
-
-  //         // TriggerX Job Creation - Create automated job after plan creation
-  //         try {
-  //           console.log("Come to line number 574...");
-  //           const { createTriggerXJobForPlan } = await import('../../../lib/triggerXIntegration');
-  //           console.log("Imported createTriggerXJobForPlan:", createTriggerXJobForPlan);
-
-  //           // Build ethers signer preferring Wagmi transport (no popup), fallback to window.ethereum
-  //           let ethersSigner: any = null;
-  //           try {
-  //             const { BrowserProvider } = await import('ethers');
-
-  //             // 1) Prefer Wagmi transport if available
-  //             if (walletClient?.transport && (walletClient.transport as any).request) {
-  //               console.log("Creating provider from Wagmi transport");
-  //               const eip1193 = { request: walletClient.transport.request } as any;
-  //               const provider = new BrowserProvider(eip1193, walletClient.chain?.id);
-  //               ethersSigner = await Promise.race([
-  //                 provider.getSigner(walletClient.account?.address),
-  //                 new Promise((_, reject) => setTimeout(() => reject(new Error('getSigner (wagmi) timeout after 10s')), 10000)) as Promise<any>,
-  //               ]);
-  //               console.log("Obtained ethers signer via Wagmi:", await ethersSigner.getAddress());
-  //             }
-
-  //             // 2) Fallback to window.ethereum
-  //             if (!ethersSigner && typeof window !== 'undefined' && (window as any).ethereum) {
-  //               console.log("Creating provider from window.ethereum");
-  //               const provider = new BrowserProvider((window as any).ethereum);
-  //               const accounts: any[] = await Promise.race([
-  //                 provider.send('eth_accounts', []),
-  //                 new Promise((_, reject) => setTimeout(() => reject(new Error('eth_accounts timeout after 5s')), 5000)) as Promise<any>,
-  //               ]).catch(() => []);
-  //               if (!accounts || accounts.length === 0) {
-  //                 console.log("No accounts, requesting via eth_requestAccounts...");
-  //                 await Promise.race([
-  //                   provider.send('eth_requestAccounts', []),
-  //                   new Promise((_, reject) => setTimeout(() => reject(new Error('eth_requestAccounts timeout after 15s')), 15000)) as Promise<any>,
-  //                 ]);
-  //               }
-  //               ethersSigner = await Promise.race([
-  //                 provider.getSigner(0),
-  //                 new Promise((_, reject) => setTimeout(() => reject(new Error('getSigner timeout after 10s')), 10000)) as Promise<any>,
-  //               ]);
-  //               console.log("Obtained ethers signer via window.ethereum:", await ethersSigner.getAddress());
-  //             }
-  //           } catch (walletErr) {
-  //             console.error('Failed to obtain ethers signer:', walletErr);
-  //             ethersSigner = null;
-  //           }
-
-  //           if (!ethersSigner) {
-  //             console.warn('⚠️ Wallet not connected, skipping TriggerX job creation');
-  //           } else {
-  //             console.log('🚀 Creating TriggerX job for plan:', planId);
-  //             console.log("Ethers signer:", ethersSigner);
-
-  //             // Create TriggerX job with real signer
-  //             const triggerXResult = await createTriggerXJobForPlan({
-  //               planId: result.data.agentResponse.id,
-  //               userAddress: result.data.agentResponse.userAddress,
-  //               fromToken: result.data.agentResponse.fromToken,
-  //               toToken: result.data.agentResponse.toToken,
-  //               amount: result.data.agentResponse.amount,
-  //               intervalMinutes: result.data.agentResponse.intervalMinutes,
-  //               durationWeeks: result.data.agentResponse.durationWeeks,
-  //               slippage: result.data.agentResponse.slippage,
-  //               signer: ethersSigner,
-  //             });
-
-  //             console.log("TriggerX result:", triggerXResult);
-
-  //             if (triggerXResult.success) {
-  //               console.log('✅ TriggerX job created successfully:', triggerXResult.jobId);
-
-  //               // Add success message about automation
-  //               const automationMessage: ChatMessage = {
-  //                 id: Date.now().toString(),
-  //                 role: "assistant",
-  //                 content: `🚀 **Automation Setup Complete!**\n\n✅ TriggerX Job ID: ${triggerXResult.jobId}\n📜 Script IPFS: ${triggerXResult.scriptIpfsUrl}\n\nYour DCA plan is now fully automated and will execute according to your schedule.`,
-  //                 timestamp: new Date(),
-  //               };
-  //               setMessages((prev) => [...prev, automationMessage]);
-  //             } else {
-  //               console.error('❌ TriggerX job creation failed:', triggerXResult.error);
-
-  //               // Add error message about automation failure
-  //               const automationErrorMessage: ChatMessage = {
-  //                 id: Date.now().toString(),
-  //                 role: "assistant",
-  //                 content: `⚠️ **Plan Created but Automation Failed**\n\nYour DCA plan was created successfully, but we couldn't set up automation:\n${triggerXResult.error}\n\nYou can manually execute swaps or try setting up automation later.`,
-  //                 timestamp: new Date(),
-  //               };
-  //               setMessages((prev) => [...prev, automationErrorMessage]);
-  //             }
-  //           }
-  //         } catch (triggerXError) {
-  //           console.error('❌ TriggerX integration error:', triggerXError);
-
-  //           // Add error message about automation failure
-  //           const automationErrorMessage: ChatMessage = {
-  //             id: Date.now().toString(),
-  //             role: "assistant",
-  //             content: `⚠️ **Plan Created but Automation Setup Failed**\n\nYour DCA plan was created successfully, but we encountered an error setting up automation. You can manually execute swaps for now.`,
-  //             timestamp: new Date(),
-  //           };
-  //           setMessages((prev) => [...prev, automationErrorMessage]);
-  //         }
-  //       }
-  //       console.log("Actual response content:", result.response);
-
-  //       if (result.success) {
-  //         // Remove loading message and show success
-  //         setMessages((prev) => prev.filter((msg) => !msg.isCreatingPlan));
-
-  //         // Show the actual response from the backend/SSE
-  //         const confirmationMessage: ChatMessage = {
-  //           id: Date.now().toString(),
-  //           role: "assistant",
-  //           content:
-  //             result.response ||
-  //             "🎉 DCA plan created successfully!\n\nYour automated investment strategy is now active and will execute according to your schedule.",
-  //           timestamp: new Date(),
-  //         };
-  //         setMessages((prev) => [...prev, confirmationMessage]);
-
-  //         // Handle action response
-  //         if (result.action) {
-  //           handleChatAction(result.action, result.data);
-  //         }
-  //       } else {
-  //         throw new Error(result.error || "Failed to create plan");
-  //       }
-  //     } catch (error) {
-  //       console.error("Error creating plan:", error);
-
-  //       // Remove loading message
-  //       setMessages((prev) => prev.filter((msg) => !msg.isCreatingPlan));
-
-  //       const errorMessage: ChatMessage = {
-  //         id: Date.now().toString(),
-  //         role: "assistant",
-  //         content:
-  //           "❌ Sorry, I encountered an error while creating your plan. Please try again.",
-  //         timestamp: new Date(),
-  //       };
-  //       setMessages((prev) => [...prev, errorMessage]);
-  //     } finally {
-  //       setIsPlanCreationLoading(false);
-  //       setIsApprovalLoading(false);
-  //       setApprovalStatus("idle");
-  //       setCurrentPlanData(null);
-  //       setIsInPlanCreationFlow(false);
-  //       setPendingConfirmationId(null);
-  //       setConfirmationStep("summary");
-  //     }
-  //   },
-  //   [address, handleChatAction]
-  // );
-
   const proceedWithPlanCreation = useCallback(
     async (confirmationId: string) => {
       try {
@@ -803,20 +595,19 @@ export function ActionsTab() {
         }
 
         const result = await response.json();
-        console.log("Plan confirmation response:", result);
 
         // Check if plan was created successfully
         if (result.success && result.data) {
           const planId = result.data.agentResponse.id;
-          console.log("Plan created successfully:", planId);
+          // console.log("Plan created successfully:", planId);
 
           // TriggerX Job Creation - Create automated job after plan creation
           try {
-            console.log("Starting TriggerX integration...");
+            // console.log("Starting TriggerX integration...");
             const { createTriggerXJobForPlan } = await import(
               "../../../lib/triggerXIntegration"
             );
-            console.log("Imported createTriggerXJobForPlan successfully");
+            // console.log("Imported createTriggerXJobForPlan successfully");
 
             // Build ethers signer with improved reliability
             let ethersSigner: any = null;
@@ -826,9 +617,9 @@ export function ActionsTab() {
 
               // Strategy 1: Try Wagmi transport first (preferred - no popup)
               if (walletClient?.account?.address && walletClient?.transport) {
-                console.log(
-                  "Attempting to create signer via Wagmi transport..."
-                );
+                // console.log(
+                //   "Attempting to create signer via Wagmi transport..."
+                // );
 
                 try {
                   const transportRequest = (walletClient.transport as any)
@@ -856,10 +647,10 @@ export function ActionsTab() {
                     ]);
 
                     const signerAddress = await ethersSigner.getAddress();
-                    console.log(
-                      "✅ Successfully obtained signer via Wagmi:",
-                      signerAddress
-                    );
+                    // console.log(
+                    //   "✅ Successfully obtained signer via Wagmi:",
+                    //   signerAddress
+                    // );
                   }
                 } catch (wagmiError) {
                   console.warn("⚠️ Wagmi transport failed:", wagmiError);
@@ -873,9 +664,6 @@ export function ActionsTab() {
                 typeof window !== "undefined" &&
                 (window as any).ethereum
               ) {
-                console.log(
-                  "Attempting to create signer via window.ethereum..."
-                );
 
                 try {
                   const provider = new BrowserProvider(
@@ -901,9 +689,9 @@ export function ActionsTab() {
 
                   // Request accounts if not available (this may show popup)
                   if (!accounts || accounts.length === 0) {
-                    console.log(
-                      "No accounts found, requesting via eth_requestAccounts..."
-                    );
+                    // console.log(
+                    //   "No accounts found, requesting via eth_requestAccounts..."
+                    // );
 
                     // Add user-facing message about wallet approval
                     const approvalMessage: ChatMessage = {
@@ -983,8 +771,8 @@ export function ActionsTab() {
               ]);
             } else {
               // Signer obtained successfully, create TriggerX job
-              console.log("🚀 Creating TriggerX job for plan:", planId);
-              console.log("Agent response:", result.data.agentResponse);
+              // console.log("🚀 Creating TriggerX job for plan:", planId);
+              // console.log("Agent response:", result.data.agentResponse);
 
               const triggerXResult = await createTriggerXJobForPlan({
                 planId: result.data.agentResponse.id,
@@ -999,13 +787,13 @@ export function ActionsTab() {
                 fid: context?.user?.fid || 727291,
               });
 
-              console.log("TriggerX result:", triggerXResult);
+              // console.log("TriggerX result:", triggerXResult);
 
               if (triggerXResult.success) {
-                console.log(
-                  "✅ TriggerX job created successfully:",
-                  triggerXResult.jobId
-                );
+                // console.log(
+                //   "✅ TriggerX job created successfully:",
+                //   triggerXResult.jobId
+                // );
 
                 // Add success message about automation
                 const shareText = `Just automated my crypto strategy with DCA Agent 🚀  
@@ -1063,7 +851,7 @@ export function ActionsTab() {
           }
         }
 
-        console.log("Actual response content:", result.response);
+        // console.log("Actual response content:", result.response);
 
         if (result.success) {
           // Remove loading messages and show success
@@ -1126,7 +914,7 @@ export function ActionsTab() {
         return;
       }
 
-      console.log("Plan data", planData);
+      // console.log("Plan data", planData);
 
       // --- Helpers to normalize user-provided interval/duration into minutes ---
       function parseIntervalToMinutes(interval: any): number {
@@ -1176,14 +964,14 @@ export function ActionsTab() {
 
       try {
         const intervalMinutes = parseIntervalToMinutes(planData.interval);
-        console.log("intervalMinutes", intervalMinutes);
+        // console.log("intervalMinutes", intervalMinutes);
         const durationMinutes = parseDurationToMinutes(planData.duration);
-        console.log("durationMinutes", durationMinutes);
+        // console.log("durationMinutes", durationMinutes);
         const amountPerExecutionStr = String(planData.amount ?? "").trim();
-        console.log("amountPerExecutionStr", amountPerExecutionStr);
+        // console.log("amountPerExecutionStr", amountPerExecutionStr);
         const decimals =
           typeof tokenInfo.decimals === "number" ? tokenInfo.decimals : 18;
-        console.log("decimals", decimals);
+        // console.log("decimals", decimals);
         // Validate before proceeding
         if (
           !amountPerExecutionStr ||
@@ -1212,11 +1000,11 @@ export function ActionsTab() {
 
         // Compute total executions
         const totalExecutions = Math.floor(durationMinutes / intervalMinutes);
-        console.log("totalExecutions", totalExecutions);
+        // console.log("totalExecutions", totalExecutions);
         // Compute approval amount
         const amountWeiPerExec = parseUnits(amountPerExecutionStr, decimals);
         const totalAmountWei = amountWeiPerExec * BigInt(totalExecutions);
-        console.log("totalAmountWei", totalAmountWei);
+        // console.log("totalAmountWei", totalAmountWei);
         // Show approval request message
         const approvalMessage: ChatMessage = {
           id: Date.now().toString(),
@@ -1235,13 +1023,13 @@ export function ActionsTab() {
         setPendingConfirmationId(confirmationId);
         setIsApprovalLoading(true);
 
-        console.log("[Approval] Starting token approval process:", {
-          token: tokenInfo.symbol,
-          amountPerExecution: amountPerExecutionStr,
-          totalExecutions,
-          decimals,
-          totalAmountWei: totalAmountWei.toString(),
-        });
+        // console.log("[Approval] Starting token approval process:", {
+        //   token: tokenInfo.symbol,
+        //   amountPerExecution: amountPerExecutionStr,
+        //   totalExecutions,
+        //   decimals,
+        //   totalAmountWei: totalAmountWei.toString(),
+        // });
 
         // Trigger wallet approval popup with dynamic total amount
         writeContract({
@@ -1294,7 +1082,7 @@ export function ActionsTab() {
       setIsPlanCreationLoading(true);
 
       try {
-        console.log("[Confirmation] Cancelling plan creation:", confirmationId);
+        // console.log("[Confirmation] Cancelling plan creation:", confirmationId);
 
         // Call the API with cancellation
         const response = await fetch("/api/dca-chat", {
@@ -1315,7 +1103,7 @@ export function ActionsTab() {
         }
 
         const result = await response.json();
-        console.log("Plan cancellation response:", result);
+        // console.log("Plan cancellation response:", result);
 
         if (result.success) {
           const cancellationMessage: ChatMessage = {
