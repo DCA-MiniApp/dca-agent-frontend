@@ -55,14 +55,6 @@ export function Header({ neynarUser }: HeaderProps) {
             </span>
           </div>
         </div>
-        {/* Attribution pill - aligned left, offset on chat to avoid back button */}
-        <div className={`absolute top-1/2 -translate-y-1/2 pointer-events-none select-none ${isOnChatPage ? 'left-28' : 'left-4'}`}>
-          <div className="pointer-events-auto rounded-full border border-white/15 bg-black/40 backdrop-blur-md text-white/80 text-[10px] sm:text-xs px-2.5 py-1 shadow-lg">
-            <span className="whitespace-nowrap">
-              Protected by <span className="font-semibold text-white">TriggerX</span> · Powered by <span className="font-semibold text-white">Vibekit</span> · <span className="font-semibold text-[#c199e4]">Arbitrum One</span>
-            </span>
-          </div>
-        </div>
         {context?.user && (
           <div 
             className="cursor-pointer"

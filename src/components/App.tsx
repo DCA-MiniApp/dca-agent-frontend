@@ -170,7 +170,7 @@ export default function App(
       </div>
 
       {/* Main content - Scrollable between header and footer */}
-      <div className="absolute top-16 left-0 right-0 bottom-36 overflow-y-auto z-10">
+      <div className="absolute top-16 left-0 right-0 bottom-48 overflow-y-auto z-10">
         <div className="px-4 py-4">
           {/* Main title */}
           {/* <h1 className="text-2xl font-bold text-center mb-6 text-white">{title}</h1> */}
@@ -273,8 +273,8 @@ export default function App(
         )}
       </AnimatePresence>
 
-      {/* Footer - Fixed at bottom */}
-      <div className="fixed bottom-0 left-0 right-0 h-36 mt-8 z-40">
+      {/* Footer - Fixed at bottom with increased height for attribution */}
+      <div className="fixed bottom-0 left-0 right-0 h-48 z-40">
         <Footer
           activeTab={currentTab as Tab}
           setActiveTab={handleTabChange}
