@@ -75,10 +75,10 @@ export const APP_SPLASH_BACKGROUND_COLOR: string = '#f7f7f7';
  */
 export const APP_ACCOUNT_ASSOCIATION: AccountAssociation | undefined = {
   header:
-    'eyJmaWQiOjcyNzI5MSwidHlwZSI6ImF1dGgiLCJrZXkiOiIweGJiOEJiYzQ1OTlENzcyRjA2Qzc3NjczMTM5NkFEMTk4QzRCRGUxMDUifQ',
-  payload: 'eyJkb21haW4iOiJkY2FhZ2VudC52ZXJjZWwuYXBwIn0',
+    'eyJmaWQiOjg2MDAwMSwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDlDNDgyMDJBMkU5MGZFMzdkNjNiMWFjRmQ4NjJiQTgwREFCNTdCMDQifQ',
+  payload: 'eyJkb21haW4iOiJkY2EubGFtcHJvc2Rhby5jb20ifQ',
   signature:
-    'ebsmK4L7NwJj/wORDBwbNd43OS6oDolD+hbNkdkDek9VIZ6qPe2yducwXjKxCMX0Zu/n6S2WBCNJ80BzoH+NWhs=',
+    'JT/BOe0YBS5xaEzhfmEVQhFXt+Njujkazp9NFYDcdY9Mh2331rlSZRSyFD3JNT9lqXORI3W4spxbqasYLZbu2hw=',
 };
 
 // --- UI Configuration ---

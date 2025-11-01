@@ -1638,16 +1638,18 @@ export function HomeTab() {
                   <div>
                     <span
                       className={`text-xs font-bold px-4 py-2 rounded-full transition-all duration-300 ${
-                        userPlans[currentPlanIndex].status === "ACTIVE"
+                        userPlans[currentPlanIndex].jobStatus === "completed"
                           ? "bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30"
-                          : userPlans[currentPlanIndex].status === "PAUSED"
-                          ? "bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 group-hover:bg-yellow-400/30"
-                          : userPlans[currentPlanIndex].status === "completed"
+                          : userPlans[currentPlanIndex].jobStatus === "running"
                           ? "bg-blue-400/20 text-blue-300 border border-blue-400/40 group-hover:bg-blue-400/30"
+                          : userPlans[currentPlanIndex].jobStatus === "pending"
+                          ? "bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 group-hover:bg-yellow-400/30"
+                          : userPlans[currentPlanIndex].jobStatus === "deleted"
+                          ? "bg-red-400/20 text-red-300 border border-red-400/40 group-hover:bg-red-400/30"
                           : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
                       }`}
                     >
-                      {userPlans[currentPlanIndex].status}
+                      {userPlans[currentPlanIndex].jobStatus || userPlans[currentPlanIndex].status || "Unknown"}
                     </span>
                   </div>
                 </div>
@@ -1846,16 +1848,18 @@ export function HomeTab() {
                 <div className="flex items-center gap-3">
                   <span
                     className={`text-xs font-bold px-4 py-2 rounded-full transition-all duration-300 ${
-                      selectedPlan.status === "ACTIVE"
+                      selectedPlan.jobStatus === "completed"
                         ? "bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30"
-                        : selectedPlan.status === "PAUSED"
-                        ? "bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 group-hover:bg-yellow-400/30"
-                        : selectedPlan.status === "completed"
+                        : selectedPlan.jobStatus === "running"
                         ? "bg-blue-400/20 text-blue-300 border border-blue-400/40 group-hover:bg-blue-400/30"
+                        : selectedPlan.jobStatus === "pending"
+                        ? "bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 group-hover:bg-yellow-400/30"
+                        : selectedPlan.jobStatus === "deleted"
+                        ? "bg-red-400/20 text-red-300 border border-red-400/40 group-hover:bg-red-400/30"
                         : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
                     }`}
                   >
-                    {selectedPlan.status}
+                    {selectedPlan.jobStatus || selectedPlan.status || "Unknown"}
                   </span>
                 </div>
                 <div className="flex gap-2">

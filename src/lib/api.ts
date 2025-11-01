@@ -20,6 +20,7 @@ export interface DCAPlan {
   updatedAt: string;
   vaultAddress?: string;
   shareTokens?: string;
+  jobStatus?: string;
   successCount: number;
 }
 
@@ -112,9 +113,12 @@ export async function fetchUserDCAPlans(userAddress: string): Promise<DCAPlan[]>
     console.log("result in fetchUserDCAPlans", result);
 
     if (result.success && result.data) {
+     
       result.data.forEach((plan: any) => {
-        console.log("plan in fetchUserDCAPlans", plan?.jobData.data.taskData);
-        const taskData =plan?.jobData.data.taskData;
+        console.log("plan in fetchUserDCAPlans", plan?.jobData?.data?.taskData);
+        // Get jobStatus from jobData.data.jobData.status
+        plan.jobStatus = plan?.jobData?.data?.jobData?.status || plan?.jobData?.data?.status || null;
+        const taskData = plan?.jobData?.data?.taskData;
         if (Array.isArray(taskData)) {
           plan.successCount = taskData.filter((t: any) => t.task_status === 'completed').length;
         }
