@@ -1,6 +1,7 @@
 // API utilities for DCA backend integration
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ||'https://dca-backend.udonswap.org'; // Default to production URL
+console.log("API_BASE_URL", API_BASE_URL);
 
 export interface DCAPlan {
   id: string;

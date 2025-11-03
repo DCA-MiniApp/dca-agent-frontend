@@ -166,7 +166,6 @@ export function ContextTab() {
   // Modal state
   const [selectedTx, setSelectedTx] = useState<TransactionRow | null>(null);
   const openModal = (tx: TransactionRow) => setSelectedTx(tx);
-  // console.log("Selected TX:", selectedTx);
   const closeModal = () => setSelectedTx(null);
 
   return (
