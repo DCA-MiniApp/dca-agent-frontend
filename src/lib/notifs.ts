@@ -57,9 +57,10 @@ export async function sendMiniAppNotification({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fid, // string
+          fid: String(fid),  // string
           notificationtoken: notificationDetails.token, // string
           notificationurl: notificationDetails.url, // string
+          isNotification:true
         }),
       }
     );

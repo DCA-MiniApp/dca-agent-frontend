@@ -389,7 +389,7 @@ export function HomeTab() {
         mode: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fid: String(fid),
+          fid,
           notificationDetails: details,
           title: "Welcome to DCA Agent 🥳",
           body: "We'll keep you updated on your plan performance.🔔",
