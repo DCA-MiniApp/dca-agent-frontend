@@ -247,22 +247,18 @@ export async function deletePlan(planId: string): Promise<boolean> {
  */
 export async function fetchJobSuccessCount(jobId: string): Promise<number | null> {
   if (!jobId) return null;
-  const paths = [
-    `${API_BASE_URL}/api/dca/job/${jobId}/success-count`,
-    `${API_BASE_URL}/job/${jobId}/success-count`,
-  ];
+  const path=`${API_BASE_URL}/api/dca/job/${jobId}/success-count`;
+
   // console.log("paths", paths);
 
-  for (const url of paths) {
-    try {
-      const response = await fetch(url, { headers: { Accept: 'application/json' } });
-      if (!response.ok) continue;
-      const result: ApiResponse<JobSuccessCountData> = await response.json();
-      // console.log("result", result.data);
-      if (result.success && result.data) return result.data.successCount;
-    } catch (err) {
-      console.log("Error fetching job success count from", url, ":", err);
-    }
+  try {
+    const response = await fetch(path, { headers: { Accept: 'application/json' } });
+    if (!response.ok) return null;
+    const result: ApiResponse<JobSuccessCountData> = await response.json();
+    // console.log("result in fetchJobSuccessCount", result.data);
+    if (result.success && result.data) return result.data.successCount;
+  } catch (err) {
+    console.log("Error fetching job success count from", path, ":", err);
   }
 
   return null;

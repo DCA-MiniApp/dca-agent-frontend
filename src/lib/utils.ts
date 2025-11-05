@@ -104,8 +104,6 @@ export async function fetchArbitrumUsdPrices(addresses: string[]): Promise<Recor
 }
 
 export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<number> {
-  // console.log('plans in computePlansInvestedUsd file utils...', plans);
-  // Include USDC too so we can fetch/confirm its price (fallback remains 1 if API misses it)
   const neededSymbols = Array.from(
     new Set(
       plans

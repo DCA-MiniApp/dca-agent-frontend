@@ -389,7 +389,7 @@ export function HomeTab() {
         mode: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fid,
+          fid: String(fid),
           notificationDetails: details,
           title: "Welcome to DCA Agent 🥳",
           body: "We'll keep you updated on your plan performance.🔔",
@@ -587,7 +587,6 @@ export function HomeTab() {
 
   // Calculate active and paused plans from real data
   const activePlans = userPlans.filter((plan) => plan.status === "ACTIVE");
-  const pausedPlans = userPlans.filter((plan) => plan.status === "PAUSED");
 
   // Plan actions with real API calls
   const handleDeletePlan = async (plan: DCAPlan) => {
@@ -1353,12 +1352,12 @@ export function HomeTab() {
                     {activePlans.length} Active Plans
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                {/* <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
                   <span className="text-sm text-white/90 font-medium">
                     {pausedPlans.length} Paused Plans
                   </span>
-                </div>
+                </div> */}
               </div>
             </div>
           </div>

@@ -154,11 +154,12 @@ export function ContextTab() {
   };
 
   const openTxExternal = (txUrl: string | null, fallbackHash?: string | null) => {
-    const url = txUrl && txUrl.length > 0
-      ? txUrl
-      : fallbackHash && fallbackHash.length > 0
-        ? `https://arbiscan.io/tx/${fallbackHash}`
-        : "";
+    // const url = txUrl && txUrl.length > 0
+    //   ? txUrl
+    //   : fallbackHash && fallbackHash.length > 0
+    //     ? `https://arbiscan.io/tx/${fallbackHash}`
+    //     : "";
+    const url=fallbackHash ? `https://arbiscan.io/tx/${fallbackHash}`: txUrl;   
     if (!url) return;
     window.open(url, "_blank", "noopener,noreferrer");
   };
