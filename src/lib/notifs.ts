@@ -38,7 +38,7 @@ export async function sendMiniAppNotification({
       notificationId: crypto.randomUUID(),
       title,
       body,
-      targetUrl: APP_URL,
+      targetUrl: 'https://dca.lamprosdao.com',
       tokens: [notificationDetails.token],
     } satisfies SendNotificationRequest),
   });
@@ -85,6 +85,7 @@ export async function sendMiniAppNotification({
     return { state: "success" };
   } else {
     // Error response
+    console.error("Notification send error:", response.status, responseJson);
     return { state: "error", error: responseJson };
   }
 }
