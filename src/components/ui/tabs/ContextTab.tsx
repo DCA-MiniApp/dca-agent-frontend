@@ -115,6 +115,7 @@ export function ContextTab() {
   const [endDate, setEndDate] = useState<string>("");
   const [fromTokenSearch, setFromTokenSearch] = useState<string>("");
   const [toTokenSearch, setToTokenSearch] = useState<string>("");
+  const [taskIdSearch, setTaskIdSearch] = useState<string>("");
 
   // Pagination
   const [page, setPage] = useState<number>(1);
@@ -133,9 +134,13 @@ export function ContextTab() {
         const toTokenLower = tx.toToken.toLowerCase();
         if (!toTokenLower.includes(toTokenSearch.toLowerCase())) return false;
       }
+      if (taskIdSearch) {
+        const taskIdStr = String(tx.taskId);
+        if (!taskIdStr.includes(taskIdSearch.trim())) return false;
+      }
       return true;
     });
-  }, [transactions, endDate, startDate, statusFilter, fromTokenSearch, toTokenSearch]);
+  }, [transactions, endDate, startDate, statusFilter, fromTokenSearch, toTokenSearch, taskIdSearch]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -150,6 +155,7 @@ export function ContextTab() {
     setEndDate("");
     setFromTokenSearch("");
     setToTokenSearch("");
+    setTaskIdSearch("");
     setPage(1);
   };
 
@@ -212,7 +218,12 @@ export function ContextTab() {
                   {startDate || "…"} → {endDate || "…"}
                 </span>
               )}
-              {!fromTokenSearch && !toTokenSearch && !startDate && !endDate && statusFilter === "All" && (
+              {taskIdSearch && (
+                <span className="px-2 py-1 rounded-lg border border-[#c199e4]/30 text-white/80">
+                  Task ID: {taskIdSearch}
+                </span>
+              )}
+              {!fromTokenSearch && !toTokenSearch && !startDate && !endDate && !taskIdSearch && statusFilter === "All" && (
                 <span className="text-white/50">None</span>
               )}
             </div>
@@ -230,6 +241,28 @@ export function ContextTab() {
                 Clear
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* Task ID Search (always visible) */}
+      {!selectedTx && (
+        <div className="mb-4">
+          <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl p-4 border border-white/20">
+            <label className="text-sm text-[#c199e4]/90 mb-2 font-medium block">
+              Search by Task ID
+            </label>
+            <input
+              type="text"
+              placeholder="Enter Task ID (e.g., 12345)"
+              value={taskIdSearch}
+              onChange={(e) => {
+                setTaskIdSearch(e.target.value);
+                setPage(1);
+              }}
+              className="w-full px-4 py-2.5 bg-gradient-to-br from-[#4a2b7a]/80 to-[#341e64]/20 backdrop-blur-lg rounded-xl border border-[#4a2b7a]/80 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-[#c199e4] focus:border-[#c199e4]/50 text-sm transition-all duration-300"
+            />
           </div>
         </div>
       )}
@@ -572,11 +605,11 @@ export function ContextTab() {
                 <div className="flex items-center gap-3">
                   <span
                     className={`text-xs font-bold px-4 py-2 rounded-full transition-all duration-300 ${
-                      selectedTx.status === "SUCCESS"
+                      selectedTx.status === "completed"
                         ? "bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30"
                         : selectedTx.status === "PENDING"
                         ? "bg-blue-400/20 text-blue-300 border border-blue-400/40 group-hover:bg-blue-400/30"
-                        : selectedTx.status === "FAILED"
+                        : selectedTx.status === "failed"
                         ? "bg-red-400/20 text-red-300 border border-red-400/40 group-hover:bg-red-400/30"
                         : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
                     }`}
@@ -587,7 +620,7 @@ export function ContextTab() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => openTxExternal(selectedTx.txUrl, selectedTx.txHash)}
-                    className={`${selectedTx.status === "SUCCESS" ? "bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30" : selectedTx.status === "PENDING" ? "bg-blue-400/20 text-blue-300 border border-blue-400/40 group-hover:bg-blue-400/30" : selectedTx.status === "failed" ? "bg-red-400/20 text-red-300 border border-red-400/40 group-hover:bg-red-400/30 cursor-not-allowed" : "bg-gray-400/20 text-gray-300 border border-gray-400/40 group-hover:bg-gray-400/30"} bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-3 px-5 rounded-xl transition-all duration-300 text-xs border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg`}
+                    className={`${selectedTx.status === "success" ? "bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30" : selectedTx.status === "PENDING" ? "bg-blue-400/20 text-blue-300 border border-blue-400/40 group-hover:bg-blue-400/30" : selectedTx.status === "failed" ? "bg-red-400/20 text-red-300 border border-red-400/40 group-hover:bg-red-400/30 cursor-not-allowed" : "bg-gray-400/20 text-gray-300 border border-gray-400/40 group-hover:bg-gray-400/30"} bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-3 px-5 rounded-xl transition-all duration-300 text-xs border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg`}
                   >
                     View Explorer
                   </button>

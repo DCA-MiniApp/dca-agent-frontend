@@ -11,9 +11,9 @@ interface StatusSelectProps {
 
 const options = [
   { value: "All", label: "All Status" },
-  { value: "SUCCESS", label: "Success" },
-  { value: "PENDING", label: "Pending" },
-  { value: "FAILED", label: "Failed" },
+  { value: "completed", label: "completed" },
+  { value: "pending", label: "pending" },
+  { value: "failed", label: "failed" },
 ];
 
 export function StatusSelect({ value, onChange }: StatusSelectProps) {
@@ -22,7 +22,7 @@ export function StatusSelect({ value, onChange }: StatusSelectProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const selectedLabel =
-    options.find((opt) => opt.value === value)?.label || "Select Status";
+    options.find((opt) => opt.value === value)?.label || "Select Status";                                                    
 
   // Calculate dropdown position to avoid overlapping
   useEffect(() => {

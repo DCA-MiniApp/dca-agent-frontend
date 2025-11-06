@@ -13,6 +13,7 @@ const TxEventSchema = z.object({
   chainId: z.string().optional(),
   planId: z.string().optional(),
   reason: z.string().optional(),
+  taskId: z.number().int().positive().optional(),
   // Optional: human text already prepared by backend
   message: z.string().optional(),
   notificationtoken: z.string().optional(),
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
       planId,
       reason,
       message,
+      taskId,
       notificationtoken,
       notification_url,
     } = parsed.data;
@@ -71,19 +73,8 @@ export async function POST(req: NextRequest) {
     const planLine = planId ? `Plan: ${planId}` : undefined;
     const chainLine = chainId ? `Chain: ${chainId}` : undefined;
 
-    const composed =
-      message ||
-      [
-        "❌ Transaction Failed",
-        planLine,
-        chainLine,
-        `Tx: ${shortHash}`,
-        reason ? `Reason: ${reason}` : undefined,
-        "",
-        "Open the app to retry or view details.",
-      ]
-        .filter(Boolean)
-        .join("\n");
+    const composed =`Open your History tab, search the ${taskId} task ID, and check what went wrong to keep your plan running smoothly.`
+     
 
     // Store details as { url, token } or null
     const details: { url: string; token: string } | null =
@@ -99,7 +90,7 @@ export async function POST(req: NextRequest) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fid,
-          title: "Transaction Failed",
+          title: "Plan execution failed ⚠️",
           body: composed,
           notificationDetails:details,
         }),
