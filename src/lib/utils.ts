@@ -87,10 +87,11 @@ export function getArbitrumAddressBySymbol(symbol: string): string | null {
   return match?.address || null;
 }
 
-export async function fetchArbitrumUsdPrices(addresses: string[]): Promise<Record<string, number>> {
+export async function fetchArbitrumUsdPrices(addresses: string): Promise<Record<string, number>> {
   if (addresses.length === 0) return {};
-  const unique = Array.from(new Set(addresses.map((a) => a.toLowerCase())));
-  const url = `https://api.coingecko.com/api/v3/simple/token_price/arbitrum-one?contract_addresses=${encodeURIComponent(unique.join(','))}&vs_currencies=usd`;
+  // const unique = Array.from(new Set(addresses.map((a) => a.toLowerCase())));
+  const uniqueParam = addresses.toLowerCase();
+  const url = `https://api.coingecko.com/api/v3/simple/token_price/arbitrum-one?contract_addresses=${encodeURIComponent(uniqueParam)}&vs_currencies=usd`;
   // console.log('url', url);
   const res = await fetch(url, { cache: 'no-store' });
   // console.log('res', res);
@@ -104,6 +105,7 @@ export async function fetchArbitrumUsdPrices(addresses: string[]): Promise<Recor
 }
 
 export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<number> {
+  // console.log("Line number 107:",plans)
   const neededSymbols = Array.from(
     new Set(
       plans
@@ -111,11 +113,15 @@ export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<numb
         .filter((s) => s)
     )
   );
-  // console.log('neededSymbols', neededSymbols);
+  // console.log('neededSymbols 116:', neededSymbols);
   const addresses = neededSymbols.map((s) => getArbitrumAddressBySymbol(s)).filter((a): a is string => !!a);
-  // console.log('addresses', addresses);
-  const prices = await fetchArbitrumUsdPrices(addresses);
-  // console.log('prices', prices);
+  // console.log('addresses 117', addresses);
+  let prices: Record<string, number> = {};
+  for(const addr of addresses){
+    // console.log("address in computePlansInvestedUsd 119:", addr);
+    prices = await fetchArbitrumUsdPrices(addr);
+    // console.log('prices 119', prices);
+  }
   const symbolToPrice: Record<string, number> = { USDC: 1 };
   for (const sym of neededSymbols) {
     const addr = getArbitrumAddressBySymbol(sym);
@@ -123,22 +129,24 @@ export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<numb
   }
 
   const successCounts = await Promise.all(plans.map((p) => fetchJobSuccessCount(p.jobId)));
-  // console.log('successCounts', successCounts);
+  // console.log('successCounts 127', successCounts);
 
   let total = 0;
   for (let i = 0; i < plans.length; i++) {
     const plan = plans[i];
     const per = parseFloat(plan.amount);
+    // console.log("per in computePlansInvestedUsd 138:", per);
     const successCount = successCounts[i];
+    // console.log("successCount in computePlansInvestedUsd 140:", successCount);
     // if (!isFinite(per) || !successCount) continue;
     const sym = (plan.fromToken || 'USDC').toUpperCase();
 
     // console.log("sym in computePlansInvestedUsd", sym);
     const price = symbolToPrice[sym] ?? 0;
     // console.log("symbolToPrice in computePlansInvestedUsd", symbolToPrice);
-    // console.log("price in computePlansInvestedUsd", price);
+    // console.log("price in computePlansInvestedUsd 147:", price);
     total += per * price * (successCount ?? 0);
-    // console.log("total in computePlansInvestedUsd", total);
+    // console.log("total in computePlansInvestedUsd 149:", total);
   }
   return total;
 }

@@ -790,16 +790,17 @@ export function ActionsTab() {
               // console.log("TriggerX result:", triggerXResult);
 
               if (triggerXResult.success) {
-                // console.log(
-                //   "✅ TriggerX job created successfully:",
-                //   triggerXResult.jobId
-                // );
-
                 // Add success message about automation
-                const shareText = `Just automated my crypto strategy with DCA Agent 🚀  
-                ${result.data.agentResponse.amount} ${result.data.agentResponse.fromToken} → ${result.data.agentResponse.toToken} Protected by TriggerX & Powered by Vibekit on Arbitrum one.  
-                 Set it. Forget it. Grow it. 🌱  
-                ${APP_URL}`;
+               
+                const shareLines = [
+                  "Took the next step in smart investing with DCA Agent 🚀",
+                  `• Swap: ${result.data.agentResponse.amount} ${result.data.agentResponse.fromToken} → ${result.data.agentResponse.toToken}`,
+                  "Automated,Protected by TriggerX & powered by Vibekit on Arbitrum.",
+                  "",
+                  "Set it. Forget it. Grow it. 🌿",
+                  APP_URL,
+                ];
+                const shareText = shareLines.join("\n");
                 const automationMessage: ChatMessage = {
                   id: Date.now().toString(),
                   role: "assistant",
