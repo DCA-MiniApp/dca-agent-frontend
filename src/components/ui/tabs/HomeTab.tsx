@@ -2,8 +2,6 @@
 
 import { useAccount, useWalletClient } from "wagmi";
 import { useMiniApp } from "@neynar/react";
-import { useReadContract } from "wagmi";
-import { formatUnits } from "viem";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import {
@@ -38,7 +36,7 @@ import {
   type PlatformStats,
   fetchJobSuccessCount,
 } from "../../../lib/api";
-import { computePlansInvestedUsd } from "../../../lib/utils";
+import { computePlansInvestedUsd, calculateWalletTotalUsdValue } from "../../../lib/utils";
 import { deleteTriggerXJobForPlan } from "../../../lib/triggerXIntegration";
 import sdk, {
   AddMiniApp,
@@ -67,25 +65,6 @@ function getTimeGreeting() {
   if (hour < 18) return "Good afternoon";
   return "Good evening";
 }
-
-// USDC contract address (example: Arbitrum mainnet)
-const USDC_ADDRESS = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
-const USDC_ABI = [
-  {
-    constant: true,
-    inputs: [{ name: "account", type: "address" }],
-    name: "balanceOf",
-    outputs: [{ name: "", type: "uint256" }],
-    type: "function",
-  },
-  {
-    constant: true,
-    inputs: [],
-    name: "decimals",
-    outputs: [{ name: "", type: "uint8" }],
-    type: "function",
-  },
-];
 
 export function HomeTab() {
   const { address, isConnected } = useAccount();
@@ -127,16 +106,6 @@ export function HomeTab() {
     []
   );
 
-  const { data: usdcRawBalance } = useReadContract({
-    address: USDC_ADDRESS,
-    abi: USDC_ABI,
-    functionName: "balanceOf",
-    args: [address],
-  });
-  // console.log("User Address:", USDC_ADDRESS);
-
-  // console.log("USDC Raw Balance:", usdcRawBalance);
-
   // Dynamic data state
   const [userPlans, setUserPlans] = useState<DCAPlan[]>([]);
   const [platformStats, setPlatformStats] = useState<PlatformStats | null>(
@@ -145,6 +114,8 @@ export function HomeTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [totalInvested, setTotalInvested] = useState(0);
   const [portfolioUsd, setPortfolioUsd] = useState<number | null>(null);
+  const [walletTotalUsd, setWalletTotalUsd] = useState<number | null>(null);
+  const [isWalletValueLoading, setIsWalletValueLoading] = useState(false);
 
   // Modal state
   const [selectedPlan, setSelectedPlan] = useState<DCAPlan | null>(null);
@@ -499,6 +470,42 @@ export function HomeTab() {
     fetchUserData();
   }, [fetchUserData]);
 
+  // Fetch wallet total USD value using Alchemy API
+  // useEffect(() => {
+  //   if (!address) {
+  //     setWalletTotalUsd(null);
+  //     setIsWalletValueLoading(false);
+  //     return;
+  //   }
+
+  //   let cancelled = false;
+  //   setIsWalletValueLoading(true);
+
+  //   const loadWalletValue = async () => {
+  //     try {
+  //       const totalUsd = await calculateWalletTotalUsdValue(address);
+  //       if (!cancelled) {
+  //         setWalletTotalUsd(totalUsd);
+  //       }
+  //     } catch (error) {
+  //       console.error("Error loading wallet value:", error);
+  //       if (!cancelled) {
+  //         setWalletTotalUsd(null);
+  //       }
+  //     } finally {
+  //       if (!cancelled) {
+  //         setIsWalletValueLoading(false);
+  //       }
+  //     }
+  //   };
+
+  //   loadWalletValue();
+
+  //   return () => {
+  //     cancelled = true;
+  //   };
+  // }, [address]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const completed = window.localStorage.getItem("dca_onboarding_completed");
@@ -728,12 +735,14 @@ export function HomeTab() {
   }, []);
 
   const userGreeting = `${getTimeGreeting()}, ${context?.user?.username} 👋`;
-  const usdcBalance =
-    typeof usdcRawBalance === "bigint"
-      ? `$${Number(formatUnits(usdcRawBalance, 6)).toLocaleString(undefined, {
+  const walletBalanceDisplay =
+    walletTotalUsd !== null
+      ? `$${walletTotalUsd.toLocaleString(undefined, {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         })}`
+      : isWalletValueLoading
+      ? "..."
       : "$0.00";
 
   const step = onboardingSteps[currentStepIndex];
@@ -1261,7 +1270,7 @@ export function HomeTab() {
         )}
       </div>
 
-      {/* USDC Balance Card */}
+      {/* Wallet Total Value Card */}
       <div className="bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 backdrop-blur-lg rounded-3xl p-6 text-white border border-[#c199e4]/30 shadow-lg hover:shadow-xl hover:border-[#c199e4]/50 transition-all duration-500 hover:scale-[1.02] group">
         <div className="flex justify-between items-start">
           <div className="flex-1">
@@ -1271,7 +1280,7 @@ export function HomeTab() {
               </div>
               <div>
                 <span className="text-sm text-white/90 font-medium">
-                  Available Balance
+                  Wallet Value (USD)
                 </span>
                 {/* <div className="flex items-center gap-2 mt-1">
                   <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
@@ -1281,10 +1290,10 @@ export function HomeTab() {
             </div>
             <div className="space-y-1">
               <p className="text-4xl font-bold text-white group-hover:text-[#c199e4] transition-colors duration-300">
-                {usdcBalance}
+                {walletBalanceDisplay}
               </p>
               <p className="text-sm text-white/70">
-                Ready for smart investments
+                Total value of all Arbitrum tokens
               </p>
             </div>
           </div>
@@ -1292,7 +1301,7 @@ export function HomeTab() {
             <span
               className={`text-xs font-bold px-4 py-2 rounded-full transition-all duration-300 bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30 uppercase`}
             >
-              USDC
+              TOTAL
             </span>
           </div>
         </div>

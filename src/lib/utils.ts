@@ -18,6 +18,25 @@ import {
 } from './constants';
 import { fetchJobSuccessCount } from './api';
 
+
+
+const ALCHEMY_URL = process.env.NEXT_PUBLIC_ALCHEMY_URL || "https://arb-mainnet.g.alchemy.com/v2";
+const ALCHEMY_API_KEY = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "";
+
+interface TokenBalance {
+  contractAddress: string;
+  tokenBalance: string;
+  error?: string;
+}
+
+interface TokenMetadata {
+  name: string;
+  symbol: string;
+  decimals: number;
+  logo?: string;
+}
+
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -87,20 +106,37 @@ export function getArbitrumAddressBySymbol(symbol: string): string | null {
   return match?.address || null;
 }
 
-export async function fetchArbitrumUsdPrices(addresses: string): Promise<Record<string, number>> {
+export async function fetchArbitrumUsdPrices(addresses: string[]): Promise<Record<string, number>> {
   if (addresses.length === 0) return {};
-  // const unique = Array.from(new Set(addresses.map((a) => a.toLowerCase())));
-  const uniqueParam = addresses.toLowerCase();
-  const url = `https://api.coingecko.com/api/v3/simple/token_price/arbitrum-one?contract_addresses=${encodeURIComponent(uniqueParam)}&vs_currencies=usd`;
-  // console.log('url', url);
-  const res = await fetch(url, { cache: 'no-store' });
-  // console.log('res', res);
-  if (!res.ok) return {};
-  const json = await res.json();
+  const unique = Array.from(new Set(addresses.map((a) => a.toLowerCase()).filter((addr) => addr)));
+  if (unique.length === 0) return {};
+  
   const out: Record<string, number> = {};
-  for (const [addr, data] of Object.entries<any>(json)) {
-    if (data && typeof data.usd === 'number') out[addr.toLowerCase()] = data.usd;
+  
+  // Fetch prices one address at a time
+  for (const address of unique) {
+    try {
+      const url = `https://api.coingecko.com/api/v3/simple/token_price/arbitrum-one?contract_addresses=${encodeURIComponent(address)}&vs_currencies=usd`;
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) continue;
+      
+      const json = await res.json();
+      if (json && typeof json === 'object') {
+        for (const [addr, data] of Object.entries<any>(json)) {
+          if (data && typeof data.usd === 'number') {
+            out[addr.toLowerCase()] = data.usd;
+          }
+        }
+      }
+      
+      // Add a small delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 100));
+    } catch (error) {
+      console.error(`Error fetching price for ${address}:`, error);
+      continue;
+    }
   }
+  
   return out;
 }
 
@@ -116,12 +152,7 @@ export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<numb
   // console.log('neededSymbols 116:', neededSymbols);
   const addresses = neededSymbols.map((s) => getArbitrumAddressBySymbol(s)).filter((a): a is string => !!a);
   // console.log('addresses 117', addresses);
-  let prices: Record<string, number> = {};
-  for(const addr of addresses){
-    // console.log("address in computePlansInvestedUsd 119:", addr);
-    prices = await fetchArbitrumUsdPrices(addr);
-    // console.log('prices 119', prices);
-  }
+  const prices = await fetchArbitrumUsdPrices(addresses);
   const symbolToPrice: Record<string, number> = { USDC: 1 };
   for (const sym of neededSymbols) {
     const addr = getArbitrumAddressBySymbol(sym);
@@ -149,4 +180,149 @@ export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<numb
     // console.log("total in computePlansInvestedUsd 149:", total);
   }
   return total;
+}
+
+// Alchemy API helpers for wallet balance calculation
+
+
+/**
+ * Get token balances for a user address using Alchemy API
+ */
+async function getTokenBalances(userAddress: string): Promise<TokenBalance[]> {
+  if (!ALCHEMY_API_KEY) {
+    console.warn("Alchemy API key not configured");
+    return [];
+  }
+
+  try {
+    const url = `${ALCHEMY_URL}/${ALCHEMY_API_KEY}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "alchemy_getTokenBalances",
+        params: [userAddress, "erc20"],
+      }),
+    });
+
+    if (!res.ok) {
+      console.error("Alchemy API error:", res.status, res.statusText);
+      return [];
+    }
+
+    const { result } = await res.json();
+    if (!result || !result.tokenBalances) return [];
+    
+    // Filter out zero balances and errors
+    return result.tokenBalances.filter(
+      (tb: TokenBalance) => tb.tokenBalance !== "0x0" && !tb.error
+    );
+  } catch (error) {
+    console.error("Error fetching token balances from Alchemy:", error);
+    return [];
+  }
+}
+
+/**
+ * Get token metadata for a contract address using Alchemy API
+ */
+async function getTokenMetadata(contractAddress: string): Promise<TokenMetadata | null> {
+  if (!ALCHEMY_API_KEY) {
+    console.warn("Alchemy API key not configured");
+    return null;
+  }
+
+  try {
+    const url = `${ALCHEMY_URL}/${ALCHEMY_API_KEY}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "alchemy_getTokenMetadata",
+        params: [contractAddress],
+      }),
+    });
+
+    if (!res.ok) {
+      console.error("Alchemy metadata API error:", res.status, res.statusText);
+      return null;
+    }
+
+    const { result } = await res.json();
+    if (!result) return null;
+
+    return {
+      name: result.name || "Unknown",
+      symbol: result.symbol || "UNKNOWN",
+      decimals: result.decimals || 18,
+      logo: result.logo,
+    };
+  } catch (error) {
+    console.error("Error fetching token metadata from Alchemy:", error);
+    return null;
+  }
+}
+
+/**
+ * Calculate total USD value of all tokens in a wallet
+ */
+export async function calculateWalletTotalUsdValue(userAddress: string): Promise<number> {
+  if (!userAddress || !ALCHEMY_API_KEY) {
+    return 0;
+  }
+
+  try {
+    // Step 1: Get token balances
+    const balances = await getTokenBalances(userAddress);
+    if (balances.length === 0) return 0;
+
+    // Step 2: Get metadata for all tokens in parallel
+    const metadataList = await Promise.all(
+      balances.map((t) => getTokenMetadata(t.contractAddress))
+    );
+
+    // Filter out tokens with no metadata
+    const validTokens = balances
+      .map((balance, i) => ({
+        balance,
+        metadata: metadataList[i],
+      }))
+      .filter((item) => item.metadata !== null);
+
+    if (validTokens.length === 0) return 0;
+
+    // Step 3: Get prices from CoinGecko
+    const addresses = validTokens.map((t) => t.balance.contractAddress);
+    const prices = await fetchArbitrumUsdPrices(addresses);
+
+    // Step 4: Calculate total USD value
+    let totalUSD = 0;
+
+    validTokens.forEach(({ balance, metadata }) => {
+      if (!metadata) return;
+
+      // Convert hex balance to decimal
+      const balanceBigInt = BigInt(balance.tokenBalance);
+      const decimals = metadata.decimals || 18;
+      const divisor = BigInt(10 ** decimals);
+      const balanceDecimal = Number(balanceBigInt) / Number(divisor);
+
+      // Get price
+      const priceKey = balance.contractAddress.toLowerCase();
+      const price = prices[priceKey] || 0;
+
+      // Calculate value
+      const valueUSD = balanceDecimal * price;
+      totalUSD += valueUSD;
+    });
+
+    return totalUSD;
+  } catch (error) {
+    console.error("Error calculating wallet total USD value:", error);
+    return 0;
+  }
 }
