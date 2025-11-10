@@ -596,6 +596,10 @@ export function ActionsTab() {
 
         const result = await response.json();
 
+        // Track TriggerX automation success/failure
+        let triggerXSuccess = false;
+        let triggerXSkipped = false;
+
         // Check if plan was created successfully
         if (result.success && result.data) {
           const planId = result.data.agentResponse.id;
@@ -759,6 +763,9 @@ export function ActionsTab() {
             if (!ethersSigner) {
               console.warn("⚠️ Could not obtain wallet signer");
 
+              // Mark as skipped (not a failure, but automation wasn't set up)
+              triggerXSkipped = true;
+
               const walletErrorMessage: ChatMessage = {
                 id: Date.now().toString(),
                 role: "assistant",
@@ -790,8 +797,11 @@ export function ActionsTab() {
               // console.log("TriggerX result:", triggerXResult);
 
               if (triggerXResult.success) {
+                // Mark TriggerX as successful
+                triggerXSuccess = true;
+
                 // Add success message about automation
-               
+
                 const shareLines = [
                   "Took the next step in smart investing with DCA Agent 🚀",
                   `• Swap: ${result.data.agentResponse.amount} ${result.data.agentResponse.fromToken} → ${result.data.agentResponse.toToken}`,
@@ -822,7 +832,7 @@ export function ActionsTab() {
                 const automationErrorMessage: ChatMessage = {
                   id: Date.now().toString(),
                   role: "assistant",
-                  content: `⚠️ **Plan Created but Automation Failed**\n\nYour DCA plan was created successfully, but we couldn't set up automation:\n${triggerXResult.error}\n\nYou can manually execute swaps or try setting up automation later.`,
+                  content: `⚠️ **Plan Created but Automation Failed**\n\nYour DCA plan was created successfully, but we couldn't set up automation:\n${triggerXResult.error}\n\nPlease try setting up automation again!`,
                   timestamp: new Date(),
                 };
                 setMessages((prev) => [
@@ -855,19 +865,21 @@ export function ActionsTab() {
         // console.log("Actual response content:", result.response);
 
         if (result.success) {
-          // Remove loading messages and show success
-          setMessages((prev) => prev.filter((msg) => !msg.isCreatingPlan));
-
-          // Show the actual response from the backend/SSE
-          const confirmationMessage: ChatMessage = {
-            id: Date.now().toString(),
-            role: "assistant",
-            content:
-              result.response ||
-              "🎉 DCA plan created successfully!\n\nYour automated investment strategy is now active and will execute according to your schedule.",
-            timestamp: new Date(),
-          };
-          setMessages((prev) => [...prev, confirmationMessage]);
+          // Only show the backend success message if TriggerX succeeded
+          // If TriggerX failed or was skipped, the appropriate error/warning message was already shown
+          if (triggerXSuccess) {
+            // TriggerX succeeded - success message already shown above with share button
+            // No need to show additional confirmation message
+            console.log("[Plan Creation] TriggerX automation setup completed successfully");
+          } else if (triggerXSkipped) {
+            // Wallet signer issue - warning message already shown above
+            // No need to show additional confirmation message
+            console.log("[Plan Creation] Plan created but automation was skipped due to wallet connection");
+          } else {
+            // TriggerX failed - error message already shown above
+            // No need to show additional confirmation message
+            console.log("[Plan Creation] Plan created but automation setup failed");
+          }
 
           // Handle action response
           if (result.action) {
@@ -1567,7 +1579,7 @@ export function ActionsTab() {
               My Plans
             </button>
             <button
-              onClick={() => setInputMessage("Create a new DCA strategy")}
+              onClick={() => setInputMessage("Create a DCA plan with 0.1 USDC into WETH every 15 minutes for 1 hour")}
               className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
             >
               Create Plan

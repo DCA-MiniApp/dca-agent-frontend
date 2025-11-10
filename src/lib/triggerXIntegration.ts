@@ -146,6 +146,8 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
     }
 
     console.log('✅ Minimal script uploaded to IPFS:', uploadResult.scriptIpfsUrl);
+    console.log("Script HASH:", uploadResult.scriptIpfsHash);
+    const scriptIpfsUrl = `https://ipfs.io/ipfs/${uploadResult.scriptIpfsHash}`;
 
     // Step 3: Create TriggerX job input
     const jobInput = createDCAJobInput({
@@ -157,7 +159,7 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
       userAddress,
       fromToken,
       amount,
-      scriptIpfsUrl: uploadResult.scriptIpfsUrl,
+      scriptIpfsUrl: scriptIpfsUrl,
     });
 
     // Step 4: Create TriggerX job

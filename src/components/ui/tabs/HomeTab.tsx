@@ -388,11 +388,13 @@ export function HomeTab() {
   const [completedStepIndex, setCompletedStepIndex] = useState<number | null>(
     null
   );
+  const [isAutoAdvancing, setIsAutoAdvancing] = useState(false);
   const [notificationState, setNotificationState] = useState({
     sendStatus: "",
     shareUrlCopied: false,
     isEnabling: false,
   });
+  const [showFinalBanner, setShowFinalBanner] = useState(false);
 
   // Derive notifications availability defensively (covers browser vs client)
   // const hasNotificationsDerived =
@@ -471,40 +473,40 @@ export function HomeTab() {
   }, [fetchUserData]);
 
   // Fetch wallet total USD value using Alchemy API
-  // useEffect(() => {
-  //   if (!address) {
-  //     setWalletTotalUsd(null);
-  //     setIsWalletValueLoading(false);
-  //     return;
-  //   }
+  useEffect(() => {
+    if (!address) {
+      setWalletTotalUsd(null);
+      setIsWalletValueLoading(false);
+      return;
+    }
 
-  //   let cancelled = false;
-  //   setIsWalletValueLoading(true);
+    let cancelled = false;
+    setIsWalletValueLoading(true);
 
-  //   const loadWalletValue = async () => {
-  //     try {
-  //       const totalUsd = await calculateWalletTotalUsdValue(address);
-  //       if (!cancelled) {
-  //         setWalletTotalUsd(totalUsd);
-  //       }
-  //     } catch (error) {
-  //       console.error("Error loading wallet value:", error);
-  //       if (!cancelled) {
-  //         setWalletTotalUsd(null);
-  //       }
-  //     } finally {
-  //       if (!cancelled) {
-  //         setIsWalletValueLoading(false);
-  //       }
-  //     }
-  //   };
+    const loadWalletValue = async () => {
+      try {
+        const totalUsd = await calculateWalletTotalUsdValue(address);
+        if (!cancelled) {
+          setWalletTotalUsd(totalUsd);
+        }
+      } catch (error) {
+        console.error("Error loading wallet value:", error);
+        if (!cancelled) {
+          setWalletTotalUsd(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsWalletValueLoading(false);
+        }
+      }
+    };
 
-  //   loadWalletValue();
+    loadWalletValue();
 
-  //   return () => {
-  //     cancelled = true;
-  //   };
-  // }, [address]);
+    return () => {
+      cancelled = true;
+    };
+  }, [address]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -663,7 +665,7 @@ export function HomeTab() {
           "42161"
         );
 
-        if (deleteJobResult.success) {
+        if (deleteJobResult.success===true) {
           // console.log("✅ TriggerX job deleted successfully");
 
           // Update the plan's jobId to null in the backend
@@ -746,8 +748,6 @@ export function HomeTab() {
       : "$0.00";
 
   const step = onboardingSteps[currentStepIndex];
-  const progressPercent =
-    ((currentStepIndex + 1) / onboardingSteps.length) * 100;
 
   return (
     <div className="flex flex-col h-full py-3 px-2 space-y-6 overflow-y-auto">
@@ -795,6 +795,45 @@ export function HomeTab() {
                     </p>
                   </div>
                 </div>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {/* Final Success Banner Overlay (after 'Okay, got it') */}
+          {showFinalBanner && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-30 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ duration: 0.55 }}
+                className="bg-gradient-to-br from-emerald-500/15 to-emerald-400/10 border border-emerald-400/40 rounded-3xl shadow-2xl p-6 text-center max-w-sm w-full mx-4"
+              >
+                <div className="mx-auto mb-3 w-14 h-14 rounded-full bg-emerald-400/30 border border-emerald-300/50 flex items-center justify-center">
+                  <motion.svg
+                    initial={{ scale: 0.8 }}
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                    className="w-8 h-8 text-emerald-300"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                      clipRule="evenodd"
+                    />
+                  </motion.svg>
+                </div>
+                <h3 className="text-white text-lg font-bold">All set now — let&apos;s go!</h3>
+                <p className="text-white/80 text-sm mt-1">
+                  Start your investment journey with DCA Agent.
+                </p>
               </motion.div>
             </motion.div>
           )}
@@ -849,7 +888,7 @@ export function HomeTab() {
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0, opacity: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
-                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
+                className="absolute top-1/2 left-1/2"
               >
                 <div className="bg-green-500/90 backdrop-blur-lg rounded-2xl p-4 border border-green-400/50 shadow-2xl">
                   <div className="flex items-center gap-3">
@@ -945,39 +984,32 @@ export function HomeTab() {
                 </button>
               </motion.div>
 
-              {/* Enhanced Progress Bar */}
-              <motion.div
-                key={`progress-${currentStepIndex}`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.4 }}
-                className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20"
+              {/* Success Banner */}
+              {/* <motion.div
+                key={`success-banner-${currentStepIndex}`}
+                initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.35, delay: 0.35 }}
+                className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-400/30 rounded-2xl p-3"
               >
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-sm text-gray-300 font-medium">
-                    Onboarding Progress
-                  </p>
-                  <p className="text-sm text-gray-200 font-medium">
-                    {currentStepIndex + 1}/{onboardingSteps.length}
-                  </p>
+                <motion.div
+                  initial={{ scale: 0.8 }}
+                  animate={{ scale: [1, 1.1, 1] }}
+                  transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+                  className="w-7 h-7 rounded-full bg-emerald-400/30 flex items-center justify-center border border-emerald-300/40"
+                >
+                  <svg className="w-4 h-4 text-emerald-300" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </motion.div>
+                <div>
+                  <p className="text-sm font-semibold text-white">All set now — let&apos;s go!</p>
+                  <p className="text-xs text-white/70">You can explore the app anytime.</p>
                 </div>
-                <div className="w-full bg-white/20 rounded-full h-3 mb-2 relative overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${progressPercent}%` }}
-                    transition={{ duration: 0.8, ease: "easeOut" }}
-                    className="bg-gradient-to-r from-[#c199e4]/60 to-[#c199e4]/40 h-3 rounded-full shadow-lg relative"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
-                  </motion.div>
-                </div>
-                <p className="text-xs text-gray-400">
-                  {Math.round(progressPercent)}% Complete
-                </p>
-              </motion.div>
+              </motion.div> */}
 
               {/* Step Indicators */}
-              <motion.div
+              {/* <motion.div
                 key={`indicators-${currentStepIndex}`}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1018,7 +1050,7 @@ export function HomeTab() {
                     )}
                   </div>
                 ))}
-              </motion.div>
+              </motion.div> */}
 
               {/* Quick Start Guide */}
               <motion.div
@@ -1056,13 +1088,7 @@ export function HomeTab() {
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.3, delay: 0.1 * idx }}
-                    className={`backdrop-blur-lg rounded-2xl p-3 border transition-all duration-300 group relative overflow-hidden ${
-                      idx === currentStepIndex
-                        ? "border-[#c199e4]/50 shadow-lg ring-2 ring-[#c199e4]/30"
-                        : idx < currentStepIndex
-                        ? "border-green-400/50 shadow-lg"
-                        : "border-[#c199e4]/20 hover:border-[#c199e4]/30"
-                    }`}
+                    className="backdrop-blur-lg rounded-2xl p-3 border transition-all duration-300 group relative overflow-hidden border-[#c199e4]/50 shadow-lg ring-2 ring-[#c199e4]/30"
                   >
                     {/* Completion indicator */}
                     {idx < currentStepIndex && (
@@ -1092,9 +1118,9 @@ export function HomeTab() {
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         transition={{ duration: 0.3, delay: 0.1 }}
-                        className="absolute top-2 right-2 w-5 h-5 bg-[#c199e4] rounded-full flex items-center justify-center"
+                        className="absolute top-2 right-2 w-5 h-5 flex items-center justify-center"
                       >
-                        <motion.div
+                        {/* <motion.div
                           animate={{
                             scale: [1, 1.2, 1],
                             opacity: [1, 0.7, 1],
@@ -1105,8 +1131,8 @@ export function HomeTab() {
                             ease: "easeInOut",
                           }}
                           className="w-2 h-2 bg-white rounded-full"
-                        />
-                        <motion.div
+                        /> */}
+                        {/* <motion.div
                           animate={{
                             scale: [1, 1.5, 1],
                             opacity: [0.3, 0, 0.3],
@@ -1118,7 +1144,7 @@ export function HomeTab() {
                             delay: 0.5,
                           }}
                           className="absolute inset-0 bg-[#c199e4] rounded-full"
-                        />
+                        /> */}
                       </motion.div>
                     )}
 
@@ -1161,61 +1187,32 @@ export function HomeTab() {
                   Don&apos;t show this again
                 </label>
 
-                {/* Action Buttons */}
-                <div className="flex gap-3 pt-2">
+                {/* Single Acknowledge Button */}
+                <div className="pt-2">
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={goPrev}
-                    disabled={currentStepIndex === 0 || isTransitioning}
-                    className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    onClick={() => {
+                      if (isTransitioning || showFinalBanner) return;
+                      setShowFinalBanner(true);
+                      setTimeout(() => {
+                        completeOnboarding();
+                        setShowFinalBanner(false);
+                      }, 1200);
+                    }}
+                    disabled={isTransitioning || showFinalBanner}
+                    className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg relative overflow-hidden"
                   >
-                    {isTransitioning ? (
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{
-                          duration: 1,
-                          repeat: Infinity,
-                          ease: "linear",
-                        }}
-                        className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full mx-auto"
-                      />
-                    ) : (
-                      "Back"
-                    )}
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={goNext}
-                    disabled={isTransitioning}
-                    className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg relative overflow-hidden group"
-                  >
-                    {/* Button background animation */}
-                    <motion.div
-                      className="absolute inset-0 bg-gradient-to-r from-[#c199e4]/40 to-[#c199e4]/20"
-                      initial={{ x: "-100%" }}
-                      whileHover={{ x: "0%" }}
-                      transition={{ duration: 0.3 }}
-                    />
-
-                    {/* Button content */}
-                    <span className="relative z-10">
-                      {isTransitioning ? (
+                    <span className="relative z-10 flex items-center justify-center gap-2">
+                      {showFinalBanner ? (
                         <motion.div
                           animate={{ rotate: 360 }}
-                          transition={{
-                            duration: 1,
-                            repeat: Infinity,
-                            ease: "linear",
-                          }}
-                          className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full mx-auto"
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          className="w-5 h-5 border-2 border-white/30 rounded-full"
+                          style={{ borderTop: "2px solid white", borderRightColor: "transparent" }}
                         />
-                      ) : currentStepIndex === onboardingSteps.length - 1 ? (
-                        "Got it!"
-                      ) : (
-                        step.action
-                      )}
+                      ) : null}
+                      {showFinalBanner ? "Closing..." : "Okay, got it"}
                     </span>
                   </motion.button>
                 </div>
@@ -1280,7 +1277,7 @@ export function HomeTab() {
               </div>
               <div>
                 <span className="text-sm text-white/90 font-medium">
-                  Wallet Value (USD)
+                  Wallet Value (USDC)
                 </span>
                 {/* <div className="flex items-center gap-2 mt-1">
                   <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
@@ -1293,7 +1290,7 @@ export function HomeTab() {
                 {walletBalanceDisplay}
               </p>
               <p className="text-sm text-white/70">
-                Total value of all Arbitrum tokens
+                Total balance across connected wallet
               </p>
             </div>
           </div>
