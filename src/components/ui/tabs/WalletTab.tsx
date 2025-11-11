@@ -86,7 +86,6 @@ function WalletStatus({
   const handleCopyAddress = () => {
     if (address) {
       navigator.clipboard.writeText(address);
-      // Optional: Add toast notification here
     }
   };
 
@@ -485,10 +484,11 @@ export function WalletTab() {
 
   // --- Hooks ---
   // const { context } = useMiniApp();
-  const { address, isConnected, connector } = useAccount();
+  const { address, isConnected, connector, chainId: accountChainId } = useAccount();
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
   const [user, setUser] = useState<UserInfo | null>(null);
   const chainId = useChainId();
+  const effectiveChainId = accountChainId ?? chainId;
 
   useEffect(() => {
     // Wait for SDK to initialize / ready if needed
@@ -552,6 +552,7 @@ export function WalletTab() {
 
   const {
     switchChain,
+    switchChainAsync,
     error: chainSwitchError,
     isError: isChainSwitchError,
     isPending: isChainSwitchPending,
@@ -572,6 +573,9 @@ export function WalletTab() {
     isCustodyWallet,
     // context: !!context,
     fid: user?.fid,
+    chainIdFromAccount: accountChainId,
+    chainIdFromHook: chainId,
+    effectiveChainId,
   });
 
   // Store user on first connect
@@ -594,10 +598,54 @@ export function WalletTab() {
   }, [isConnected, address, user?.fid]);
 
   // --- Handlers ---
-  const handleSwitchToArbitrum = useCallback(() => {
+  const handleSwitchToArbitrum = useCallback(async () => {
     console.log("Switching to Arbitrum");
-    switchChain({ chainId: arbitrum.id });
-  }, [switchChain]);
+    try {
+      if (switchChainAsync) {
+        await switchChainAsync({ chainId: arbitrum.id });
+        return;
+      }
+      if (typeof window !== "undefined" && (window as any).ethereum?.request) {
+        await (window as any).ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0xa4b1" }],
+        });
+        return;
+      }
+      // Fallback: non-async call
+      switchChain({ chainId: arbitrum.id });
+    } catch (switchError: any) {
+      if (switchError?.code === 4902 && typeof window !== "undefined" && (window as any).ethereum?.request) {
+        try {
+          await (window as any).ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [
+              {
+                chainId: "0xa4b1",
+                chainName: "Arbitrum One",
+                nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+                rpcUrls: ["https://arb1.arbitrum.io/rpc"],
+                blockExplorerUrls: ["https://arbiscan.io"],
+              },
+            ],
+          });
+          // After adding, try switching again
+          if (switchChainAsync) {
+            await switchChainAsync({ chainId: arbitrum.id });
+          } else {
+            await (window as any).ethereum.request({
+              method: "wallet_switchEthereumChain",
+              params: [{ chainId: "0xa4b1" }],
+            });
+          }
+        } catch (addError) {
+          console.error("Failed to add Arbitrum network:", addError);
+        }
+      } else {
+        console.error("Error switching network:", switchError);
+      }
+    }
+  }, [switchChain, switchChainAsync]);
 
   // --- Early Return ---
   if (!USE_WALLET) {
@@ -637,7 +685,7 @@ export function WalletTab() {
       {/* Profile Section */}
       <WalletStatus
         address={address}
-        chainId={chainId}
+        chainId={effectiveChainId}
         pfpUrl={user?.pfpUrl}
         username={user?.username}
         fid={user?.fid}
@@ -657,7 +705,7 @@ export function WalletTab() {
       <WalletControls
         isConnected={isConnected}
         context={user ? { user: { fid: user.fid }, client: null } : null}
-        chainId={chainId}
+        chainId={effectiveChainId}
         onSwitchToArbitrum={handleSwitchToArbitrum}
         isChainSwitchPending={isChainSwitchPending}
         isChainSwitchError={isChainSwitchError}
