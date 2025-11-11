@@ -536,12 +536,12 @@ export async function deleteTriggerXJobForPlan(jobId: string, signer: any, chain
     const wrappedSigner = new Proxy(signer, {
       get(target, prop) {
         const original = target[prop as keyof typeof target];
-        
+
         // Intercept sendTransaction to catch user rejections
         if (prop === 'sendTransaction') {
           return async function(...args: any[]) {
             try {
-              const result = await (original as Function).apply(target, args);
+              const result = await (original as (...args: any[]) => any).apply(target, args);
               return result;
             } catch (error: any) {
               const msg = (error?.message || '').toString().toLowerCase();
@@ -568,7 +568,7 @@ export async function deleteTriggerXJobForPlan(jobId: string, signer: any, chain
             }
           };
         }
-        
+
         // For other properties, return as-is
         if (typeof original === 'function') {
           return original.bind(target);
