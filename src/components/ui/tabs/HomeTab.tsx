@@ -446,6 +446,7 @@ export function HomeTab() {
         // console.log('plans in computePlansInvestedUsd', plans);
         const usd = await computePlansInvestedUsd(
           plans.map((p) => ({
+            userAddress: p.userAddress,
             fromToken: p.fromToken,
             amount: p.amount,
             jobId: p.jobId,
@@ -665,7 +666,16 @@ export function HomeTab() {
           "42161"
         );
 
-        if (deleteJobResult.success===true) {
+        console.log("Delete job result:", deleteJobResult);
+
+        // Explicitly check for user rejection - don't update backend if user cancelled
+        if (deleteJobResult.error === 'user_rejected') {
+          console.log("ℹ️ User cancelled job deletion");
+          setIsDeleting(false);
+          return; // Exit early, don't update backend
+        }
+
+        if (deleteJobResult.success === true) {
           // console.log("✅ TriggerX job deleted successfully");
 
           // Update the plan's jobId to null in the backend

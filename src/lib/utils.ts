@@ -89,7 +89,7 @@ export async function getFarcasterDomainManifest(): Promise<Manifest> {
 }
 
 // Portfolio helpers
-type PlanForUsd = { fromToken: string; amount: string;jobId:string };
+type PlanForUsd = { fromToken: string; amount: string;jobId:string;userAddress:string; };
 
 // Simple token map import can be added later; use a lightweight fallback resolver for now
 export function getArbitrumAddressBySymbol(symbol: string): string | null {
@@ -159,7 +159,7 @@ export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<numb
     if (addr) symbolToPrice[sym] = prices[addr.toLowerCase()] ?? 0;
   }
 
-  const successCounts = await Promise.all(plans.map((p) => fetchJobSuccessCount(p.jobId)));
+  const successCounts = await Promise.all(plans.map((p) => fetchJobSuccessCount(p.jobId,p.userAddress)));
   // console.log('successCounts 127', successCounts);
 
   let total = 0;
@@ -280,7 +280,6 @@ async function getTokenBalances(userAddress: string): Promise<TokenBalance[]> {
     return [];
   }
 }
-
 /**
  * Get token metadata for a contract address using Alchemy API
  */

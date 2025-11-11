@@ -532,17 +532,122 @@ export async function deleteTriggerXJobForPlan(jobId: string, signer: any, chain
     const client = new TriggerXClient(apiKey);
     // console.log('📡 TriggerX Client created for deletion');
 
+    // Wrap signer to detect user rejections at transaction level
+    const wrappedSigner = new Proxy(signer, {
+      get(target, prop) {
+        const original = target[prop as keyof typeof target];
+        
+        // Intercept sendTransaction to catch user rejections
+        if (prop === 'sendTransaction') {
+          return async function(...args: any[]) {
+            try {
+              const result = await (original as Function).apply(target, args);
+              return result;
+            } catch (error: any) {
+              const msg = (error?.message || '').toString().toLowerCase();
+              const code = error?.code || error?.error?.code;
+              
+              // Check if this is a user rejection
+              const isUserRejection = 
+                code === 'ACTION_REJECTED' || 
+                code === 4001 || 
+                code === 'USER_REJECTED' ||
+                /rejected/i.test(msg) ||
+                /user.*cancel/i.test(msg) ||
+                /user.*denied/i.test(msg) ||
+                /cancelled/i.test(msg);
+              
+              if (isUserRejection) {
+                // Throw a specific error that we can catch
+                const rejectionError: any = new Error('user_rejected');
+                rejectionError.code = 'USER_REJECTED';
+                rejectionError.isUserRejection = true;
+                throw rejectionError;
+              }
+              throw error;
+            }
+          };
+        }
+        
+        // For other properties, return as-is
+        if (typeof original === 'function') {
+          return original.bind(target);
+        }
+        return original;
+      }
+    });
+
     // Delete the job using the TriggerX SDK (requires signer and chainId)
     try {
-      await deleteJob(client, jobId, signer, chainId);
+      const result = await deleteJob(client, jobId, wrappedSigner, chainId);
+      console.log('deleteJob result:', result);
+      
+      // Check if result is an object with success property (like createJob)
+      if (result && typeof result === 'object') {
+        const resultAny = result as any;
+        
+        // If result has success: false, it might indicate user rejection
+        if (result.success === false) {
+          const errorMsg = (result.error || resultAny.message || '').toString().toLowerCase();
+          const isUserRejection = 
+            /rejected/i.test(errorMsg) ||
+            /user.*cancel/i.test(errorMsg) ||
+            /user.*denied/i.test(errorMsg) ||
+            /cancelled/i.test(errorMsg) ||
+            errorMsg.includes('rejected') ||
+            errorMsg.includes('user cancelled');
+          
+          if (isUserRejection) {
+            return { success: false, error: 'user_rejected' };
+          }
+          return { success: false, error: errorMsg || 'delete_failed' };
+        }
+        
+        // If result has success: true, check if there's any indication of rejection
+        if (result.success === true) {
+          // Check if transaction hash exists - if user rejected, there might be no hash
+          if (resultAny.txHash || resultAny.transactionHash || resultAny.hash) {
+            return { success: true };
+          }
+          // If no hash but success is true, might be a false positive
+          // Still return success but log for debugging
+          console.warn('deleteJob returned success but no transaction hash');
+          return { success: true };
+        }
+      }
+      
+      // If result doesn't have expected structure, assume success
       // console.log('✅ TriggerX job deleted successfully:', jobId, signer, chainId);
       return { success: true };
     } catch (apiError: any) {
       console.error('❌ Error deleting job via SDK:', apiError);
-      const msg = (apiError?.message || '').toString();
+      
+      // Check if this is a user rejection from the wrapped signer
+      if (apiError?.isUserRejection || apiError?.message === 'user_rejected') {
+        console.log('ℹ️ User rejected the transaction');
+        return { success: false, error: 'user_rejected' };
+      }
+      
+      const msg = (apiError?.message || '').toString().toLowerCase();
       const code = apiError?.code || apiError?.error?.code || apiError?.info?.error?.code;
+      console.log('Error code:', code);
+      
+      // Enhanced user rejection detection - check multiple patterns
+      const isUserRejection = 
+        code === 'ACTION_REJECTED' || 
+        code === 4001 || 
+        code === 'USER_REJECTED' ||
+        /rejected/i.test(msg) ||
+        /user.*cancel/i.test(msg) ||
+        /user.*denied/i.test(msg) ||
+        /cancelled/i.test(msg) ||
+        msg.includes('rejected') ||
+        msg.includes('user cancelled');
+
+      console.log('Is user rejection:', isUserRejection);
+      
       // Propagate user rejection distinctly so UI does NOT update backend
-      if (code === 'ACTION_REJECTED' || code === 4001 || /rejected/i.test(msg)) {
+      if (isUserRejection) {
         return { success: false, error: 'user_rejected' };
       }
       return { success: false, error: msg || 'delete_failed' };

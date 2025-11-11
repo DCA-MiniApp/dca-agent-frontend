@@ -245,9 +245,9 @@ export async function deletePlan(planId: string): Promise<boolean> {
  * Fetch number of successful task executions for a given TriggerX jobId.
  * Tries the path under /api/dca first, then falls back to root /job route.
  */
-export async function fetchJobSuccessCount(jobId: string): Promise<number | null> {
+export async function fetchJobSuccessCount(jobId: string,userAddress:string): Promise<number | null> {
   if (!jobId) return null;
-  const path=`${API_BASE_URL}/api/dca/job/${jobId}/success-count`;
+  const path=`${API_BASE_URL}/api/dca/userAddress/${userAddress}/job/${jobId}/success-count`;
 
   // console.log("paths", paths);
 

@@ -3041,9 +3041,9 @@ axios@1.12.2:
     proxy-from-env "^1.1.0"
 
 axios@^1.11.0:
-  version "1.13.1"
-  resolved "https://registry.yarnpkg.com/axios/-/axios-1.13.1.tgz#45b62dc8fe04e0e92274e08b98e910ba3d7963a7"
-  integrity sha512-hU4EGxxt+j7TQijx1oYdAjw4xuIp1wRQSsbMFwSthCWeBQur1eF+qJ5iQ5sN3Tw8YRzQNKb8jszgBdMDVqwJcw==
+  version "1.13.2"
+  resolved "https://registry.yarnpkg.com/axios/-/axios-1.13.2.tgz#9ada120b7b5ab24509553ec3e40123521117f687"
+  integrity sha512-VPk9ebNqPcy5lRGuSlKx752IlDatOjT9paPlm8A7yOuW2Fbvp4X3JznJtT4f0GzGLLiWE9W8onz51SqLYwzGaA==
   dependencies:
     follow-redirects "^1.15.6"
     form-data "^4.0.4"
@@ -6706,10 +6706,10 @@ scheduler@^0.27.0:
   resolved "https://registry.yarnpkg.com/scheduler/-/scheduler-0.27.0.tgz#0c4ef82d67d1e5c1e359e8fc76d3a87f045fe5bd"
   integrity sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==
 
-sdk-triggerx@0.1.22:
-  version "0.1.22"
-  resolved "https://registry.yarnpkg.com/sdk-triggerx/-/sdk-triggerx-0.1.22.tgz#86921b2a778566f730334dda4daa567b7287ab68"
-  integrity sha512-wmFygv+TaPM3oHYQ08jikra0XfMawh7oRopXPQ+U57nx1EKYc7hK8oZ2AIkbmogkmLEkpXHqEPpsnSNH7S11UA==
+sdk-triggerx@0.1.26:
+  version "0.1.26"
+  resolved "https://registry.yarnpkg.com/sdk-triggerx/-/sdk-triggerx-0.1.26.tgz#11bd90690c544cff40ac0324364c030eed2e3e37"
+  integrity sha512-h+68We7k8LIEqPuDuJX2OcTJUwBiPCQVJXix4t2DwTp0uLh6+3YpdJDKShciB+6m3itouuJPnO2JptoaSxa0pw==
   dependencies:
     axios "^1.11.0"
     ethers "^6.15.0"
