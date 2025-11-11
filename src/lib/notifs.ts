@@ -44,6 +44,7 @@ export async function sendMiniAppNotification({
   });
 
   const responseJson = await response.json();
+  console.log("Notification send response on notifs:", response.status, responseJson);
   if (response.status === 200) {
     const responseBody = sendNotificationResponseSchema.safeParse(responseJson);
     // console.log("responseBody", responseBody);

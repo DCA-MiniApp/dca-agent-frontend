@@ -24,6 +24,8 @@ export async function POST(req: NextRequest) {
   try {
     const json = await req.json();
     const parsed = TxEventSchema.safeParse(json);
+    console.log("[tx-events] received payload:", json);
+    console.log("[tx-events] parsed result:", parsed);
     if (!parsed.success) {
       return NextResponse.json(
         {

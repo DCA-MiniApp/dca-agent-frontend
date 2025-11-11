@@ -358,6 +358,7 @@ export function createDCAJobInput(params: {
     isImua: false, // Add missing isImua field
     walletMode:'regular', // Add missing walletMode field
     safeAddress: '0x27e801a2233D322eB72861F073f9B1F72B103b01', // Add missing safeAddress field
+    language:'go',
   };
 }
 
