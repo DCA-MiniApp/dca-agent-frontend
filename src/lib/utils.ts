@@ -89,8 +89,35 @@ export async function getFarcasterDomainManifest(): Promise<Manifest> {
 }
 
 // Portfolio helpers
-type PlanForUsd = { fromToken: string; amount: string;jobId:string;userAddress:string; };
+type PlanForUsd = {
+  fromToken: string;
+  amount: string;
+  executionCount?: number;
+  jobId?: string | null;
+  userAddress?: string;
+};
+const PORTFOLIO_CACHE_PREFIX = "dca_portfolio_usd_v1";
 
+function buildPortfolioCacheKey(plans: PlanForUsd[]): string | null {
+  if (typeof window === "undefined") return null;
+  if (!Array.isArray(plans) || plans.length === 0) return null;
+  const owner = (plans[0] as any)?.userAddress;
+  if (!owner) return null;
+  return `${PORTFOLIO_CACHE_PREFIX}:${String(owner).toLowerCase()}`;
+}
+
+function buildPlansSignature(plans: PlanForUsd[]): string {
+  return plans
+    .map((plan) => {
+      const jobId = (plan as any).jobId ?? "";
+      const from = (plan.fromToken || "").toUpperCase();
+      const amount = String(plan.amount ?? "");
+      const execs = String(plan.executionCount ?? "");
+      return `${jobId}|${from}|${amount}|${execs}`;
+    })
+    .sort()
+    .join(";");
+}
 // Simple token map import can be added later; use a lightweight fallback resolver for now
 export function getArbitrumAddressBySymbol(symbol: string): string | null {
   const sym = (symbol || '').toUpperCase();
@@ -142,6 +169,30 @@ export async function fetchArbitrumUsdPrices(addresses: string[]): Promise<Recor
 
 export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<number> {
   // console.log("Line number 107:",plans)
+  const cacheKey = buildPortfolioCacheKey(plans);
+  const signature = buildPlansSignature(plans);
+  if (cacheKey) {
+    try {
+      const cachedRaw = window.localStorage.getItem(cacheKey);
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw) as {
+          value: number;
+          signature: string;
+          timestamp: number;
+        };
+        if (
+          cached &&
+          cached.signature === signature &&
+          typeof cached.timestamp === "number" &&
+          Date.now() - cached.timestamp < 10 * 60 * 1000
+        ) {
+          return cached.value ?? 0;
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to read portfolio cache", err);
+    }
+  }
   const neededSymbols = Array.from(
     new Set(
       plans
@@ -159,7 +210,18 @@ export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<numb
     if (addr) symbolToPrice[sym] = prices[addr.toLowerCase()] ?? 0;
   }
 
-  const successCounts = await Promise.all(plans.map((p) => fetchJobSuccessCount(p.jobId,p.userAddress)));
+  const successCounts = await Promise.all(
+    plans.map((p) => {
+      const jobId = p.jobId ?? null;
+      const userAddress = p.userAddress ?? null;
+      if (!jobId || !userAddress) {
+        return Promise.resolve(p.executionCount ?? 0);
+      }
+      return fetchJobSuccessCount(jobId, userAddress).catch(() =>
+        p.executionCount ?? 0
+      );
+    })
+  );
   // console.log('successCounts 127', successCounts);
 
   let total = 0;
@@ -169,7 +231,7 @@ export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<numb
     // console.log("per in computePlansInvestedUsd 138:", per);
     const successCount = successCounts[i];
     // console.log("successCount in computePlansInvestedUsd 140:", successCount);
-    // if (!isFinite(per) || !successCount) continue;
+    if (!isFinite(per)) continue;
     const sym = (plan.fromToken || 'USDC').toUpperCase();
 
     // console.log("sym in computePlansInvestedUsd", sym);
@@ -178,6 +240,20 @@ export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<numb
     // console.log("price in computePlansInvestedUsd 147:", price);
     total += per * price * (successCount ?? 0);
     // console.log("total in computePlansInvestedUsd 149:", total);
+  }
+  if (cacheKey) {
+    try {
+      window.localStorage.setItem(
+        cacheKey,
+        JSON.stringify({
+          value: total,
+          signature,
+          timestamp: Date.now(),
+        })
+      );
+    } catch (err) {
+      console.warn("Failed to write portfolio cache", err);
+    }
   }
   return total;
 }

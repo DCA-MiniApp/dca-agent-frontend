@@ -34,7 +34,6 @@ import {
   formatDuration,
   type DCAPlan,
   type PlatformStats,
-  fetchJobSuccessCount,
 } from "../../../lib/api";
 import { computePlansInvestedUsd, calculateWalletTotalUsdValue } from "../../../lib/utils";
 import { deleteTriggerXJobForPlan } from "../../../lib/triggerXIntegration";
@@ -126,9 +125,6 @@ export function HomeTab() {
 
   // Slider state
   const [currentPlanIndex, setCurrentPlanIndex] = useState(0);
-
-  // Success count state
-   const [successCount, setSuccessCount] = useState<number>(0);
 
   // Notification state
   const [hasNotifications, setHasNotifications] = useState(false);
