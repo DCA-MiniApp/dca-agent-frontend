@@ -746,6 +746,7 @@ export function ActionsTab() {
                     "✅ Successfully obtained signer via window.ethereum:",
                     signerAddress
                   );
+                  console.log("Signer value:", ethersSigner);
                 } catch (windowEthereumError) {
                   console.error(
                     "❌ window.ethereum failed:",
