@@ -113,7 +113,7 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
 
   try {
     // console.log('🚀 Starting TriggerX job creation for plan:', planId);
-    // console.log("params", params);
+    console.log("params", params);
 
     // Step 1: Get token addresses and validate script parameters
     const fromTokenInfo = getTokenInfo(fromToken);

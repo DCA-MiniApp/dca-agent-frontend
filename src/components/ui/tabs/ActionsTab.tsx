@@ -25,6 +25,7 @@ import { IoPersonCircle } from "react-icons/io5";
 import { RiRobot2Fill } from "react-icons/ri";
 import { parseUnits } from "viem";
 import sdk from "@farcaster/miniapp-sdk";
+import { BrowserProvider, JsonRpcSigner } from "ethers";
 
 // Chat message interface
 interface ChatMessage {
@@ -62,140 +63,261 @@ function formatLongText(text: string, maxLength = 20): string {
   return `${text.slice(0, 8)}...${text.slice(-6)}`;
 }
 
-async function getEthersSigner(walletClient: any, connector: any) {
-  let ethersSigner: any = null;
+// async function getEthersSigner(walletClient: any, connector: any) {
+//   let ethersSigner: any = null;
 
+//   try {
+//     const { BrowserProvider } = await import("ethers");
+
+//     // ✅ Strategy 1: Check if using Farcaster wallet and use SDK provider
+//     if (connector?.id === "farcaster" || connector?.name === "Farcaster") {
+//       console.log("Detected Farcaster wallet, using SDK provider...");
+
+//       try {
+//         // Get the Farcaster SDK's Ethereum Provider
+//         const farcasterProvider = await sdk.wallet.getEthereumProvider();
+
+//         if (farcasterProvider) {
+//           const provider = new BrowserProvider(
+//             farcasterProvider,
+//             walletClient?.chain?.id
+//           );
+
+//           ethersSigner = await Promise.race([
+//             provider.getSigner(),
+//             new Promise((_, reject) =>
+//               setTimeout(
+//                 () => reject(new Error("Farcaster signer timeout")),
+//                 30000
+//               )
+//             ) as Promise<any>,
+//           ]);
+
+//           const signerAddress = await ethersSigner.getAddress();
+//           console.log(
+//             "✅ Successfully obtained signer via Farcaster SDK:",
+//             signerAddress
+//           );
+//           return ethersSigner;
+//         }
+//       } catch (farcasterError) {
+//         console.warn("⚠️ Farcaster SDK provider failed:", farcasterError);
+//       }
+//     }
+
+//     // Strategy 2: Try Wagmi transport (for other connectors)
+//     if (walletClient?.account?.address && walletClient?.transport) {
+//       try {
+//         const transportRequest = (walletClient.transport as any).request;
+
+//         if (transportRequest) {
+//           const eip1193Provider = {
+//             request: transportRequest.bind(walletClient.transport),
+//           };
+
+//           const provider = new BrowserProvider(
+//             eip1193Provider,
+//             walletClient.chain?.id
+//           );
+
+//           ethersSigner = await Promise.race([
+//             provider.getSigner(walletClient.account.address),
+//             new Promise((_, reject) =>
+//               setTimeout(() => reject(new Error("Wagmi signer timeout")), 30000)
+//             ) as Promise<any>,
+//           ]);
+
+//           const signerAddress = await ethersSigner.getAddress();
+//           console.log(
+//             "✅ Successfully obtained signer via Wagmi:",
+//             signerAddress
+//           );
+//           return ethersSigner;
+//         }
+//       } catch (wagmiError) {
+//         console.warn("⚠️ Wagmi transport failed:", wagmiError);
+//       }
+//     }
+
+//     // Strategy 3: Fallback to window.ethereum
+//     if (
+//       !ethersSigner &&
+//       typeof window !== "undefined" &&
+//       (window as any).ethereum
+//     ) {
+//       try {
+//         const provider = new BrowserProvider((window as any).ethereum);
+
+//         let accounts: string[] = [];
+//         try {
+//           accounts = await Promise.race([
+//             provider.send("eth_accounts", []),
+//             new Promise((_, reject) =>
+//               setTimeout(() => reject(new Error("eth_accounts timeout")), 8000)
+//             ) as Promise<string[]>,
+//           ]);
+//         } catch (accountsError) {
+//           console.warn("Failed to get accounts:", accountsError);
+//           accounts = [];
+//         }
+
+//         if (!accounts || accounts.length === 0) {
+//           await Promise.race([
+//             provider.send("eth_requestAccounts", []),
+//             new Promise((_, reject) =>
+//               setTimeout(
+//                 () =>
+//                   reject(new Error("User did not approve wallet connection")),
+//                 60000
+//               )
+//             ) as Promise<any>,
+//           ]);
+//         }
+
+//         ethersSigner = await Promise.race([
+//           provider.getSigner(0),
+//           new Promise((_, reject) =>
+//             setTimeout(() => reject(new Error("getSigner timeout")), 30000)
+//           ) as Promise<any>,
+//         ]);
+
+//         const signerAddress = await ethersSigner.getAddress();
+//         console.log(
+//           "✅ Successfully obtained signer via window.ethereum:",
+//           signerAddress
+//         );
+//         return ethersSigner;
+//       } catch (windowEthereumError) {
+//         console.error("❌ window.ethereum failed:", windowEthereumError);
+//         throw windowEthereumError;
+//       }
+//     }
+
+//     throw new Error("Could not obtain signer from any source");
+//   } catch (walletErr) {
+//     console.error("❌ Failed to obtain ethers signer:", walletErr);
+//     throw walletErr;
+//   }
+// }
+
+export async function getEthersSigner(
+  walletClient: any,
+  connector: any
+): Promise<JsonRpcSigner> {
   try {
-    const { BrowserProvider } = await import("ethers");
-
-    // ✅ Strategy 1: Check if using Farcaster wallet and use SDK provider
-    if (connector?.id === "farcaster" || connector?.name === "Farcaster") {
-      console.log("Detected Farcaster wallet, using SDK provider...");
-
-      try {
-        // Get the Farcaster SDK's Ethereum Provider
-        const farcasterProvider = await sdk.wallet.getEthereumProvider();
-
-        if (farcasterProvider) {
-          const provider = new BrowserProvider(
-            farcasterProvider,
-            walletClient?.chain?.id
-          );
-
-          ethersSigner = await Promise.race([
-            provider.getSigner(),
-            new Promise((_, reject) =>
-              setTimeout(
-                () => reject(new Error("Farcaster signer timeout")),
-                30000
-              )
-            ) as Promise<any>,
-          ]);
-
-          const signerAddress = await ethersSigner.getAddress();
-          console.log(
-            "✅ Successfully obtained signer via Farcaster SDK:",
-            signerAddress
-          );
-          return ethersSigner;
-        }
-      } catch (farcasterError) {
-        console.warn("⚠️ Farcaster SDK provider failed:", farcasterError);
+    // 1. If the connector is the Farcaster Mini App connector → use SDK provider
+    const isFarcasterConnector =
+      connector?.id === "farcaster" || connector?.name === "Farcaster";
+    if (isFarcasterConnector) {
+      console.log("Detected Farcaster Mini App connector → using SDK provider");
+      console.log("Wallet Client faracaster:", walletClient);
+      console.log("Wallet Client chainid faracaster:", walletClient?.chain?.id);
+      const farcasterProvider = await sdk.wallet.getEthereumProvider();
+      if (!farcasterProvider) {
+        throw new Error("Farcaster SDK did not return a provider");
       }
+
+      // Wrap with Ethers provider
+      const provider = new BrowserProvider(farcasterProvider);
+      const signer = await Promise.race([
+        provider.getSigner(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Farcaster signer timeout")), 30000)
+        ),
+      ]);
+
+      const address = await signer.getAddress();
+      try {
+        const balance = await provider.getBalance(address);
+        console.log("Balance of signer faracaster:", balance.toString());
+      } catch (balanceErr) {
+        console.warn("Could not fetch signer balance:", balanceErr);
+      }
+      console.log("Signer obtained via Farcaster SDK:", address);
+      return signer;
     }
 
-    // Strategy 2: Try Wagmi transport (for other connectors)
-    if (walletClient?.account?.address && walletClient?.transport) {
-      try {
-        const transportRequest = (walletClient.transport as any).request;
-
-        if (transportRequest) {
-          const eip1193Provider = {
-            request: transportRequest.bind(walletClient.transport),
-          };
-
-          const provider = new BrowserProvider(
-            eip1193Provider,
-            walletClient.chain?.id
-          );
-
-          ethersSigner = await Promise.race([
-            provider.getSigner(walletClient.account.address),
-            new Promise((_, reject) =>
-              setTimeout(() => reject(new Error("Wagmi signer timeout")), 30000)
-            ) as Promise<any>,
-          ]);
-
-          const signerAddress = await ethersSigner.getAddress();
-          console.log(
-            "✅ Successfully obtained signer via Wagmi:",
-            signerAddress
-          );
-          return ethersSigner;
-        }
-      } catch (wagmiError) {
-        console.warn("⚠️ Wagmi transport failed:", wagmiError);
-      }
-    }
-
-    // Strategy 3: Fallback to window.ethereum
+    // 2. If Wagmi walletClient is available → use its transport/provider
     if (
-      !ethersSigner &&
-      typeof window !== "undefined" &&
-      (window as any).ethereum
+      walletClient &&
+      walletClient.account?.address &&
+      walletClient.transport
     ) {
-      try {
-        const provider = new BrowserProvider((window as any).ethereum);
+      console.log("Using Wagmi walletClient transport path");
+      console.log("Wallet Client wagmi:", walletClient);
+      console.log("Wallet Client wagmi:", walletClient?.chain?.id);
+      const requestFn = (walletClient.transport as any).request;
+      if (typeof requestFn === "function") {
+        const eip1193Provider = {
+          request: requestFn.bind(walletClient.transport),
+        };
 
-        let accounts: string[] = [];
-        try {
-          accounts = await Promise.race([
-            provider.send("eth_accounts", []),
-            new Promise((_, reject) =>
-              setTimeout(() => reject(new Error("eth_accounts timeout")), 8000)
-            ) as Promise<string[]>,
-          ]);
-        } catch (accountsError) {
-          console.warn("Failed to get accounts:", accountsError);
-          accounts = [];
-        }
+        const provider = walletClient.chain
+          ? new BrowserProvider(eip1193Provider, walletClient.chain.id)
+          : new BrowserProvider(eip1193Provider);
 
-        if (!accounts || accounts.length === 0) {
-          await Promise.race([
-            provider.send("eth_requestAccounts", []),
-            new Promise((_, reject) =>
-              setTimeout(
-                () =>
-                  reject(new Error("User did not approve wallet connection")),
-                60000
-              )
-            ) as Promise<any>,
-          ]);
-        }
-
-        ethersSigner = await Promise.race([
-          provider.getSigner(0),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("getSigner timeout")), 30000)
-          ) as Promise<any>,
+        const signer = await Promise.race([
+          provider.getSigner(walletClient.account.address),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Wagmi signer timeout")), 30000)
+          ),
         ]);
 
-        const signerAddress = await ethersSigner.getAddress();
-        console.log(
-          "✅ Successfully obtained signer via window.ethereum:",
-          signerAddress
-        );
-        return ethersSigner;
-      } catch (windowEthereumError) {
-        console.error("❌ window.ethereum failed:", windowEthereumError);
-        throw windowEthereumError;
+        const address = await signer.getAddress();
+        const balance = await provider.getBalance(address);
+        console.log("Balance of signer wagmi transport:", balance.toString());
+        console.log("Signer obtained via Wagmi transport:", address);
+        return signer;
       }
+    }
+
+    // 3. Fallback: window.ethereum
+    if (typeof window !== "undefined" && (window as any).ethereum) {
+      console.log("Falling back to window.ethereum provider");
+      const provider = new BrowserProvider((window as any).ethereum as any);
+
+      // Check accounts
+      let accounts: string[] = [];
+      try {
+        accounts = (await Promise.race([
+          provider.send("eth_accounts", []),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("eth_accounts timeout")), 8000)
+          ),
+        ])) as string[];
+      } catch (err) {
+        console.warn("eth_accounts call failed:", err);
+        // We can attempt requestAccounts
+      }
+
+      if (!accounts || accounts.length === 0) {
+        await Promise.race([
+          provider.send("eth_requestAccounts", []),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error("User did not connect wallet")),
+              60000
+            )
+          ),
+        ]);
+      }
+
+      const signer = await Promise.race([
+        provider.getSigner(0),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("getSigner timeout")), 30000)
+        ),
+      ]);
+
+      const address = await signer.getAddress();
+      console.log("Signer obtained via window.ethereum:", address);
+      return signer;
     }
 
     throw new Error("Could not obtain signer from any source");
-  } catch (walletErr) {
-    console.error("❌ Failed to obtain ethers signer:", walletErr);
-    throw walletErr;
+  } catch (err) {
+    console.error("getEthersSigner failure:", err);
+    throw err;
   }
 }
 
@@ -203,7 +325,7 @@ export function ActionsTab() {
   // --- Hooks ---
   const { notificationDetails, haptics, context } = useMiniApp();
 
-  const { address, isConnected,connector } = useAccount();
+  const { address, isConnected, connector } = useAccount();
   const { data: walletClient } = useWalletClient();
 
   // --- State ---
