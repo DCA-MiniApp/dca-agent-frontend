@@ -11,6 +11,7 @@ import {
   useWaitForTransactionReceipt,
   useReadContract,
   useWalletClient,
+  useConnectors,
 } from "wagmi";
 import { maxUint256 } from "viem";
 import { arbitrum } from "wagmi/chains";
@@ -61,11 +62,148 @@ function formatLongText(text: string, maxLength = 20): string {
   return `${text.slice(0, 8)}...${text.slice(-6)}`;
 }
 
+async function getEthersSigner(walletClient: any, connector: any) {
+  let ethersSigner: any = null;
+
+  try {
+    const { BrowserProvider } = await import("ethers");
+
+    // ✅ Strategy 1: Check if using Farcaster wallet and use SDK provider
+    if (connector?.id === "farcaster" || connector?.name === "Farcaster") {
+      console.log("Detected Farcaster wallet, using SDK provider...");
+
+      try {
+        // Get the Farcaster SDK's Ethereum Provider
+        const farcasterProvider = await sdk.wallet.getEthereumProvider();
+
+        if (farcasterProvider) {
+          const provider = new BrowserProvider(
+            farcasterProvider,
+            walletClient?.chain?.id
+          );
+
+          ethersSigner = await Promise.race([
+            provider.getSigner(),
+            new Promise((_, reject) =>
+              setTimeout(
+                () => reject(new Error("Farcaster signer timeout")),
+                30000
+              )
+            ) as Promise<any>,
+          ]);
+
+          const signerAddress = await ethersSigner.getAddress();
+          console.log(
+            "✅ Successfully obtained signer via Farcaster SDK:",
+            signerAddress
+          );
+          return ethersSigner;
+        }
+      } catch (farcasterError) {
+        console.warn("⚠️ Farcaster SDK provider failed:", farcasterError);
+      }
+    }
+
+    // Strategy 2: Try Wagmi transport (for other connectors)
+    if (walletClient?.account?.address && walletClient?.transport) {
+      try {
+        const transportRequest = (walletClient.transport as any).request;
+
+        if (transportRequest) {
+          const eip1193Provider = {
+            request: transportRequest.bind(walletClient.transport),
+          };
+
+          const provider = new BrowserProvider(
+            eip1193Provider,
+            walletClient.chain?.id
+          );
+
+          ethersSigner = await Promise.race([
+            provider.getSigner(walletClient.account.address),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error("Wagmi signer timeout")), 30000)
+            ) as Promise<any>,
+          ]);
+
+          const signerAddress = await ethersSigner.getAddress();
+          console.log(
+            "✅ Successfully obtained signer via Wagmi:",
+            signerAddress
+          );
+          return ethersSigner;
+        }
+      } catch (wagmiError) {
+        console.warn("⚠️ Wagmi transport failed:", wagmiError);
+      }
+    }
+
+    // Strategy 3: Fallback to window.ethereum
+    if (
+      !ethersSigner &&
+      typeof window !== "undefined" &&
+      (window as any).ethereum
+    ) {
+      try {
+        const provider = new BrowserProvider((window as any).ethereum);
+
+        let accounts: string[] = [];
+        try {
+          accounts = await Promise.race([
+            provider.send("eth_accounts", []),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error("eth_accounts timeout")), 8000)
+            ) as Promise<string[]>,
+          ]);
+        } catch (accountsError) {
+          console.warn("Failed to get accounts:", accountsError);
+          accounts = [];
+        }
+
+        if (!accounts || accounts.length === 0) {
+          await Promise.race([
+            provider.send("eth_requestAccounts", []),
+            new Promise((_, reject) =>
+              setTimeout(
+                () =>
+                  reject(new Error("User did not approve wallet connection")),
+                60000
+              )
+            ) as Promise<any>,
+          ]);
+        }
+
+        ethersSigner = await Promise.race([
+          provider.getSigner(0),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("getSigner timeout")), 30000)
+          ) as Promise<any>,
+        ]);
+
+        const signerAddress = await ethersSigner.getAddress();
+        console.log(
+          "✅ Successfully obtained signer via window.ethereum:",
+          signerAddress
+        );
+        return ethersSigner;
+      } catch (windowEthereumError) {
+        console.error("❌ window.ethereum failed:", windowEthereumError);
+        throw windowEthereumError;
+      }
+    }
+
+    throw new Error("Could not obtain signer from any source");
+  } catch (walletErr) {
+    console.error("❌ Failed to obtain ethers signer:", walletErr);
+    throw walletErr;
+  }
+}
+
 export function ActionsTab() {
   // --- Hooks ---
   const { notificationDetails, haptics, context } = useMiniApp();
 
-  const { address, isConnected } = useAccount();
+  const { address, isConnected,connector } = useAccount();
   const { data: walletClient } = useWalletClient();
 
   // --- State ---
@@ -317,7 +455,6 @@ export function ActionsTab() {
       content: inputMessage,
       timestamp: new Date(),
     };
-
 
     setMessages((prev) => [...prev, userMessage]);
     const currentInput = inputMessage;
@@ -611,153 +748,25 @@ export function ActionsTab() {
             const { createTriggerXJobForPlan } = await import(
               "../../../lib/triggerXIntegration"
             );
-            // console.log("Imported createTriggerXJobForPlan successfully");
 
-            // Build ethers signer with improved reliability
             let ethersSigner: any = null;
 
             try {
-              const { BrowserProvider } = await import("ethers");
+              // ✅ Just call the function with connector and walletClient
+              ethersSigner = await getEthersSigner(walletClient, connector);
 
-              // Strategy 1: Try Wagmi transport first (preferred - no popup)
-              if (walletClient?.account?.address && walletClient?.transport) {
-                // console.log(
-                //   "Attempting to create signer via Wagmi transport..."
-                // );
+              console.log(
+                "✅ Signer obtained successfully:",
+                await ethersSigner.getAddress()
+              );
+              console.log("Signer value:", ethersSigner);
 
-                try {
-                  const transportRequest = (walletClient.transport as any)
-                    .request;
-
-                  if (transportRequest) {
-                    const eip1193Provider = {
-                      request: transportRequest.bind(walletClient.transport),
-                    };
-
-                    const provider = new BrowserProvider(
-                      eip1193Provider,
-                      walletClient.chain?.id
-                    );
-
-                    // Increased timeout to 30 seconds for better reliability
-                    ethersSigner = await Promise.race([
-                      provider.getSigner(walletClient.account.address),
-                      new Promise((_, reject) =>
-                        setTimeout(
-                          () => reject(new Error("Wagmi signer timeout")),
-                          30000
-                        )
-                      ) as Promise<any>,
-                    ]);
-
-                    const signerAddress = await ethersSigner.getAddress();
-                    // console.log(
-                    //   "✅ Successfully obtained signer via Wagmi:",
-                    //   signerAddress
-                    // );
-                  }
-                } catch (wagmiError) {
-                  console.warn("⚠️ Wagmi transport failed:", wagmiError);
-                  ethersSigner = null;
-                }
-              }
-
-              // Strategy 2: Fallback to window.ethereum if Wagmi failed
-              if (
-                !ethersSigner &&
-                typeof window !== "undefined" &&
-                (window as any).ethereum
-              ) {
-
-                try {
-                  const provider = new BrowserProvider(
-                    (window as any).ethereum
-                  );
-
-                  // Check if accounts are already available
-                  let accounts: string[] = [];
-                  try {
-                    accounts = await Promise.race([
-                      provider.send("eth_accounts", []),
-                      new Promise((_, reject) =>
-                        setTimeout(
-                          () => reject(new Error("eth_accounts timeout")),
-                          8000
-                        )
-                      ) as Promise<string[]>,
-                    ]);
-                  } catch (accountsError) {
-                    console.warn("Failed to get accounts:", accountsError);
-                    accounts = [];
-                  }
-
-                  // Request accounts if not available (this may show popup)
-                  if (!accounts || accounts.length === 0) {
-                    // console.log(
-                    //   "No accounts found, requesting via eth_requestAccounts..."
-                    // );
-
-                    // Add user-facing message about wallet approval
-                    const approvalMessage: ChatMessage = {
-                      id: `approval-${Date.now()}`,
-                      role: "assistant",
-                      content:
-                        "🔐 Please approve the wallet connection request...",
-                      timestamp: new Date(),
-                      isCreatingPlan: true,
-                    };
-                    setMessages((prev) => [...prev, approvalMessage]);
-
-                    try {
-                      await Promise.race([
-                        provider.send("eth_requestAccounts", []),
-                        new Promise((_, reject) =>
-                          setTimeout(
-                            () =>
-                              reject(
-                                new Error(
-                                  "User did not approve wallet connection"
-                                )
-                              ),
-                            60000
-                          )
-                        ) as Promise<any>,
-                      ]);
-                    } catch (requestError) {
-                      throw new Error(
-                        "Wallet connection was not approved. Please try again."
-                      );
-                    }
-                  }
-
-                  // Get signer with increased timeout
-                  ethersSigner = await Promise.race([
-                    provider.getSigner(0),
-                    new Promise((_, reject) =>
-                      setTimeout(
-                        () => reject(new Error("getSigner timeout")),
-                        30000
-                      )
-                    ) as Promise<any>,
-                  ]);
-
-                  const signerAddress = await ethersSigner.getAddress();
-                  console.log(
-                    "✅ Successfully obtained signer via window.ethereum:",
-                    signerAddress
-                  );
-                  console.log("Signer value:", ethersSigner);
-                } catch (windowEthereumError) {
-                  console.error(
-                    "❌ window.ethereum failed:",
-                    windowEthereumError
-                  );
-                  throw windowEthereumError;
-                }
-              }
+              // Now you can use ethersSigner for your transactions
             } catch (walletErr) {
               console.error("❌ Failed to obtain ethers signer:", walletErr);
               ethersSigner = null;
+
+              // Handle error (show message to user, etc.)
             }
 
             // Handle case where no signer could be obtained
@@ -871,15 +880,21 @@ export function ActionsTab() {
           if (triggerXSuccess) {
             // TriggerX succeeded - success message already shown above with share button
             // No need to show additional confirmation message
-            console.log("[Plan Creation] TriggerX automation setup completed successfully");
+            console.log(
+              "[Plan Creation] TriggerX automation setup completed successfully"
+            );
           } else if (triggerXSkipped) {
             // Wallet signer issue - warning message already shown above
             // No need to show additional confirmation message
-            console.log("[Plan Creation] Plan created but automation was skipped due to wallet connection");
+            console.log(
+              "[Plan Creation] Plan created but automation was skipped due to wallet connection"
+            );
           } else {
             // TriggerX failed - error message already shown above
             // No need to show additional confirmation message
-            console.log("[Plan Creation] Plan created but automation setup failed");
+            console.log(
+              "[Plan Creation] Plan created but automation setup failed"
+            );
           }
 
           // Handle action response
@@ -919,7 +934,6 @@ export function ActionsTab() {
     [address, handleChatAction, walletClient, setMessages]
   );
 
-  
   const startApprovalProcess = useCallback(
     async (confirmationId: string, planData: any) => {
       const tokenInfo = getTokenInfo(planData.fromToken);
@@ -1580,7 +1594,11 @@ export function ActionsTab() {
               My Plans
             </button>
             <button
-              onClick={() => setInputMessage("Create a DCA plan with 0.1 USDC into WETH every 15 minutes for 1 hour")}
+              onClick={() =>
+                setInputMessage(
+                  "Create a DCA plan with 0.1 USDC into WETH every 15 minutes for 1 hour"
+                )
+              }
               className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
             >
               Create Plan

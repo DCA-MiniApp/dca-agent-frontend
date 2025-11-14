@@ -1,7 +1,7 @@
 import { createConfig, http, WagmiProvider } from "wagmi";
 import { arbitrum, mainnet } from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { farcasterFrame } from "@farcaster/miniapp-wagmi-connector";
+import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
 import { coinbaseWallet, metaMask } from "wagmi/connectors";
 import { APP_NAME, APP_ICON_URL, APP_URL } from "~/lib/constants";
 import { useEffect, useState } from "react";
@@ -15,7 +15,6 @@ function useCoinbaseWalletAutoConnect() {
   const { isConnected } = useAccount();
 
   useEffect(() => {
-    // Check if we're running in Coinbase Wallet
     const checkCoinbaseWallet = () => {
       const isInCoinbaseWallet =
         window.ethereum?.isCoinbaseWallet ||
@@ -33,9 +32,8 @@ function useCoinbaseWalletAutoConnect() {
   }, []);
 
   useEffect(() => {
-    // Auto-connect if in Coinbase Wallet and not already connected
     if (isCoinbaseWallet && !isConnected) {
-      connect({ connector: connectors[1] }); // Coinbase Wallet connector
+      connect({ connector: connectors[1] });
     }
   }, [isCoinbaseWallet, isConnected, connect, connectors]);
 
@@ -49,7 +47,7 @@ export const config = createConfig({
     [mainnet.id]: http(),
   },
   connectors: [
-    farcasterFrame(),
+    farcasterMiniApp(),
     coinbaseWallet({
       appName: APP_NAME,
       appLogoUrl: APP_ICON_URL,
@@ -66,7 +64,6 @@ export const config = createConfig({
 
 const queryClient = new QueryClient();
 
-// Wrapper component that provides Coinbase Wallet auto-connection
 function CoinbaseWalletAutoConnect({
   children,
 }: {
