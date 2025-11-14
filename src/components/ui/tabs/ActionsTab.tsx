@@ -205,13 +205,74 @@ export async function getEthersSigner(
   connector: any
 ): Promise<JsonRpcSigner> {
   try {
-    // 1. If the connector is the Farcaster Mini App connector → use SDK provider
     const isFarcasterConnector =
       connector?.id === "farcaster" || connector?.name === "Farcaster";
+
+    // 1. Try Wagmi walletClient transport first (works for Farcaster and other connectors)
+    if (
+      walletClient &&
+      walletClient.account?.address &&
+      walletClient.transport
+    ) {
+      console.log(
+        isFarcasterConnector
+          ? "Detected Farcaster connector → trying Wagmi transport first"
+          : "Using Wagmi walletClient transport path"
+      );
+      console.log("Wallet Client:", walletClient);
+      console.log("Wallet Client chain ID:", walletClient?.chain?.id);
+
+      const requestFn = (walletClient.transport as any).request;
+      if (typeof requestFn === "function") {
+        try {
+          const eip1193Provider = {
+            request: requestFn.bind(walletClient.transport),
+          };
+
+          const provider = walletClient.chain
+            ? new BrowserProvider(eip1193Provider, walletClient.chain.id)
+            : new BrowserProvider(eip1193Provider);
+
+          console.log("Provider:", provider);
+
+          const signer = await Promise.race([
+            provider.getSigner(walletClient.account.address),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error("Wagmi signer timeout")), 30000)
+            ),
+          ]);
+
+          console.log("Signer:", signer);
+
+          const address = await signer.getAddress();
+          try {
+            const balance = await provider.getBalance(address);
+            console.log("Balance of signer (Wagmi transport):", balance.toString());
+          } catch (balanceErr) {
+            console.warn("Could not fetch signer balance:", balanceErr);
+          }
+          console.log(
+            isFarcasterConnector
+              ? "✅ Signer obtained via Wagmi transport (Farcaster connector)"
+              : "✅ Signer obtained via Wagmi transport",
+            address
+          );
+          return signer;
+        } catch (wagmiError) {
+          console.warn("⚠️ Wagmi transport failed:", wagmiError);
+          // If Farcaster connector and Wagmi transport failed, fall through to SDK provider
+          if (!isFarcasterConnector) {
+            throw wagmiError;
+          }
+        }
+      }
+    }
+
+    // 2. Fallback: If Farcaster connector and Wagmi transport didn't work → use SDK provider
     if (isFarcasterConnector) {
-      console.log("Detected Farcaster Mini App connector → using SDK provider");
-      console.log("Wallet Client faracaster:", walletClient);
-      console.log("Wallet Client chainid faracaster:", walletClient?.chain?.id);
+      console.log(
+        "Farcaster connector detected but Wagmi transport unavailable/unsuccessful → falling back to SDK provider"
+      );
       const farcasterProvider = await sdk.wallet.getEthereumProvider();
       if (!farcasterProvider) {
         throw new Error("Farcaster SDK did not return a provider");
@@ -229,46 +290,12 @@ export async function getEthersSigner(
       const address = await signer.getAddress();
       try {
         const balance = await provider.getBalance(address);
-        console.log("Balance of signer faracaster:", balance.toString());
+        console.log("Balance of signer (Farcaster SDK):", balance.toString());
       } catch (balanceErr) {
         console.warn("Could not fetch signer balance:", balanceErr);
       }
-      console.log("Signer obtained via Farcaster SDK:", address);
+      console.log("✅ Signer obtained via Farcaster SDK (fallback):", address);
       return signer;
-    }
-
-    // 2. If Wagmi walletClient is available → use its transport/provider
-    if (
-      walletClient &&
-      walletClient.account?.address &&
-      walletClient.transport
-    ) {
-      console.log("Using Wagmi walletClient transport path");
-      console.log("Wallet Client wagmi:", walletClient);
-      console.log("Wallet Client wagmi:", walletClient?.chain?.id);
-      const requestFn = (walletClient.transport as any).request;
-      if (typeof requestFn === "function") {
-        const eip1193Provider = {
-          request: requestFn.bind(walletClient.transport),
-        };
-
-        const provider = walletClient.chain
-          ? new BrowserProvider(eip1193Provider, walletClient.chain.id)
-          : new BrowserProvider(eip1193Provider);
-
-        const signer = await Promise.race([
-          provider.getSigner(walletClient.account.address),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("Wagmi signer timeout")), 30000)
-          ),
-        ]);
-
-        const address = await signer.getAddress();
-        const balance = await provider.getBalance(address);
-        console.log("Balance of signer wagmi transport:", balance.toString());
-        console.log("Signer obtained via Wagmi transport:", address);
-        return signer;
-      }
     }
 
     // 3. Fallback: window.ethereum
