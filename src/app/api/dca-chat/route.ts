@@ -330,14 +330,19 @@ async function handleDCAOperation(message: string, userAddress?: string): Promis
           };
         }
 
-        const plansText = plans.map((plan: any, index: number) => 
-          `${index + 1}. **${plan.fromToken} → ${plan.toToken}**\n` +
-          `   Amount: ${plan.amount} ${plan.fromToken}\n` +
-          `   Interval: Every ${plan.intervalMinutes} minutes\n` +
-          `   Status: ${plan.status}\n` +
-          `   Progress: ${plan.executionCount}/${plan.totalExecutions} executions\n` +
-          `   Next: ${plan.nextExecution ? new Date(plan.nextExecution).toLocaleString() : 'Completed'}`
-        ).join('\n\n');
+        const plansText = plans.map((plan: any, index: number) => {
+          const jobIdStr = String(plan.jobId || '');
+          const jobIdLine = plan.jobId
+            ? `   Job ID: ${jobIdStr.slice(0, 7)}...${jobIdStr.slice(-5)}`
+            : '';
+          return `${index + 1}. **${plan.fromToken} → ${plan.toToken}**\n` +
+            `   Amount: ${plan.amount} ${plan.fromToken}\n` +
+            `   Interval: Every ${plan.intervalMinutes} minutes\n` +
+            `   Status: ${plan.status}\n` +
+            `   Progress: ${plan.executionCount}/${plan.totalExecutions} executions\n` +
+            (jobIdLine ? `${jobIdLine}\n` : '') +
+            `   Next: ${plan.nextExecution ? new Date(plan.nextExecution).toLocaleString() : 'Completed'}`;
+        }).join('\n\n');
 
         return {
           success: true,
@@ -734,7 +739,10 @@ function enhanceResponseWithData(responseText: string, data: any): string {
       `   Amount: ${plan.amount} ${plan.fromToken}\n` +
       `   Interval: Every ${plan.intervalMinutes} minutes\n` +
       `   Status: ${plan.status}\n` +
-      `   Progress: ${plan.executionCount}/${plan.totalExecutions} executions`
+      `   Progress: ${plan.executionCount}/${plan.totalExecutions} executions\n` +
+      (plan.jobId
+        ? `   Job ID: \`${String(plan.jobId).slice(0, 7)}...${String(plan.jobId).slice(-5)}\``
+        : '')
     ).join('\n\n');
     
     return `${responseText}\n\n📋 **Your DCA Plans:**\n\n${plansText}`;

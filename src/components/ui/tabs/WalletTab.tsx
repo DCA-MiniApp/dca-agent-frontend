@@ -291,8 +291,13 @@ function ConnectionControls({
         {context?.user?.fid ? (
           <>
             <Button
-              onClick={() => connect({ connector: connectors[0] })}
-              className="w-full bg-gradient-to-br from-[#c199e4]/40 to-[#b380db]/40 hover:from-[#c199e4]/60 hover:to-[#b380db]/60 border border-[#c199e4]/30 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 hover:scale-105"
+              onClick={() => {
+                const farcasterConnector = connectors.find(
+                  (c) => c.id === "farcaster"
+                );
+                if (farcasterConnector)
+                  connect({ connector: farcasterConnector });
+              }}
             >
               Connect Farcaster Wallet
             </Button>
@@ -484,7 +489,12 @@ export function WalletTab() {
 
   // --- Hooks ---
   // const { context } = useMiniApp();
-  const { address, isConnected, connector, chainId: accountChainId } = useAccount();
+  const {
+    address,
+    isConnected,
+    connector,
+    chainId: accountChainId,
+  } = useAccount();
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
   const [user, setUser] = useState<UserInfo | null>(null);
   const chainId = useChainId();
@@ -615,7 +625,11 @@ export function WalletTab() {
       // Fallback: non-async call
       switchChain({ chainId: arbitrum.id });
     } catch (switchError: any) {
-      if (switchError?.code === 4902 && typeof window !== "undefined" && (window as any).ethereum?.request) {
+      if (
+        switchError?.code === 4902 &&
+        typeof window !== "undefined" &&
+        (window as any).ethereum?.request
+      ) {
         try {
           await (window as any).ethereum.request({
             method: "wallet_addEthereumChain",

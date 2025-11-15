@@ -119,6 +119,7 @@ export function HomeTab() {
   // Modal state
   const [selectedPlan, setSelectedPlan] = useState<DCAPlan | null>(null);
   const [showPlanModal, setShowPlanModal] = useState(false);
+  const [showConnectWalletModal, setShowConnectWalletModal] = useState(false);
 
   //Plan status state
   const [isDeleting, setIsDeleting] = useState(false);
@@ -469,6 +470,20 @@ export function HomeTab() {
     fetchUserData();
   }, [fetchUserData]);
 
+  // Show connect wallet modal when not connected (with delay to avoid immediate popup)
+  // Don't show if onboarding is active
+  useEffect(() => {
+    if (!isConnected && isSDKLoaded && !showOnboarding) {
+      // Small delay to let the page render first
+      const timer = setTimeout(() => {
+        setShowConnectWalletModal(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    } else if (isConnected) {
+      setShowConnectWalletModal(false);
+    }
+  }, [isConnected, isSDKLoaded, showOnboarding]);
+
   // Fetch wallet total USD value using Alchemy API
   useEffect(() => {
     if (!address) {
@@ -755,8 +770,148 @@ export function HomeTab() {
 
   const step = onboardingSteps[currentStepIndex];
 
+  // Check if user has Farcaster context (for better messaging)
+  const hasFarcasterContext = !!context?.user?.fid;
+
   return (
     <div className="flex flex-col h-full py-3 px-2 space-y-6 overflow-y-auto">
+      {/* Connect Wallet Modal */}
+      {showConnectWalletModal && !isConnected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowConnectWalletModal(false)}
+          />
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="relative z-10 w-full max-w-md mx-auto bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl shadow-2xl border border-[#c199e4]/30 max-h-[80vh] overflow-y-auto"
+          >
+            <div className="p-6 space-y-6">
+              {/* Header */}
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="w-14 h-14 bg-gradient-to-br from-[#c199e4]/30 to-[#c199e4]/20 rounded-2xl flex items-center justify-center border border-[#c199e4]/40">
+                    <HiOutlineWallet className="w-8 h-8 text-[#c199e4]" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-bold text-white mb-1">
+                      Connect Your Wallet
+                    </h3>
+                    <p className="text-sm text-white/70">
+                      {hasFarcasterContext
+                        ? "Connect your wallet to start investing"
+                        : "Get started by connecting your wallet"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowConnectWalletModal(false)}
+                  className="text-white/70 hover:text-white transition-colors duration-200 p-2 hover:bg-white/10 rounded-xl"
+                >
+                  <HiOutlineXMark className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Info Section */}
+              <div className="bg-gradient-to-br from-[#c199e4]/10 to-[#c199e4]/5 rounded-2xl p-4 border border-[#c199e4]/20">
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 bg-[#c199e4]/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <span className="text-[#c199e4] text-xs font-bold">1</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-white">
+                        Choose Your Wallet Type
+                      </p>
+                      <p className="text-xs text-white/70 mt-1">
+                        {hasFarcasterContext
+                          ? "Connect your Farcaster custody wallet or an external wallet (EOA)"
+                          : "Connect MetaMask, Coinbase Wallet, or another EOA wallet"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 bg-[#c199e4]/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <span className="text-[#c199e4] text-xs font-bold">2</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-white">
+                        Switch to Arbitrum Network
+                      </p>
+                      <p className="text-xs text-white/70 mt-1">
+                        Make sure you&apos;re on Arbitrum mainnet to use DCA Agent
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 bg-[#c199e4]/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <span className="text-[#c199e4] text-xs font-bold">3</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-white">
+                        Start Creating DCA Plans
+                      </p>
+                      <p className="text-xs text-white/70 mt-1">
+                        Once connected, you can create and manage your investment strategies
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Wallet Type Info */}
+              {hasFarcasterContext && (
+                <div className="bg-gradient-to-br from-white/5 to-transparent rounded-2xl p-4 border border-white/10">
+                  <p className="text-xs text-white/60 mb-2 font-medium">
+                    Available Wallet Options:
+                  </p>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-[#c199e4] rounded-full"></div>
+                      <span className="text-xs text-white/80">
+                        Farcaster Custody Wallet
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-white/40 rounded-full"></div>
+                      <span className="text-xs text-white/80">
+                        External Wallet (EOA) - MetaMask, Coinbase, etc.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    setShowConnectWalletModal(false);
+                    setActiveTab("wallet" as any);
+                  }}
+                  className="w-full bg-gradient-to-r from-[#c199e4]/40 to-[#b380db]/40 hover:from-[#c199e4]/60 hover:to-[#b380db]/60 text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 border border-[#c199e4]/50 hover:border-[#c199e4]/70 hover:shadow-xl flex items-center justify-center gap-3"
+                >
+                  <HiOutlineWallet className="w-5 h-5" />
+                  <span>Go to Wallet Tab</span>
+                  <HiOutlineArrowNarrowRight className="w-5 h-5" />
+                </motion.button>
+                <button
+                  onClick={() => setShowConnectWalletModal(false)}
+                  className="w-full bg-white/5 hover:bg-white/10 text-white/80 font-medium py-3 px-6 rounded-2xl transition-all duration-300 border border-white/10 hover:border-white/20"
+                >
+                  Maybe Later
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* Onboarding Modal */}
       {showOnboarding && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
@@ -1235,29 +1390,22 @@ export function HomeTab() {
         </h1>
         {!isConnected && (
           <div className="mt-3">
-            <p className="text-sm text-white/70 mb-2">
+            <p className="text-sm text-white/70 mb-3">
               Connect your wallet to view balances and manage your DCA
               strategies.
             </p>
-            <button
-              onClick={() => setActiveTab("wallet" as any)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-[#c199e4]/20 to-[#b380db]/10 hover:from-[#c199e4]/30 hover:to-[#b380db]/20 text-white text-sm font-medium rounded-xl border border-[#c199e4]/30 hover:border-[#c199e4]/50 transition-all duration-300"
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                setShowConnectWalletModal(true);
+              }}
+              className="inline-flex items-center gap-2 px-5 py-3 bg-gradient-to-br from-[#c199e4]/30 to-[#b380db]/20 hover:from-[#c199e4]/40 hover:to-[#b380db]/30 text-white text-sm font-semibold rounded-xl border border-[#c199e4]/40 hover:border-[#c199e4]/60 transition-all duration-300 shadow-lg hover:shadow-xl"
             >
-              Go to Wallet
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 7l5 5m0 0l-5 5m5-5H6"
-                />
-              </svg>
-            </button>
+              <HiOutlineWallet className="w-5 h-5" />
+              <span>Connect Wallet</span>
+              <HiOutlineArrowNarrowRight className="w-4 h-4" />
+            </motion.button>
           </div>
         )}
         {address && (
@@ -1274,7 +1422,7 @@ export function HomeTab() {
       </div>
 
       {/* Wallet Total Value Card */}
-      <div className="bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 backdrop-blur-lg rounded-3xl p-6 text-white border border-[#c199e4]/30 shadow-lg hover:shadow-xl hover:border-[#c199e4]/50 transition-all duration-500 hover:scale-[1.02] group">
+      <div className="bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-3xl p-6 text-white border border-[#c199e4]/30 shadow-lg hover:shadow-xl hover:border-[#c199e4]/50 transition-all duration-500 hover:scale-[1.02] group">
         <div className="flex justify-between items-start">
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-3">

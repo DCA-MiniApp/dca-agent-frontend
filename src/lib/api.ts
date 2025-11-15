@@ -67,6 +67,48 @@ export interface JobSuccessCountData {
   totalTasks: number;
 }
 
+export interface TaskData {
+  task_id: number;
+  task_number: number;
+  task_opx_cost: number;
+  execution_timestamp: string;
+  execution_tx_hash: string;
+  task_performer_id: number;
+  task_attester_ids: number[] | null;
+  task_status: string;
+  task_error: string;
+  is_accepted: boolean;
+  tx_url: string;
+  converted_arguments: any;
+}
+
+export interface JobMonitorUser {
+  Address: string;
+  fid: number | null;
+  username?: string;
+  fromToken?: string;
+  toToken?: string;
+  amount?: string;
+  successCount?: number;
+  ipfs_url: string;
+  jobid: string;
+  tasks_id: number[];
+  task_data?: TaskData[];
+  Cost_of_TG: string;
+  total_swapped: number;
+  status?: string;
+}
+
+export interface JobMonitorData {
+  total_unique_user: number;
+  total_job_live_count: number;
+  total_job_failed: number;
+  total_job_processing: number;
+  total_value_swapped: number;
+  users: JobMonitorUser[];
+  last_update: string;
+}
+
 
 export interface StoreUserPayload {
   fid: string;
@@ -332,5 +374,35 @@ export function formatDuration(durationWeeks: number): string {
       result += ` ${remainingWeeks} week${remainingWeeks !== 1 ? 's' : ''}`;
     }
     return result;
+  }
+}
+
+/**
+ * Fetch platform statistics for Job Monitor
+ */
+export async function fetchPlatformStatsForMonitor(): Promise<JobMonitorData | null> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/dca/platform-stats`, {
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.error('Failed to fetch platform stats:', response.status);
+      return null;
+    }
+
+    const result: ApiResponse<JobMonitorData> = await response.json();
+
+    if (result.success && result.data) {
+      return result.data;
+    } else {
+      console.error('Failed to fetch platform stats:', result.message);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error fetching platform stats for monitor:', error);
+    return null;
   }
 }
