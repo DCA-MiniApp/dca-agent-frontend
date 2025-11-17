@@ -783,25 +783,21 @@ export function HomeTab() {
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"
             onClick={() => setShowConnectWalletModal(false)}
           />
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="relative z-10 w-full max-w-sm mx-auto bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl shadow-2xl border border-[#c199e4]/30 max-h-[80vh] overflow-y-auto"
+          <div
+            className="relative z-10 w-full max-w-[320px] mx-auto bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 max-h-[72vh] overflow-y-auto"
           >
-            <div className="p-4 space-y-5">
+            <div className="p-4 pb-5 space-y-4">
               {/* Header */}
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-3 flex-1">
-                  <div className="w-12 h-12 bg-gradient-to-br from-[#c199e4]/30 to-[#c199e4]/20 rounded-2xl flex items-center justify-center border border-[#c199e4]/40">
-                    <HiOutlineWallet className="w-6 h-6 text-[#c199e4]" />
+                  <div className="w-10 h-10 bg-gradient-to-br from-[#c199e4]/30 to-[#c199e4]/20 rounded-2xl flex items-center justify-center border border-[#c199e4]/40">
+                    <HiOutlineWallet className="w-5 h-5 text-[#c199e4]" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-xl font-bold text-white mb-0.5">
+                    <h3 className="text-lg font-semibold text-white mb-0.5 leading-tight">
                       Connect Your Wallet
                     </h3>
-                    <p className="text-xs text-white/70">
+                    <p className="text-[11px] text-white/70 leading-snug">
                       {hasFarcasterContext
                         ? "Connect your wallet to start investing"
                         : "Get started by connecting your wallet"}
@@ -810,14 +806,14 @@ export function HomeTab() {
                 </div>
                 <button
                   onClick={() => setShowConnectWalletModal(false)}
-                  className="text-white/70 hover:text-white transition-colors duration-200 p-1.5 hover:bg-white/10 rounded-xl"
+                  className="text-white/70 hover:text-white transition-colors duration-200 p-1 hover:bg-white/10 rounded-lg"
                 >
-                  <HiOutlineXMark className="h-4 w-4" />
+                  <HiOutlineXMark className="h-3.5 w-3.5" />
                 </button>
               </div>
 
               {/* Info Section */}
-              <div className="bg-gradient-to-br from-[#c199e4]/10 to-[#c199e4]/5 rounded-2xl p-3 border border-[#c199e4]/20 space-y-2">
+              <div className="bg-white/5 rounded-xl p-3 border border-white/10 space-y-2">
                 {[
                   {
                     step: "1",
@@ -841,8 +837,8 @@ export function HomeTab() {
                     <div className="w-5 h-5 bg-[#c199e4]/25 rounded-full flex items-center justify-center text-[11px] font-bold text-[#c199e4]">
                       {step}
                     </div>
-                    <div className="text-xs text-white/70 space-y-0.5">
-                      <p className="text-[13px] font-semibold text-white">{title}</p>
+                    <div className="text-[11px] text-white/70 space-y-0.5">
+                      <p className="text-xs font-semibold text-white leading-tight">{title}</p>
                       <p className="leading-snug">{desc}</p>
                     </div>
                   </div>
@@ -851,7 +847,7 @@ export function HomeTab() {
 
               {/* Wallet Type Info */}
               {hasFarcasterContext && (
-                <div className="bg-gradient-to-br from-white/5 to-transparent rounded-2xl p-3 border border-white/10">
+                <div className="bg-white/5 rounded-xl p-3 border border-white/10">
                   <p className="text-[11px] text-white/60 mb-2 font-medium">
                     Available Wallet Options:
                   </p>
@@ -874,28 +870,26 @@ export function HomeTab() {
 
               {/* Action Buttons */}
               <div className="space-y-3">
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                <button
                   onClick={() => {
                     setShowConnectWalletModal(false);
                     setActiveTab("wallet" as any);
                   }}
-                  className="w-full bg-gradient-to-r from-[#c199e4]/40 to-[#b380db]/40 hover:from-[#c199e4]/60 hover:to-[#b380db]/60 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-300 border border-[#c199e4]/50 hover:border-[#c199e4]/70 hover:shadow-xl flex items-center justify-center gap-2"
+                  className="w-full bg-gradient-to-r from-[#c199e4]/40 to-[#b380db]/40 hover:from-[#c199e4]/55 hover:to-[#b380db]/55 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200 border border-[#c199e4]/40 hover:border-[#c199e4]/60 flex items-center justify-center gap-2"
                 >
                   <HiOutlineWallet className="w-4 h-4" />
                   <span>Go to Wallet Tab</span>
                   <HiOutlineArrowNarrowRight className="w-4 h-4" />
-                </motion.button>
+                </button>
                 <button
                   onClick={() => setShowConnectWalletModal(false)}
-                  className="w-full bg-white/5 hover:bg-white/10 text-white/80 text-sm font-medium py-2.5 px-4 rounded-xl transition-all duration-300 border border-white/10 hover:border-white/20"
+                  className="w-full bg-white/5 hover:bg-white/10 text-white/80 text-xs font-medium py-2 px-4 rounded-lg transition-all duration-200 border border-white/10 hover:border-white/20"
                 >
                   Maybe Later
                 </button>
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
       )}
 
