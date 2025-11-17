@@ -6706,10 +6706,10 @@ scheduler@^0.27.0:
   resolved "https://registry.yarnpkg.com/scheduler/-/scheduler-0.27.0.tgz#0c4ef82d67d1e5c1e359e8fc76d3a87f045fe5bd"
   integrity sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==
 
-sdk-triggerx@0.1.29:
-  version "0.1.29"
-  resolved "https://registry.yarnpkg.com/sdk-triggerx/-/sdk-triggerx-0.1.29.tgz#dbe8e1d01635234b7cb7326a5cf832faf1d595bc"
-  integrity sha512-zcxODfIDp0sdb15oDJKsMtY0ecQJr6frShoawDTpDZsed+vVzTJ4rzfWE318i8uua1HqapiS7XYOfbuO3t3dtg==
+sdk-triggerx@0.1.30:
+  version "0.1.30"
+  resolved "https://registry.yarnpkg.com/sdk-triggerx/-/sdk-triggerx-0.1.30.tgz#216a93342eb000cc855955ee53d950bb685cd1d9"
+  integrity sha512-JulN1bR++bbc7Q7Lqhd5lC0keqP5j1c2/RKYDRl6rYxhbk2X2V6aSs3n/arRKBVXbDoGTTVZTH/fjo5PkZqnVQ==
   dependencies:
     axios "^1.11.0"
     ethers "^6.15.0"
