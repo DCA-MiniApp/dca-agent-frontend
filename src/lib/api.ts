@@ -12,7 +12,7 @@ export interface DCAPlan {
   amount: string;
   intervalMinutes: number;
   durationWeeks: number;
-  status: 'ACTIVE' | 'PAUSED' | 'completed' | 'CANCELLED';
+  status: 'ACTIVE' | 'PAUSED' | 'completed' | 'CANCELLED'|'pending'|'processing';
   nextExecution: string | null;
   executionCount: number;
   totalExecutions: number;
@@ -153,7 +153,6 @@ export async function fetchUserDCAPlans(userAddress: string): Promise<DCAPlan[]>
     });
     // console.log("response", await response.json());
     const result: ApiResponse<DCAPlan[]> = await response.json();
-    // console.log("result in fetchUserDCAPlans", result);
 
     if (result.success && result.data) {
      
@@ -361,20 +360,85 @@ export function formatInterval(intervalMinutes: number): string {
 
 /**
  * Format duration weeks to human readable string
+ * Converts weeks to the most appropriate unit (hours, days, weeks, months, years)
+ * 
+ * @param durationWeeks - Duration in weeks (e.g., 0.006 weeks = ~1 hour)
+ * @returns Human-readable duration string (e.g., "1 hour", "3 days", "2 weeks", "6 months", "2 years")
  */
 export function formatDuration(durationWeeks: number): string {
-  if (durationWeeks < 4) {
-    return `${durationWeeks} week${durationWeeks !== 1 ? 's' : ''}`;
-  } else {
-    const months = Math.floor(durationWeeks / 4);
-    const remainingWeeks = durationWeeks % 4;
+  // Convert weeks to hours for easier calculation
+  const totalHours = durationWeeks * 168; // 1 week = 168 hours
+  const totalDays = durationWeeks * 7; // 1 week = 7 days
+  const totalMonths = durationWeeks / 4.33; // Average month ≈ 4.33 weeks
+  const totalYears = durationWeeks / 52; // 1 year ≈ 52 weeks
 
-    let result = `${months} month${months !== 1 ? 's' : ''}`;
-    if (remainingWeeks > 0) {
-      result += ` ${remainingWeeks} week${remainingWeeks !== 1 ? 's' : ''}`;
+  // Handle hours (< 1 day = 24 hours)
+  if (totalHours < 24) {
+    const hours = Math.round(totalHours * 10) / 10; // Round to 1 decimal
+    if (hours < 1) {
+      const minutes = Math.round(totalHours * 60);
+      if (minutes < 1) {
+        return 'Less than 1 minute';
+      }
+      return minutes === 1 ? '1 minute' : `${minutes} minutes`;
     }
+    // Round to whole number if close to whole number
+    const roundedHours = Math.round(hours);
+    if (Math.abs(hours - roundedHours) < 0.1) {
+      return roundedHours === 1 ? '1 hour' : `${roundedHours} hours`;
+    }
+    return `${hours} hours`;
+  }
+
+  // Handle days (< 1 week = 7 days)
+  if (totalDays < 7) {
+    const days = Math.round(totalDays * 10) / 10; // Round to 1 decimal
+    // Round to whole number if close to whole number
+    const roundedDays = Math.round(days);
+    if (Math.abs(days - roundedDays) < 0.1) {
+      return roundedDays === 1 ? '1 day' : `${roundedDays} days`;
+    }
+    return `${days} days`;
+  }
+
+  // Handle weeks (< 1 month ≈ 4.33 weeks)
+  if (durationWeeks < 4.33) {
+    const weeks = Math.round(durationWeeks * 10) / 10; // Round to 1 decimal
+    // Round to whole number if close to whole number
+    const roundedWeeks = Math.round(weeks);
+    if (Math.abs(weeks - roundedWeeks) < 0.1) {
+      return roundedWeeks === 1 ? '1 week' : `${roundedWeeks} weeks`;
+    }
+    return `${weeks} weeks`;
+  }
+
+  // Handle months (< 1 year ≈ 52 weeks)
+  if (durationWeeks < 52) {
+    const months = Math.round(totalMonths * 10) / 10; // Round to 1 decimal
+    const remainingWeeks = Math.round((durationWeeks % 4.33) * 10) / 10;
+    
+    let result = months === 1 ? '1 month' : `${months} months`;
+    
+    // Add remaining weeks if significant (> 0.5 weeks)
+    if (remainingWeeks >= 0.5) {
+      result += ` ${remainingWeeks === 1 ? '1 week' : `${remainingWeeks} weeks`}`;
+    }
+    
     return result;
   }
+
+  // Handle years (>= 52 weeks)
+  const years = Math.floor(totalYears);
+  const remainingMonths = Math.round((durationWeeks % 52) / 4.33);
+  
+  let result = years === 1 ? '1 year' : `${years} years`;
+  
+  // Add remaining months if significant (> 0.5 months)
+  if (remainingMonths >= 0.5) {
+    result += ` ${remainingMonths === 1 ? '1 month' : `${remainingMonths} months`}`;
+  }
+  
+  return result;
 }
 
 /**

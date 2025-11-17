@@ -608,6 +608,7 @@ export function HomeTab() {
 
   // Calculate active and paused plans from real data
   const activePlans = userPlans.filter((plan) => plan.status === "ACTIVE");
+  const runningPlans = userPlans.filter((plan) => plan.jobStatus === "processing" || plan.jobStatus === "pending");
 
   // Plan actions with real API calls
   const handleDeletePlan = async (plan: DCAPlan) => {
@@ -1494,8 +1495,8 @@ export function HomeTab() {
                 <p className="text-sm text-white/70">
                   {isLoading
                     ? "Loading..."
-                    : `Across ${userPlans.length} ${
-                        userPlans.length === 1 ? "strategy" : "strategies"
+                    : `Running ${runningPlans.length} ${
+                        runningPlans.length === 1 ? "strategy in process" : "strategies in process"
                       }`}
                 </p>
                 {/* {portfolioUsd !== null && (
@@ -1509,7 +1510,7 @@ export function HomeTab() {
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
                   <span className="text-sm text-white/90 font-medium">
-                    {activePlans.length} Active Plans
+                    {activePlans.length} Plan created by you
                   </span>
                 </div>
                 {/* <div className="flex items-center gap-2">
