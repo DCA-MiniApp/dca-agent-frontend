@@ -46,7 +46,7 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedUser, setSelectedUser] = useState<JobMonitorUser | null>(null);
-  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
+  const [copiedAddressKey, setCopiedAddressKey] = useState<string | null>(null);
   const [copiedJobId, setCopiedJobId] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [refreshCountdown, setRefreshCountdown] = useState(600); // 10 minutes = 600 seconds
@@ -157,10 +157,10 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
     return () => clearInterval(interval);
   }, [fetchData, isAuthenticated]);
 
-  const handleCopyAddress = (address: string) => {
+  const handleCopyAddress = (address: string, key: string) => {
     navigator.clipboard.writeText(address);
-    setCopiedAddress(address);
-    setTimeout(() => setCopiedAddress(null), 2000);
+    setCopiedAddressKey(key);
+    setTimeout(() => setCopiedAddressKey(null), 2000);
   };
 
   const handleCopyJobId = (jobId: string) => {
@@ -510,7 +510,10 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                     </td>
                   </tr>
                 ) : (
-                  paginatedUsers.map((user) => (
+                  paginatedUsers.map((user) => {
+                    const addressCopyKey = `${user.Address}-${user.jobid}`;
+
+                    return (
                     <tr
                       key={user.jobid}
                       className="border-b border-gray-700/30 hover:bg-gray-700/20 transition-colors cursor-pointer"
@@ -524,11 +527,11 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleCopyAddress(user.Address);
+                              handleCopyAddress(user.Address, addressCopyKey);
                             }}
                             className="text-gray-400 hover:text-white transition-colors"
                           >
-                            {copiedAddress === user.Address ? (
+                            {copiedAddressKey === addressCopyKey ? (
                               <span className="text-green-400 text-xs">Copied!</span>
                             ) : (
                               <IoCopyOutline className="w-4 h-4" />
@@ -600,7 +603,8 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                         </span>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -702,10 +706,15 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                           {truncateAddressShort(selectedUser.Address)}
                         </span>
                         <button
-                          onClick={() => handleCopyAddress(selectedUser.Address)}
+                          onClick={() =>
+                            handleCopyAddress(
+                              selectedUser.Address,
+                              `${selectedUser.Address}-${selectedUser.jobid ?? "modal"}`
+                            )
+                          }
                           className="text-gray-400 hover:text-white"
                         >
-                          {copiedAddress === selectedUser.Address ? (
+                          {copiedAddressKey === `${selectedUser.Address}-${selectedUser.jobid ?? "modal"}` ? (
                             <span className="text-green-400 text-xs">Copied!</span>
                           ) : (
                             <IoCopyOutline className="w-4 h-4" />
