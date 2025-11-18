@@ -389,7 +389,7 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
             <div className="text-3xl font-bold text-white mb-1">
               {data.total_job_live_count}
             </div>
-            <div className="text-sm text-gray-400">Active now</div>
+            <div className="text-sm text-gray-400">Completed Job</div>
           </motion.div>
 
           {/* Processing */}

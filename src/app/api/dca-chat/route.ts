@@ -738,8 +738,8 @@ function enhanceResponseWithData(responseText: string, data: any): string {
       `${index + 1}. **${plan.fromToken} → ${plan.toToken}**\n` +
       `   Amount: ${plan.amount} ${plan.fromToken}\n` +
       `   Interval: Every ${plan.intervalMinutes} minutes\n` +
-      `   Status: ${plan.status}\n` +
-      `   Progress: ${plan.executionCount}/${plan.totalExecutions} executions\n` +
+      `   Status: ${plan.jobDataStatus}\n` +
+      `   Progress: ${plan.successCount}/${plan.totalExecutions} executions\n` +
       (plan.jobId
         ? `   Job ID: \`${String(plan.jobId).slice(0, 7)}...${String(plan.jobId).slice(-5)}\``
         : '')

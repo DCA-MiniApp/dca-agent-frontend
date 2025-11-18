@@ -3,7 +3,11 @@
 import { useMiniApp } from "@neynar/react";
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { HiOutlineEye, HiOutlineDocumentText, HiOutlineFilter } from "react-icons/hi";
+import {
+  HiOutlineEye,
+  HiOutlineDocumentText,
+  HiOutlineFilter,
+} from "react-icons/hi";
 import { StatusSelect } from "./StatusSelect";
 import { useAccount } from "wagmi";
 import { fetchUserExecutionHistory } from "../../../lib/api";
@@ -36,10 +40,14 @@ export function ContextTab() {
     executionTxHash: string;
     taskStatus: TaskStatus;
     txUrl: string;
+    slippage: string;
+    gasFee: string | null;
   }
 
   // Dynamic data state
-  const [executionHistory, setExecutionHistory] = useState<UserHistoryItem[]>([]);
+  const [executionHistory, setExecutionHistory] = useState<UserHistoryItem[]>(
+    []
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -55,6 +63,8 @@ export function ContextTab() {
     status: string; // task status
     txHash: string | null; // optional
     txUrl: string | null; // optional
+    slippage: string | null; // optional
+    gasFee: string | null;
   }
 
   const truncateHash = (hash: string) =>
@@ -103,14 +113,14 @@ export function ContextTab() {
         status: item.taskStatus,
         txHash: item.executionTxHash || null,
         txUrl: item.txUrl || null,
+        slippage: item.slippage || null,
+        gasFee: item.gasFee || null,
       };
     });
   }, [executionHistory]);
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState<"All" | string>(
-    "All"
-  );
+  const [statusFilter, setStatusFilter] = useState<"All" | string>("All");
   const [startDate, setStartDate] = useState<string>(""); // YYYY-MM-DD
   const [endDate, setEndDate] = useState<string>("");
   const [fromTokenSearch, setFromTokenSearch] = useState<string>("");
@@ -128,7 +138,8 @@ export function ContextTab() {
       if (endDate && tx.dateISO > endDate) return false;
       if (fromTokenSearch) {
         const fromTokenLower = tx.fromToken.toLowerCase();
-        if (!fromTokenLower.includes(fromTokenSearch.toLowerCase())) return false;
+        if (!fromTokenLower.includes(fromTokenSearch.toLowerCase()))
+          return false;
       }
       if (toTokenSearch) {
         const toTokenLower = tx.toToken.toLowerCase();
@@ -140,7 +151,15 @@ export function ContextTab() {
       }
       return true;
     });
-  }, [transactions, endDate, startDate, statusFilter, fromTokenSearch, toTokenSearch, taskIdSearch]);
+  }, [
+    transactions,
+    endDate,
+    startDate,
+    statusFilter,
+    fromTokenSearch,
+    toTokenSearch,
+    taskIdSearch,
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -159,13 +178,16 @@ export function ContextTab() {
     setPage(1);
   };
 
-  const openTxExternal = (txUrl: string | null, fallbackHash?: string | null) => {
+  const openTxExternal = (
+    txUrl: string | null,
+    fallbackHash?: string | null
+  ) => {
     // const url = txUrl && txUrl.length > 0
     //   ? txUrl
     //   : fallbackHash && fallbackHash.length > 0
     //     ? `https://arbiscan.io/tx/${fallbackHash}`
     //     : "";
-    const url=fallbackHash ? `https://arbiscan.io/tx/${fallbackHash}`: txUrl;   
+    const url = fallbackHash ? `https://arbiscan.io/tx/${fallbackHash}` : txUrl;
     if (!url) return;
     window.open(url, "_blank", "noopener,noreferrer");
   };
@@ -223,16 +245,22 @@ export function ContextTab() {
                   Task ID: {taskIdSearch}
                 </span>
               )}
-              {!fromTokenSearch && !toTokenSearch && !startDate && !endDate && !taskIdSearch && statusFilter === "All" && (
-                <span className="text-white/50">None</span>
-              )}
+              {!fromTokenSearch &&
+                !toTokenSearch &&
+                !startDate &&
+                !endDate &&
+                !taskIdSearch &&
+                statusFilter === "All" && (
+                  <span className="text-white/50">None</span>
+                )}
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowFilters((v) => !v)}
                 className="inline-flex items-center gap-2 px-3 py-2 bg-gradient-to-br from-[#c199e4]/20 to-[#b380db]/10 hover:from-[#c199e4]/30 hover:to-[#b380db]/20 text-white text-xs font-medium rounded-xl border border-[#c199e4]/30 hover:border-[#c199e4]/50 transition-all duration-300"
               >
-                <HiOutlineFilter className="w-4 h-4" /> {showFilters ? "Hide" : "Show"} Filters
+                <HiOutlineFilter className="w-4 h-4" />{" "}
+                {showFilters ? "Hide" : "Show"} Filters
               </button>
               <button
                 onClick={resetFilters}
@@ -244,7 +272,6 @@ export function ContextTab() {
           </div>
         </div>
       )}
-
 
       {/* Task ID Search (always visible) */}
       {!selectedTx && (
@@ -410,7 +437,7 @@ export function ContextTab() {
                         Connect your wallet to view transaction history
                       </p>
                       <button
-                        onClick={() => setActiveTab('wallet' as any)}
+                        onClick={() => setActiveTab("wallet" as any)}
                         className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-[#c199e4]/20 to-[#b380db]/10 hover:from-[#c199e4]/30 hover:to-[#b380db]/20 text-white text-sm font-medium rounded-xl border border-[#c199e4]/30 hover:border-[#c199e4]/50 transition-all duration-300"
                       >
                         Go to Wallet
@@ -575,8 +602,7 @@ export function ContextTab() {
                       Execution Details
                     </h3>
                     <p className="text-sm text-white/70">
-                      {selectedTx.fromToken} → {selectedTx.toToken} 
-                   
+                      {selectedTx.fromToken} → {selectedTx.toToken}
                     </p>
                   </div>
                 </div>
@@ -619,8 +645,18 @@ export function ContextTab() {
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => openTxExternal(selectedTx.txUrl, selectedTx.txHash)}
-                    className={`${selectedTx.status === "success" ? "bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30" : selectedTx.status === "PENDING" ? "bg-blue-400/20 text-blue-300 border border-blue-400/40 group-hover:bg-blue-400/30" : selectedTx.status === "failed" ? "bg-red-400/20 text-red-300 border border-red-400/40 group-hover:bg-red-400/30 cursor-not-allowed" : "bg-gray-400/20 text-gray-300 border border-gray-400/40 group-hover:bg-gray-400/30"} bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-3 px-5 rounded-xl transition-all duration-300 text-xs border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg`}
+                    onClick={() =>
+                      openTxExternal(selectedTx.txUrl, selectedTx.txHash)
+                    }
+                    className={`${
+                      selectedTx.status === "success"
+                        ? "bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30"
+                        : selectedTx.status === "PENDING"
+                        ? "bg-blue-400/20 text-blue-300 border border-blue-400/40 group-hover:bg-blue-400/30"
+                        : selectedTx.status === "failed"
+                        ? "bg-red-400/20 text-red-300 border border-red-400/40 group-hover:bg-red-400/30 cursor-not-allowed"
+                        : "bg-gray-400/20 text-gray-300 border border-gray-400/40 group-hover:bg-gray-400/30"
+                    } bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-3 px-5 rounded-xl transition-all duration-300 text-xs border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg`}
                   >
                     View Explorer
                   </button>
@@ -647,10 +683,11 @@ export function ContextTab() {
                 </div>
                 <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
                   <p className="text-sm text-gray-400 mb-2 font-medium">
-                   Job ID (TriggerX)
+                    Job ID (TriggerX)
                   </p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
-                   {selectedTx.jobId.slice(0, 8)}...{selectedTx.jobId.slice(-3)}
+                    {selectedTx.jobId.slice(0, 8)}...
+                    {selectedTx.jobId.slice(-3)}
                   </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
@@ -658,9 +695,15 @@ export function ContextTab() {
                     Task ID (TriggerX)
                   </p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300 font-mono">
-                    {selectedTx.taskId
-                      ? `${selectedTx.taskId}`
-                      : "N/A"}
+                    {selectedTx.taskId ? `${selectedTx.taskId}` : "N/A"}
+                  </p>
+                </div>
+                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">
+                  <p className="text-sm text-gray-400 mb-2 font-medium">
+                    Slippage Tolerance
+                  </p>
+                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
+                    {selectedTx.slippage} %
                   </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">
@@ -671,6 +714,22 @@ export function ContextTab() {
                     {selectedTx.txHash
                       ? truncateHash(selectedTx.txHash)
                       : "N/A"}
+                  </p>
+                </div>
+                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">
+                  <p className="text-sm text-gray-400 mb-2 font-medium">
+                    Slippage Tolerance
+                  </p>
+                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
+                    {selectedTx.slippage} %
+                  </p>
+                </div>
+                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">
+                  <p className="text-sm text-gray-400 mb-2 font-medium">
+                    Transaction Fee (ETH)
+                  </p>
+                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
+                    {selectedTx.gasFee ? `${selectedTx.gasFee}` : "N/A"}
                   </p>
                 </div>
               </div>
@@ -688,7 +747,6 @@ export function ContextTab() {
                   </span>
                 </div>
               </div>
-
 
               {/* Error Message (if failed) */}
               {/* {selectedTx.status === "FAILED" && selectedTx.statusMessage && (

@@ -481,7 +481,7 @@ Extract any new DCA parameters from this message and provide the next question f
       `• Interval: ${planData.interval}\n` +
       `• Slippage: ${planData.slippage || "2"}%\n\n` +
       `💰 **Token:** ${formatTokenAddress(tokenInfo?.address || "")}\n` +
-      `⚠️ **Note:** You'll need to approve unlimited spending for ${planData.fromToken} tokens to the executor.`
+      `⚠️ **Note:** You'll need to approve a spending allowance for ${planData.fromToken} tokens to the executor.`
     );
   }
 

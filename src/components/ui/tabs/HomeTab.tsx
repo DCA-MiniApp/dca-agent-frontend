@@ -19,7 +19,9 @@ import {
   HiOutlineDevicePhoneMobile,
   HiOutlineXMark,
   HiOutlineBell,
+  HiInformationCircle,
 } from "react-icons/hi2";
+
 import { HiOutlineArrowNarrowRight } from "react-icons/hi";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { useRouter } from "next/navigation";
@@ -35,7 +37,10 @@ import {
   type DCAPlan,
   type PlatformStats,
 } from "../../../lib/api";
-import { computePlansInvestedUsd, calculateWalletTotalUsdValue } from "../../../lib/utils";
+import {
+  computePlansInvestedUsd,
+  calculateWalletTotalUsdValue,
+} from "../../../lib/utils";
 import { deleteTriggerXJobForPlan } from "../../../lib/triggerXIntegration";
 import sdk, {
   AddMiniApp,
@@ -66,7 +71,7 @@ function getTimeGreeting() {
 }
 
 export function HomeTab() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chain } = useAccount();
   const { data: wagmiWalletClient } = useWalletClient();
   const {
     // context,
@@ -82,6 +87,8 @@ export function HomeTab() {
   const [context, setContext] = useState<Context.MiniAppContext>();
   const [notificationDetails, setNotificationDetails] =
     useState<MiniAppNotificationDetails | null>(null);
+
+  const [showTooltip, setShowTooltip] = useState(false);
 
   // Track latest notificationDetails as it may populate shortly after addMiniApp
   const latestNotifDetailsRef = useRef(notificationDetails);
@@ -335,7 +342,10 @@ export function HomeTab() {
     }
   }, []);
 
-    const handleNotification = async (fidParam?: number, detailsParam?: MiniAppNotificationDetails | null) => {
+  const handleNotification = async (
+    fidParam?: number,
+    detailsParam?: MiniAppNotificationDetails | null
+  ) => {
     // rely solely on SDK/context values if params not provided
 
     try {
@@ -608,7 +618,9 @@ export function HomeTab() {
 
   // Calculate active and paused plans from real data
   const activePlans = userPlans.filter((plan) => plan.status === "ACTIVE");
-  const runningPlans = userPlans.filter((plan) => plan.jobStatus === "processing" || plan.jobStatus === "pending");
+  const runningPlans = userPlans.filter(
+    (plan) => plan.jobStatus === "processing" || plan.jobStatus === "pending"
+  );
 
   // Plan actions with real API calls
   const handleDeletePlan = async (plan: DCAPlan) => {
@@ -681,7 +693,7 @@ export function HomeTab() {
         console.log("Delete job result:", deleteJobResult);
 
         // Explicitly check for user rejection - don't update backend if user cancelled
-        if (deleteJobResult.error === 'user_rejected') {
+        if (deleteJobResult.error === "user_rejected") {
           console.log("ℹ️ User cancelled job deletion");
           setIsDeleting(false);
           return; // Exit early, don't update backend
@@ -758,7 +770,7 @@ export function HomeTab() {
     return () => window.removeEventListener("keydown", handleKeyPress);
   }, []);
 
-  const userGreeting = `${getTimeGreeting()}, ${context?.user?.username} 👋`;
+  const userGreeting = `Welcome back, ${context?.user?.username} 👋`;
   const walletBalanceDisplay =
     walletTotalUsd !== null
       ? `$${walletTotalUsd.toLocaleString(undefined, {
@@ -783,10 +795,8 @@ export function HomeTab() {
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"
             onClick={() => setShowConnectWalletModal(false)}
           />
-          <div
-            className="relative z-10 w-full max-w-[320px] mx-auto bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 max-h-[72vh] overflow-y-auto"
-          >
-            <div className="p-4 pb-5 space-y-4">
+          <div className="relative z-10 w-full max-w-[300px] mx-auto bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 max-h-[68vh] overflow-y-auto">
+            <div className="p-3.5 pb-4 space-y-4">
               {/* Header */}
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-3 flex-1">
@@ -838,44 +848,23 @@ export function HomeTab() {
                       {step}
                     </div>
                     <div className="text-[11px] text-white/70 space-y-0.5">
-                      <p className="text-xs font-semibold text-white leading-tight">{title}</p>
+                      <p className="text-xs font-semibold text-white leading-tight">
+                        {title}
+                      </p>
                       <p className="leading-snug">{desc}</p>
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Wallet Type Info */}
-              {hasFarcasterContext && (
-                <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-                  <p className="text-[11px] text-white/60 mb-2 font-medium">
-                    Available Wallet Options:
-                  </p>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-[#c199e4] rounded-full"></div>
-                      <span className="text-xs text-white/80">
-                        Farcaster Custody Wallet
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-white/40 rounded-full"></div>
-                      <span className="text-xs text-white/80">
-                        External Wallet (EOA) - MetaMask, Coinbase, etc.
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Action Buttons */}
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <button
                   onClick={() => {
                     setShowConnectWalletModal(false);
                     setActiveTab("wallet" as any);
                   }}
-                  className="w-full bg-gradient-to-r from-[#c199e4]/40 to-[#b380db]/40 hover:from-[#c199e4]/55 hover:to-[#b380db]/55 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200 border border-[#c199e4]/40 hover:border-[#c199e4]/60 flex items-center justify-center gap-2"
+                  className="w-full bg-gradient-to-r from-[#c199e4]/40 to-[#b380db]/40 hover:from-[#c199e4]/55 hover:to-[#b380db]/55 text-white font-medium py-2 px-4 rounded-md transition-all duration-200 border border-[#c199e4]/40 hover:border-[#c199e4]/60 flex items-center justify-center gap-2 text-sm"
                 >
                   <HiOutlineWallet className="w-4 h-4" />
                   <span>Go to Wallet Tab</span>
@@ -883,7 +872,7 @@ export function HomeTab() {
                 </button>
                 <button
                   onClick={() => setShowConnectWalletModal(false)}
-                  className="w-full bg-white/5 hover:bg-white/10 text-white/80 text-xs font-medium py-2 px-4 rounded-lg transition-all duration-200 border border-white/10 hover:border-white/20"
+                  className="w-full bg-white/5 hover:bg-white/10 text-white/80 text-[11px] font-medium py-1.5 px-4 rounded-md transition-all duration-200 border border-white/10 hover:border-white/20"
                 >
                   Maybe Later
                 </button>
@@ -960,7 +949,11 @@ export function HomeTab() {
                   <motion.svg
                     initial={{ scale: 0.8 }}
                     animate={{ scale: [1, 1.1, 1] }}
-                    transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                    transition={{
+                      duration: 1.2,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }}
                     className="w-8 h-8 text-emerald-300"
                     viewBox="0 0 20 20"
                     fill="currentColor"
@@ -972,7 +965,9 @@ export function HomeTab() {
                     />
                   </motion.svg>
                 </div>
-                <h3 className="text-white text-lg font-bold">All set now — let&apos;s go!</h3>
+                <h3 className="text-white text-lg font-bold">
+                  All set now — let&apos;s go!
+                </h3>
                 <p className="text-white/80 text-sm mt-1">
                   Start your investment journey with DCA Agent.
                 </p>
@@ -1349,9 +1344,16 @@ export function HomeTab() {
                       {showFinalBanner ? (
                         <motion.div
                           animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          transition={{
+                            duration: 1,
+                            repeat: Infinity,
+                            ease: "linear",
+                          }}
                           className="w-5 h-5 border-2 border-white/30 rounded-full"
-                          style={{ borderTop: "2px solid white", borderRightColor: "transparent" }}
+                          style={{
+                            borderTop: "2px solid white",
+                            borderRightColor: "transparent",
+                          }}
                         />
                       ) : null}
                       {showFinalBanner ? "Closing..." : "Okay, got it"}
@@ -1380,7 +1382,7 @@ export function HomeTab() {
               whileTap={{ scale: 0.98 }}
               onClick={() => {
                 // setShowConnectWalletModal(true);
-                 setActiveTab("wallet" as any);
+                setActiveTab("wallet" as any);
               }}
               className="inline-flex items-center gap-2 px-5 py-3 bg-gradient-to-br from-[#c199e4]/30 to-[#b380db]/20 hover:from-[#c199e4]/40 hover:to-[#b380db]/30 text-white text-sm font-semibold rounded-xl border border-[#c199e4]/40 hover:border-[#c199e4]/60 transition-all duration-300 shadow-lg hover:shadow-xl"
             >
@@ -1398,6 +1400,34 @@ export function HomeTab() {
               <code className="text-xs bg-white/20 px-2 py-1 rounded-md">
                 {address.slice(0, 6)}...{address.slice(-4)}
               </code>
+              <button
+                className={`inline-flex items-center px-1.5 py-0.5 rounded transition ${
+                  copied ? "bg-green-400/20" : "hover:bg-white/20"
+                }`}
+                title={copied ? "Copied!" : "Copy address"}
+                onClick={() => {
+                  navigator.clipboard.writeText(address);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1200);
+                }}
+                type="button"
+              >
+                <HiOutlineClipboard
+                  className={`w-3.5 h-3.5 transition ${
+                    copied ? "text-green-400" : "text-white/70 hover:text-white"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Network Display */}
+            <div className="flex items-center gap-1.5 text-white/70 ml-3.5">
+              <span className="text-sm">Network:</span>
+              <code className="text-xs bg-white/20 px-2 py-1 rounded-md">
+                {chain?.name === "Arbitrum One"
+                  ? "Arbitrum One"
+                  : "Wrong network"}
+              </code>
             </div>
           </div>
         )}
@@ -1413,7 +1443,35 @@ export function HomeTab() {
               </div>
               <div>
                 <span className="text-sm text-white/90 font-medium">
-                  Wallet Value (USDC)
+                  Total Wallet Value (in USDC)
+                  <button
+                    onClick={() => setShowTooltip(!showTooltip)}
+                    className="relative inline-block ml-2 align-middle"
+                    type="button"
+                  >
+                    <HiInformationCircle className="w-4 h-4 text-white/50 transition hover:text-green-400 hover:scale-110" />
+
+                    {showTooltip && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowTooltip(false);
+                          }}
+                        />
+
+                        <span className="absolute left-1/2 z-20 -translate-x-1/2 mt-2 w-72 rounded-lg bg-black/95 text-xs text-white/90 px-3 py-3 shadow-2xl border border-green-400/20">
+                          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-black/95 border-l border-t border-green-400/20 rotate-45" />
+                          <div className="text-center w-full">
+                            This amount reflects the total value of all tokens
+                            <br />
+                            converted to USDC using current market prices.
+                          </div>
+                        </span>
+                      </>
+                    )}
+                  </button>
                 </span>
                 {/* <div className="flex items-center gap-2 mt-1">
                   <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
@@ -1426,7 +1484,7 @@ export function HomeTab() {
                 {walletBalanceDisplay}
               </p>
               <p className="text-sm text-white/70">
-                Total balance across connected wallet
+                Total value of all assets in your connected wallet
               </p>
             </div>
           </div>
@@ -1470,16 +1528,18 @@ export function HomeTab() {
                         })}`}
                   </p>
                   <span className="text-sm text-white/60 font-medium">
-                    Total Invested{portfolioUsd !== null ? " (USD)" : ""}
+                    Total Invested
                   </span>
                 </div>
-                <p className="text-sm text-white/70">
+                {/* <p className="text-sm text-white/70">
                   {isLoading
                     ? "Loading..."
                     : `Running ${runningPlans.length} ${
-                        runningPlans.length === 1 ? "strategy in process" : "strategies in process"
+                        runningPlans.length === 1
+                          ? "strategy in process"
+                          : "strategies in process"
                       }`}
-                </p>
+                </p> */}
                 {/* {portfolioUsd !== null && (
                   <p className="text-xs text-white/60 mt-1">
                     Est. USD Value: ${portfolioUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1489,11 +1549,20 @@ export function HomeTab() {
 
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                  <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
                   <span className="text-sm text-white/90 font-medium">
-                    {activePlans.length} Plan created by you
+                    {isLoading
+                      ? "Loading..."
+                      : `Active Strategies : ${runningPlans.length}`}
                   </span>
                 </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                  <span className="text-sm text-white/90 font-medium">
+                    Plan created : {activePlans.length}
+                  </span>
+                </div>
+
                 {/* <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
                   <span className="text-sm text-white/90 font-medium">
@@ -1506,7 +1575,16 @@ export function HomeTab() {
 
           <div className="ml-6 flex flex-col items-end">
             <div className="w-12 h-12 bg-gradient-to-br from-emerald-400/20 to-green-500/20 rounded-2xl flex items-center justify-center border border-emerald-400/30 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
-              <FaCircleUser className="text-emerald-400 size-6" />
+              {context?.user?.pfpUrl ? (
+                <img
+                  src={context.user.pfpUrl}
+                  alt="Farcaster Profile"
+                  className="w-6 h-6 rounded-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <FaCircleUser className="text-emerald-400 size-6" />
+              )}
             </div>
             {/* <div className="mt-2 text-center">
               <div className="text-xs text-emerald-400 font-semibold">+24.5%</div>
@@ -1560,17 +1638,19 @@ export function HomeTab() {
               {isConnected && (
                 <>
                   <p className="text-white/70 text-sm mb-4">
-                    Create your first DCA strategy to start automated investing
+                    Set up a recurring, automated crypto investment with a
+                    simple DCA strategy
                   </p>
                   <div className="text-xs text-white/50">
-                    Use the chat to get started 💡
+                    Start small, invest consistently, and let the agent handle
+                    the execution.
                   </div>
                   <div className="mt-4">
                     <button
                       onClick={() => router.push("/chat")}
                       className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-[#c199e4]/20 to-[#b380db]/10 hover:from-[#c199e4]/30 hover:to-[#b380db]/20 text-white text-sm font-semibold rounded-2xl border border-[#c199e4]/30 hover:border-[#c199e4]/50 transition-all duration-300"
                     >
-                      Talk to Agent
+                      Start a Strategy
                       <svg
                         className="w-4 h-4"
                         fill="none"
@@ -1634,7 +1714,9 @@ export function HomeTab() {
                           : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
                       }`}
                     >
-                      {userPlans[currentPlanIndex].jobStatus || userPlans[currentPlanIndex].status || "Unknown"}
+                      {userPlans[currentPlanIndex].jobStatus ||
+                        userPlans[currentPlanIndex].status ||
+                        "Unknown"}
                     </span>
                   </div>
                 </div>
@@ -1677,7 +1759,7 @@ export function HomeTab() {
                       <p className="text-2xl font-bold text-[#c199e4]">
                         {(
                           parseFloat(userPlans[currentPlanIndex].amount) *
-                          userPlans[currentPlanIndex].successCount || 0
+                            userPlans[currentPlanIndex].successCount || 0
                         ).toFixed(5)}
                       </p>
                     </div>
@@ -1692,7 +1774,7 @@ export function HomeTab() {
                           }%`,
                         }}
                       />
-                    </div>  
+                    </div>
                   </div>
                 </div>
 
@@ -1921,8 +2003,7 @@ export function HomeTab() {
                       Execution Progress
                     </p>
                     <p className="text-sm text-gray-200 font-medium">
-                      {selectedPlan.successCount}/
-                      {selectedPlan.totalExecutions}
+                      {selectedPlan.successCount}/{selectedPlan.totalExecutions}
                     </p>
                   </div>
                   <div className="w-full bg-white/20 rounded-full h-3 mb-2">
