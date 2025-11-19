@@ -45,6 +45,101 @@ interface ChatMessage {
   shareText?: string;
 }
 
+type StepStatus = "pending" | "active" | "complete";
+
+interface PlanSimulationStep {
+  id: string;
+  label: string;
+  description: string;
+  weight: number;
+}
+
+interface PlanSimulationState {
+  startedAt: number;
+  progress: number;
+  etaMs: number;
+  activeStepIndex: number;
+  stepStatuses: StepStatus[];
+}
+
+const PLAN_SIMULATION_DURATION_MS = 120000; // 2 minutes
+
+const PLAN_SIMULATION_STEPS: PlanSimulationStep[] = [
+  {
+    id: "validate",
+    label: "Validating strategy details",
+    description: "Double-checking token amounts & frequency",
+    weight: 0.18,
+  },
+  {
+    id: "triggerx-shape",
+    label: "Forming plan data for TriggerX",
+    description: "Passing automation-ready details to TriggerX",
+    weight: 0.16,
+  },
+  {
+    id: "automation-config",
+    label: "Configuring automation script content",
+    description: "Defining the instructions TriggerX will execute",
+    weight: 0.17,
+  },
+  {
+    id: "plan-validation",
+    label: "Checking plan data validation",
+    description: "Re-running guards on interval, duration & totals",
+    weight: 0.17,
+  },
+  {
+    id: "tg-balance",
+    label: "Checking TG balance (TriggerX)",
+    description: "Ensuring TriggerX can execute your plan",
+    weight: 0.16,
+  },
+  {
+    id: "finalize",
+    label: "Finalizing your plan",
+    description: "Locking everything to execute on time",
+    weight: 0.16,
+  },
+];
+
+const formatFastEta = (etaMs: number, ticker = 0): string => {
+  const totalMs = Math.max(0, Math.floor(etaMs));
+  const minutes = Math.floor(totalMs / 60000)
+    .toString()
+    .padStart(2, "0");
+  const seconds = Math.floor((totalMs % 60000) / 1000)
+    .toString()
+    .padStart(2, "0");
+  const centis = (ticker % 100).toString().padStart(2, "0");
+  return `${minutes}:${seconds}:${centis}`;
+};
+
+const calculateStepState = (
+  progress: number
+): { activeIndex: number; statuses: StepStatus[] } => {
+  const clampedProgress = Math.max(0, Math.min(1, progress));
+  let cumulative = 0;
+  let activeIndex = PLAN_SIMULATION_STEPS.length - 1;
+
+  for (let i = 0; i < PLAN_SIMULATION_STEPS.length; i++) {
+    cumulative += PLAN_SIMULATION_STEPS[i].weight;
+    if (clampedProgress <= cumulative) {
+      activeIndex = i;
+      break;
+    }
+  }
+
+  const statuses = PLAN_SIMULATION_STEPS.map((_, index) => {
+    if (index < activeIndex) return "complete";
+    if (index === activeIndex)
+      return clampedProgress >= 1 ? "complete" : "active";
+    return "pending";
+  });
+
+  return { activeIndex, statuses };
+};
+
 // Helper to format addresses nicely (e.g., 0x1234...ABCD)
 function formatAddress(
   address: string,
@@ -63,142 +158,8 @@ function formatLongText(text: string, maxLength = 20): string {
   return `${text.slice(0, 8)}...${text.slice(-6)}`;
 }
 
-// async function getEthersSigner(walletClient: any, connector: any) {
-//   let ethersSigner: any = null;
-
-//   try {
-//     const { BrowserProvider } = await import("ethers");
-
-//     // ✅ Strategy 1: Check if using Farcaster wallet and use SDK provider
-//     if (connector?.id === "farcaster" || connector?.name === "Farcaster") {
-//       console.log("Detected Farcaster wallet, using SDK provider...");
-
-//       try {
-//         // Get the Farcaster SDK's Ethereum Provider
-//         const farcasterProvider = await sdk.wallet.getEthereumProvider();
-
-//         if (farcasterProvider) {
-//           const provider = new BrowserProvider(
-//             farcasterProvider,
-//             walletClient?.chain?.id
-//           );
-
-//           ethersSigner = await Promise.race([
-//             provider.getSigner(),
-//             new Promise((_, reject) =>
-//               setTimeout(
-//                 () => reject(new Error("Farcaster signer timeout")),
-//                 30000
-//               )
-//             ) as Promise<any>,
-//           ]);
-
-//           const signerAddress = await ethersSigner.getAddress();
-//           console.log(
-//             "✅ Successfully obtained signer via Farcaster SDK:",
-//             signerAddress
-//           );
-//           return ethersSigner;
-//         }
-//       } catch (farcasterError) {
-//         console.warn("⚠️ Farcaster SDK provider failed:", farcasterError);
-//       }
-//     }
-
-//     // Strategy 2: Try Wagmi transport (for other connectors)
-//     if (walletClient?.account?.address && walletClient?.transport) {
-//       try {
-//         const transportRequest = (walletClient.transport as any).request;
-
-//         if (transportRequest) {
-//           const eip1193Provider = {
-//             request: transportRequest.bind(walletClient.transport),
-//           };
-
-//           const provider = new BrowserProvider(
-//             eip1193Provider,
-//             walletClient.chain?.id
-//           );
-
-//           ethersSigner = await Promise.race([
-//             provider.getSigner(walletClient.account.address),
-//             new Promise((_, reject) =>
-//               setTimeout(() => reject(new Error("Wagmi signer timeout")), 30000)
-//             ) as Promise<any>,
-//           ]);
-
-//           const signerAddress = await ethersSigner.getAddress();
-//           console.log(
-//             "✅ Successfully obtained signer via Wagmi:",
-//             signerAddress
-//           );
-//           return ethersSigner;
-//         }
-//       } catch (wagmiError) {
-//         console.warn("⚠️ Wagmi transport failed:", wagmiError);
-//       }
-//     }
-
-//     // Strategy 3: Fallback to window.ethereum
-//     if (
-//       !ethersSigner &&
-//       typeof window !== "undefined" &&
-//       (window as any).ethereum
-//     ) {
-//       try {
-//         const provider = new BrowserProvider((window as any).ethereum);
-
-//         let accounts: string[] = [];
-//         try {
-//           accounts = await Promise.race([
-//             provider.send("eth_accounts", []),
-//             new Promise((_, reject) =>
-//               setTimeout(() => reject(new Error("eth_accounts timeout")), 8000)
-//             ) as Promise<string[]>,
-//           ]);
-//         } catch (accountsError) {
-//           console.warn("Failed to get accounts:", accountsError);
-//           accounts = [];
-//         }
-
-//         if (!accounts || accounts.length === 0) {
-//           await Promise.race([
-//             provider.send("eth_requestAccounts", []),
-//             new Promise((_, reject) =>
-//               setTimeout(
-//                 () =>
-//                   reject(new Error("User did not approve wallet connection")),
-//                 60000
-//               )
-//             ) as Promise<any>,
-//           ]);
-//         }
-
-//         ethersSigner = await Promise.race([
-//           provider.getSigner(0),
-//           new Promise((_, reject) =>
-//             setTimeout(() => reject(new Error("getSigner timeout")), 30000)
-//           ) as Promise<any>,
-//         ]);
-
-//         const signerAddress = await ethersSigner.getAddress();
-//         console.log(
-//           "✅ Successfully obtained signer via window.ethereum:",
-//           signerAddress
-//         );
-//         return ethersSigner;
-//       } catch (windowEthereumError) {
-//         console.error("❌ window.ethereum failed:", windowEthereumError);
-//         throw windowEthereumError;
-//       }
-//     }
-
-//     throw new Error("Could not obtain signer from any source");
-//   } catch (walletErr) {
-//     console.error("❌ Failed to obtain ethers signer:", walletErr);
-//     throw walletErr;
-//   }
-// }
+const createMessageId = (prefix = "msg"): string =>
+  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 export async function getEthersSigner(
   walletClient: any,
@@ -247,7 +208,10 @@ export async function getEthersSigner(
           const address = await signer.getAddress();
           try {
             const balance = await provider.getBalance(address);
-            console.log("Balance of signer (Wagmi transport):", balance.toString());
+            console.log(
+              "Balance of signer (Wagmi transport):",
+              balance.toString()
+            );
           } catch (balanceErr) {
             console.warn("Could not fetch signer balance:", balanceErr);
           }
@@ -402,6 +366,9 @@ export function ActionsTab() {
   const [completedConfirmations, setCompletedConfirmations] = useState<
     Set<string>
   >(new Set());
+  const [planSimulation, setPlanSimulation] =
+    useState<PlanSimulationState | null>(null);
+  const [microTicker, setMicroTicker] = useState(0);
 
   // Contract interactions for token approval
   const {
@@ -555,7 +522,7 @@ export function ActionsTab() {
       setConnectionStatus("connected");
       // Add a system message about wallet connection
       const connectionMessage: ChatMessage = {
-        id: `wallet-${Date.now()}`,
+        id: createMessageId("wallet"),
         role: "assistant",
         content: `✅ Great! Your wallet (${formatAddress(
           address
@@ -577,7 +544,7 @@ export function ActionsTab() {
       // Wallet was disconnected
       setConnectionStatus(null);
       const disconnectionMessage: ChatMessage = {
-        id: `wallet-disconnect-${Date.now()}`,
+        id: createMessageId("wallet-disconnect"),
         role: "assistant",
         content: `⚠️ Your wallet has been disconnected. Some features like creating DCA plans and viewing your portfolio will be limited. Please reconnect your wallet to access all features.`,
         timestamp: new Date(),
@@ -599,7 +566,7 @@ export function ActionsTab() {
     if (!canSend) return;
 
     const userMessage: ChatMessage = {
-      id: Date.now().toString(),
+      id: createMessageId("user"),
       role: "user",
       content: inputMessage,
       timestamp: new Date(),
@@ -653,7 +620,7 @@ export function ActionsTab() {
         // Set connected status on successful response
         setConnectionStatus("connected");
 
-        const assistantMessageId = (Date.now() + 1).toString();
+        const assistantMessageId = createMessageId("assistant");
 
         // Check if this is a plan confirmation response that already contains approval content
         const isPlanConfirmationResponse =
@@ -697,8 +664,8 @@ export function ActionsTab() {
 
       // Fallback to local response generation on error
       const fallbackResponse = generateAssistantResponse(currentInput);
-      const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
+        const assistantMessage: ChatMessage = {
+          id: createMessageId("assistant"),
         role: "assistant",
         content: `⚠️ I'm having trouble connecting to the DCA backend right now. Here's a basic response:\n\n${fallbackResponse}`,
         timestamp: new Date(),
@@ -793,7 +760,7 @@ export function ActionsTab() {
 
       // Add success message with transaction hash and copy functionality
       const approvalMessage: ChatMessage = {
-        id: Date.now().toString(),
+        id: createMessageId("assistant"),
         role: "assistant",
         content: `✅ Token approval confirmed!\n\n**Transaction Hash:** ${approvalTxHash.slice(
           0,
@@ -826,7 +793,7 @@ export function ActionsTab() {
         approvalError.message.includes("rejected");
 
       const errorMessage: ChatMessage = {
-        id: Date.now().toString(),
+        id: createMessageId("assistant"),
         role: "assistant",
         content: isUserRejection
           ? "❌ Token approval was cancelled. No plan was created.\n\nYou can try creating the plan again when you're ready."
@@ -841,6 +808,77 @@ export function ActionsTab() {
     }
   }, [approvalError]);
 
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    let finalizeTimeout: NodeJS.Timeout | null = null;
+
+    if (isPlanCreationLoading) {
+      const startedAt = Date.now();
+      const initialState = calculateStepState(0);
+      setPlanSimulation({
+        startedAt,
+        progress: 0,
+        etaMs: PLAN_SIMULATION_DURATION_MS,
+        activeStepIndex: initialState.activeIndex,
+        stepStatuses: initialState.statuses,
+      });
+
+      interval = setInterval(() => {
+        const elapsed = Date.now() - startedAt;
+        const rawProgress = Math.min(
+          elapsed / PLAN_SIMULATION_DURATION_MS,
+          0.98
+        );
+        const etaMs = Math.max(PLAN_SIMULATION_DURATION_MS - elapsed, 0);
+        const { activeIndex, statuses } = calculateStepState(rawProgress);
+
+        setPlanSimulation((prev) =>
+          prev
+            ? {
+                ...prev,
+                progress: rawProgress,
+                etaMs,
+                activeStepIndex: activeIndex,
+                stepStatuses: statuses,
+              }
+            : prev
+        );
+      }, 900);
+    } else {
+      setPlanSimulation((prev) =>
+        prev
+          ? {
+              ...prev,
+              progress: 1,
+              etaMs: 0,
+              activeStepIndex: PLAN_SIMULATION_STEPS.length - 1,
+              stepStatuses: PLAN_SIMULATION_STEPS.map(() => "complete"),
+            }
+          : prev
+      );
+      finalizeTimeout = setTimeout(() => setPlanSimulation(null), 600);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+      if (finalizeTimeout) clearTimeout(finalizeTimeout);
+    };
+  }, [isPlanCreationLoading]);
+
+  useEffect(() => {
+    let microInterval: NodeJS.Timeout | null = null;
+    if (isPlanCreationLoading) {
+      microInterval = setInterval(() => {
+        setMicroTicker((prev) => (prev + Math.floor(Math.random() * 7) + 1) % 100);
+      }, 40);
+    } else {
+      setMicroTicker(0);
+    }
+    return () => {
+      if (microInterval) clearInterval(microInterval);
+    };
+  }, [isPlanCreationLoading]);
+
   const proceedWithPlanCreation = useCallback(
     async (confirmationId: string) => {
       try {
@@ -853,9 +891,9 @@ export function ActionsTab() {
 
         // Add loading message for plan creation
         const loadingMessage: ChatMessage = {
-          id: Date.now().toString(),
+          id: createMessageId("assistant"),
           role: "assistant",
-          content: "🔄 Creating your DCA plan...",
+          content: "🪄 Creating your DCA plan...",
           timestamp: new Date(),
           isCreatingPlan: true,
         };
@@ -926,7 +964,7 @@ export function ActionsTab() {
               triggerXSkipped = true;
 
               const walletErrorMessage: ChatMessage = {
-                id: Date.now().toString(),
+                id: createMessageId("assistant"),
                 role: "assistant",
                 content: `⚠️ **Plan Created Successfully**\n\nHowever, we couldn't connect to your wallet to set up automation. Your plan was created but automation setup was skipped.\n\nYou can manually execute swaps or reconnect your wallet to enable automation.`,
                 timestamp: new Date(),
@@ -971,7 +1009,7 @@ export function ActionsTab() {
                 ];
                 const shareText = shareLines.join("\n");
                 const automationMessage: ChatMessage = {
-                  id: Date.now().toString(),
+                  id: createMessageId("assistant"),
                   role: "assistant",
                   content: `🚀 **Automation Setup Complete!**\n\n✅ TriggerX Job ID: ${triggerXResult.jobId}\n📜 Script IPFS: ${triggerXResult.scriptIpfsUrl}\n\nYour DCA plan is now fully automated and will execute according to your schedule.`,
                   timestamp: new Date(),
@@ -989,7 +1027,7 @@ export function ActionsTab() {
 
                 // Add error message about automation failure
                 const automationErrorMessage: ChatMessage = {
-                  id: Date.now().toString(),
+                  id: createMessageId("assistant"),
                   role: "assistant",
                   content: `⚠️ **Plan Created but Automation Failed**\n\nYour DCA plan was created successfully, but we couldn't set up automation:\n${triggerXResult.error}\n\nPlease try setting up automation again!`,
                   timestamp: new Date(),
@@ -1005,7 +1043,7 @@ export function ActionsTab() {
 
             // Add error message about automation failure
             const automationErrorMessage: ChatMessage = {
-              id: Date.now().toString(),
+              id: createMessageId("assistant"),
               role: "assistant",
               content: `⚠️ **Plan Created but Automation Setup Failed**\n\nYour DCA plan was created successfully, but we encountered an error setting up automation:\n${
                 triggerXError instanceof Error
@@ -1060,7 +1098,7 @@ export function ActionsTab() {
         setMessages((prev) => prev.filter((msg) => !msg.isCreatingPlan));
 
         const errorMessage: ChatMessage = {
-          id: Date.now().toString(),
+          id: createMessageId("assistant"),
           role: "assistant",
           content:
             error instanceof Error &&
@@ -1164,8 +1202,8 @@ export function ActionsTab() {
             duration: planData.duration,
           });
 
-          const errMsg: ChatMessage = {
-            id: Date.now().toString(),
+        const errMsg: ChatMessage = {
+          id: createMessageId("assistant"),
             role: "assistant",
             content:
               "❌ Invalid plan details for approval. Please review your amount, interval, and duration.",
@@ -1184,7 +1222,7 @@ export function ActionsTab() {
         // console.log("totalAmountWei", totalAmountWei);
         // Show approval request message
         const approvalMessage: ChatMessage = {
-          id: Date.now().toString(),
+          id: createMessageId("assistant"),
           role: "assistant",
           content: `🔐 **Requesting Token Approval**\n\nPlease approve spending of ${
             planData.fromToken
@@ -1220,7 +1258,7 @@ export function ActionsTab() {
         console.error("Error starting approval process:", error);
 
         const errorMessage: ChatMessage = {
-          id: Date.now().toString(),
+          id: createMessageId("assistant"),
           role: "assistant",
           content:
             "❌ Failed to start token approval process. Please try again.",
@@ -1284,7 +1322,7 @@ export function ActionsTab() {
 
         if (result.success) {
           const cancellationMessage: ChatMessage = {
-            id: Date.now().toString(),
+            id: createMessageId("assistant"),
             role: "assistant",
             content:
               result.response ||
@@ -1304,7 +1342,7 @@ export function ActionsTab() {
         console.error("Error cancelling plan:", error);
 
         const errorMessage: ChatMessage = {
-          id: Date.now().toString(),
+          id: createMessageId("assistant"),
           role: "assistant",
           content: "✅ Action cancelled locally. No DCA plan was created.",
           timestamp: new Date(),
@@ -1466,14 +1504,23 @@ export function ActionsTab() {
         {/* Address pill */}
         <div className="flex-shrink-0 flex justify-end p-3 pb-2">
           <div className="px-3 py-1.5 rounded-full bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 border border-[#c199e4]/30 text-xs font-mono text-white/90 shadow-sm flex items-center gap-2">
-            <svg
-              className="w-3.5 h-3.5 text-[#c199e4]"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden
-            >
-              <path d="M12 12c2.761 0 5-2.239 5-5s-2.239-5-5-5-5 2.239-5 5 2.239 5 5 5zm0 2c-3.866 0-7 3.134-7 7h2c0-2.761 2.239-5 5-5s5 2.239 5 5h2c0-3.866-3.134-7-7-7z" />
-            </svg>
+            {context?.user?.pfpUrl ? (
+              <img
+                src={context.user.pfpUrl}
+                alt="User Avatar"
+                className="w-5 h-5 rounded-full object-cover border border-[#c199e4]"
+                style={{ background: "#fff" }}
+              />
+            ) : (
+              <div className="w-5 h-5 rounded-full bg-[#c199e4]/20 border border-[#c199e4] flex items-center justify-center">
+                <img
+                src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTvAyrN5PLmvXRRHsJOVxJZN1SRscvJQLL33Q&s"
+                alt="User Avatar"
+                className="w-5 h-5 rounded-full object-cover border border-[#c199e4]"
+                style={{ background: "#fff" }}
+              />
+              </div>
+            )}
             {/* {address ? formatAddress(address) : "Not Connected"} */}
             {!isConnected
               ? "Wallet Not Connected"
@@ -1548,19 +1595,96 @@ export function ActionsTab() {
                       </button>
                     </div>
                   )}
-                  {message.isCreatingPlan && (
-                    <div className="mt-2 flex space-x-1">
-                      <div className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce"></div>
-                      <div
-                        className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce"
-                        style={{ animationDelay: "0.1s" }}
-                      ></div>
-                      <div
-                        className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce"
-                        style={{ animationDelay: "0.2s" }}
-                      ></div>
-                    </div>
-                  )}
+                  {message.isCreatingPlan &&
+                    (planSimulation ? (
+                      <div className="mt-3 space-y-3 rounded-2xl border border-white/10 bg-black/20 p-3">
+                        <div className="flex items-center justify-between text-xs text-white/70">
+                          <span>
+                            Step {planSimulation.activeStepIndex + 1} of{" "}
+                            {PLAN_SIMULATION_STEPS.length}
+                          </span>
+                          <span>ETA {formatFastEta(planSimulation.etaMs, microTicker)}</span>
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-[#c199e4] to-[#b380db] transition-all duration-700"
+                            style={{
+                              width: `${Math.max(
+                                planSimulation.progress * 100,
+                                4
+                              ).toFixed(2)}%`,
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          {PLAN_SIMULATION_STEPS.map((step, index) => {
+                            const status =
+                              planSimulation.stepStatuses[index] || "pending";
+                            const statusClasses =
+                              status === "complete"
+                                ? "border-emerald-300/60 text-emerald-200 bg-emerald-400/20"
+                                : status === "active"
+                                ? "border-[#c199e4]/60 text-[#c199e4] bg-[#c199e4]/10"
+                                : "border-white/10 text-white/40 bg-white/5";
+
+                            return (
+                              <div
+                                key={step.id}
+                                className="flex items-start gap-2 text-xs text-white/80"
+                              >
+                                <span
+                                  className={`mt-0.5 flex size-5 items-center justify-center rounded-full border ${statusClasses}`}
+                                >
+                                  {status === "complete" ? (
+                                    <svg
+                                      className="size-3"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={3}
+                                        d="M5 13l4 4L19 7"
+                                      />
+                                    </svg>
+                                  ) : status === "active" ? (
+                                    <span className="size-2 rounded-full bg-current animate-pulse" />
+                                  ) : (
+                                    <span className="size-1 rounded-full bg-current/60" />
+                                  )}
+                                </span>
+                                <div className="flex-1">
+                                  <div className="font-medium text-white">
+                                    {step.label}
+                                  </div>
+                                  <div className="text-[11px] text-white/60">
+                                    {step.description}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="text-[11px] text-white/50">
+                          Almost there,we&apos;re running deep checks so your
+                          automation launches safely.
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-2 flex space-x-1">
+                        <div className="h-2 w-2 animate-bounce rounded-full bg-[#c199e4]"></div>
+                        <div
+                          className="h-2 w-2 animate-bounce rounded-full bg-[#c199e4]"
+                          style={{ animationDelay: "0.1s" }}
+                        ></div>
+                        <div
+                          className="h-2 w-2 animate-bounce rounded-full bg-[#c199e4]"
+                          style={{ animationDelay: "0.2s" }}
+                        ></div>
+                      </div>
+                    ))}
                 </div>
 
                 {/* Copy Transaction Hash Button */}
@@ -1709,16 +1833,19 @@ export function ActionsTab() {
           {isLoading && (
             <div className="flex justify-start">
               <div className="max-w-[85%] bg-gradient-to-br from-white/15 to-white/10 backdrop-blur-sm border border-white/20 rounded-2xl px-4 py-3">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce"></div>
-                  <div
-                    className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce"
-                    style={{ animationDelay: "0.1s" }}
-                  ></div>
-                  <div
-                    className="w-2 h-2 bg-[#c199e4] rounded-full animate-bounce"
-                    style={{ animationDelay: "0.2s" }}
-                  ></div>
+                <div className="flex items-center gap-3 text-sm text-white/80">
+                  <span className="font-medium">Generating response…</span>
+                  <div className="flex space-x-1">
+                    <div className="h-1.5 w-1.5 rounded-full bg-[#c199e4] animate-bounce" />
+                    <div
+                      className="h-1.5 w-1.5 rounded-full bg-[#c199e4] animate-bounce"
+                      style={{ animationDelay: "0.1s" }}
+                    />
+                    <div
+                      className="h-1.5 w-1.5 rounded-full bg-[#c199e4] animate-bounce"
+                      style={{ animationDelay: "0.2s" }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>

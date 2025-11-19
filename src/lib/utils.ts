@@ -184,7 +184,7 @@ export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<numb
           cached &&
           cached.signature === signature &&
           typeof cached.timestamp === "number" &&
-          Date.now() - cached.timestamp < 10 * 60 * 1000
+          Date.now() - cached.timestamp < 2 * 60 * 1000 
         ) {
           return cached.value ?? 0;
         }

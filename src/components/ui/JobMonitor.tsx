@@ -15,6 +15,8 @@ import {
   IoArrowUp,
   IoClose,
   IoLockClosed,
+  IoArrowDown,
+  IoFilter,
 } from "react-icons/io5";
 import { fetchPlatformStatsForMonitor, type JobMonitorData, type JobMonitorUser } from "~/lib/api";
 
@@ -45,6 +47,8 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortField, setSortField] = useState<"latest" | "jobid" | "address">("latest");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [selectedUser, setSelectedUser] = useState<JobMonitorUser | null>(null);
   const [copiedAddressKey, setCopiedAddressKey] = useState<string | null>(null);
   const [copiedJobId, setCopiedJobId] = useState<string | null>(null);
@@ -113,20 +117,72 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
   }, [initialData, fetchData, isAuthenticated]);
 
 
-  // Filter users based on search query (by Job ID, username, or address)
+  // Get latest execution timestamp from task_data
+  const getLatestExecutionTime = (user: JobMonitorUser): number => {
+    if (!user.task_data || user.task_data.length === 0) return 0;
+    const timestamps = user.task_data
+      .map((task) => {
+        if (task.execution_timestamp && task.execution_timestamp !== "0001-01-01T00:00:00Z") {
+          return new Date(task.execution_timestamp).getTime();
+        }
+        return 0;
+      })
+      .filter((ts) => ts > 0);
+    return timestamps.length > 0 ? Math.max(...timestamps) : 0;
+  };
+
+  // Filter and sort users based on search query and sort options
   const filteredUsers = useMemo(() => {
     if (!data?.users) return [];
-    if (!searchQuery.trim()) {
-      return data.users;
+    
+    // First, filter by search query
+    let filtered = data.users;
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = data.users.filter(
+        (user) =>
+          user.jobid.toLowerCase().includes(query) ||
+          (user.username && user.username.toLowerCase().includes(query)) ||
+          user.Address.toLowerCase().includes(query)
+      );
     }
-    const query = searchQuery.toLowerCase();
-    return data.users.filter(
-      (user) =>
-        user.jobid.toLowerCase().includes(query) ||
-        (user.username && user.username.toLowerCase().includes(query)) ||
-        user.Address.toLowerCase().includes(query)
-    );
-  }, [data?.users, searchQuery]);
+
+    // Then, sort the filtered results
+    const sorted = [...filtered].sort((a, b) => {
+      let aValue: number | string = 0;
+      let bValue: number | string = 0;
+
+      switch (sortField) {
+        case "latest":
+          aValue = getLatestExecutionTime(a);
+          bValue = getLatestExecutionTime(b);
+          break;
+        case "jobid":
+          aValue = a.jobid;
+          bValue = b.jobid;
+          break;
+        case "address":
+          aValue = a.Address.toLowerCase();
+          bValue = b.Address.toLowerCase();
+          break;
+        default:
+          return 0;
+      }
+
+      // Compare values
+      let comparison = 0;
+      if (typeof aValue === "number" && typeof bValue === "number") {
+        comparison = aValue - bValue;
+      } else {
+        comparison = String(aValue).localeCompare(String(bValue));
+      }
+
+      // Apply sort order
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+
+    return sorted;
+  }, [data?.users, searchQuery, sortField, sortOrder]);
 
   // Calculate pagination
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
@@ -134,10 +190,10 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
   const endIndex = startIndex + itemsPerPage;
   const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
 
-  // Reset to page 1 when search changes
+  // Reset to page 1 when search or sort changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [searchQuery, sortField, sortOrder]);
 
   // Refresh countdown timer (10 minutes = 600 seconds)
   useEffect(() => {
@@ -454,20 +510,46 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
 
         {/* Recent Transactions Section */}
         <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl p-6 border border-gray-700/50">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-3">
               <IoArrowUp className="w-5 h-5 text-green-400" />
               <h2 className="text-xl font-bold text-white">Recent Transactions</h2>
             </div>
-            <div className="relative w-64">
-              <IoSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by Job ID..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
-              />
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <div className="relative flex-1 md:w-64">
+                <IoSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by Job ID, Address..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <IoFilter className="w-5 h-5 text-gray-400" />
+                <select
+                  value={sortField}
+                  onChange={(e) => setSortField(e.target.value as typeof sortField)}
+                  className="px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+                >
+                  <option value="latest">Latest</option>
+                  <option value="jobid">Job ID</option>
+                  <option value="address">Address</option>
+                </select>
+                <button
+                  onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                  className="px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white hover:bg-gray-800/70 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 flex items-center gap-1"
+                  title={`Sort ${sortOrder === "asc" ? "Ascending" : "Descending"}`}
+                >
+                  {sortOrder === "asc" ? (
+                    <IoArrowUp className="w-4 h-4" />
+                  ) : (
+                    <IoArrowDown className="w-4 h-4" />
+                  )}
+                  <span className="text-xs">{sortOrder === "asc" ? "ASC" : "DESC"}</span>
+                </button>
+              </div>
             </div>
           </div>
 

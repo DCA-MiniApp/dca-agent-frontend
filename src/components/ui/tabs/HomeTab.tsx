@@ -1442,11 +1442,14 @@ export function HomeTab() {
                 <HiCurrencyDollar className="text-[#c199e4] size-6" />
               </div>
               <div>
-                <span className="text-sm text-white/90 font-medium">
-                  Total Wallet Value (in USDC)
+                <span className="text-sm text-white/90 font-medium inline-flex items-center">
+                  Total Wallet Value 
                   <button
-                    onClick={() => setShowTooltip(!showTooltip)}
-                    className="relative inline-block ml-2 align-middle"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowTooltip(!showTooltip);
+                    }}
+                    className="relative inline-flex items-center ml-2 align-middle"
                     type="button"
                   >
                     <HiInformationCircle className="w-4 h-4 text-white/50 transition hover:text-green-400 hover:scale-110" />
@@ -1454,21 +1457,21 @@ export function HomeTab() {
                     {showTooltip && (
                       <>
                         <div
-                          className="fixed inset-0 z-10"
+                          className="fixed inset-0 z-[60]"
                           onClick={(e) => {
                             e.stopPropagation();
                             setShowTooltip(false);
                           }}
                         />
 
-                        <span className="absolute left-1/2 z-20 -translate-x-1/2 mt-2 w-72 rounded-lg bg-black/95 text-xs text-white/90 px-3 py-3 shadow-2xl border border-green-400/20">
+                        <div className="absolute z-[70] left-1/2 -translate-x-1/2 top-full mt-2 w-72 rounded-lg bg-black/95 text-xs text-white/90 px-4 py-3 shadow-2xl border border-green-400/20 pointer-events-none">
                           <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-black/95 border-l border-t border-green-400/20 rotate-45" />
-                          <div className="text-center w-full">
+                          <div className="text-center w-full relative z-10">
                             This amount reflects the total value of all tokens
                             <br />
                             converted to USDC using current market prices.
                           </div>
-                        </span>
+                        </div>
                       </>
                     )}
                   </button>
@@ -1520,9 +1523,9 @@ export function HomeTab() {
               <div>
                 <div className="flex items-baseline gap-2 mb-1">
                   <p className="text-3xl font-bold text-[#c199e4]">
-                    {isLoading || portfolioUsd === null
-                      ? "..."
-                      : `${portfolioUsd?.toLocaleString(undefined, {
+                    {isLoading || portfolioUsd === null || !isConnected
+                      ? "$0.00"
+                      : `$${portfolioUsd?.toLocaleString(undefined, {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}`}
@@ -1547,19 +1550,19 @@ export function HomeTab() {
                 )} */}
               </div>
 
-              <div className="flex items-center gap-6">
+              <div className="flex items-center gap-6 flex-wrap">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
-                  <span className="text-sm text-white/90 font-medium">
+                  <span className="text-sm text-white/90 font-medium whitespace-nowrap">
                     {isLoading
                       ? "Loading..."
-                      : `Active Strategies : ${runningPlans.length}`}
+                      : `Active Strategies: ${runningPlans.length}`}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-                  <span className="text-sm text-white/90 font-medium">
-                    Plan created : {activePlans.length}
+                  <span className="text-sm text-white/90 font-medium whitespace-nowrap">
+                    Plan created: {activePlans.length}
                   </span>
                 </div>
 
@@ -1574,16 +1577,22 @@ export function HomeTab() {
           </div>
 
           <div className="ml-6 flex flex-col items-end">
-            <div className="w-12 h-12 bg-gradient-to-br from-emerald-400/20 to-green-500/20 rounded-2xl flex items-center justify-center border border-emerald-400/30 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center border border-purple-400/30 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 overflow-hidden">
               {context?.user?.pfpUrl ? (
                 <img
                   src={context.user.pfpUrl}
                   alt="Farcaster Profile"
-                  className="w-6 h-6 rounded-full object-cover"
+                  className="w-11 h-11 rounded-2xl object-cover"
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <FaCircleUser className="text-emerald-400 size-6" />
+                // <FaCircleUser className="text-emerald-400 size-6" />
+                <img
+                  src={"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTvAyrN5PLmvXRRHsJOVxJZN1SRscvJQLL33Q&s"}
+                  alt="Farcaster Profile"
+                  className="w-11 h-11 rounded-2xl object-cover"
+                  referrerPolicy="no-referrer"
+                />
               )}
             </div>
             {/* <div className="mt-2 text-center">
