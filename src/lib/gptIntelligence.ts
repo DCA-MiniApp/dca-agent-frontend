@@ -15,6 +15,10 @@ export interface DCAPlanData {
   interval: string; // Store as string, backend will parse (e.g., "2 minutes", "1 day", "weekly")
   duration: string; // Store as string, backend will parse (e.g., "1 day", "3 weeks", "2 months")
   slippage?: string;
+  usdEstimate?: {
+    amountUsd: number;
+    tokenPriceUsd: number;
+  };
 }
 
 // Legacy interface for backward compatibility during transition
@@ -45,6 +49,12 @@ export interface TokenInfo {
 
 // Available tokens from the tokenMap
 const availableTokens: Record<string, TokenInfo[]> = tokenMapArbitrum.tokenMap;
+
+const TOKEN_PRICE_CACHE_TTL_MS = 60_000;
+const tokenPriceCache = new Map<
+  string,
+  { priceUsd: number; fetchedAt: number }
+>();
 
 /**
  * Main GPT Intelligence Service
@@ -473,13 +483,26 @@ Extract any new DCA parameters from this message and provide the next question f
       return `${address.slice(0, 8)}...${address.slice(-6)}`;
     };
 
+    const usdLine =
+      planData.usdEstimate && isFinite(planData.usdEstimate.amountUsd)
+        ? `• USD equivalent (per execution): ~$${planData.usdEstimate.amountUsd.toFixed(
+            2
+          )}\n`
+        : "";
+
     return (
       `📊 **DCA Plan Summary:**\n` +
-      `• Investment: ${planData.amount} ${planData.fromToken}\n` +
+      `• Investment: ${planData.amount} ${planData.fromToken}${
+        planData.usdEstimate
+          ? ` (~$${planData.usdEstimate.amountUsd.toFixed(2)})`
+          : ""
+      }\n` +
       `• Target: ${planData.toToken}\n` +
       `• Duration: ${planData.duration}\n` +
       `• Interval: ${planData.interval}\n` +
-      `• Slippage: ${planData.slippage || "2"}%\n\n` +
+      `• Slippage: ${planData.slippage || "2"}%\n` +
+      usdLine +
+      `\n` +
       `💰 **Token:** ${formatTokenAddress(tokenInfo?.address || "")}\n` +
       `⚠️ **Note:** You'll need to approve a spending allowance for ${planData.fromToken} tokens to the executor.`
     );
@@ -516,6 +539,114 @@ Extract any new DCA parameters from this message and provide the next question f
     }
 
     return { valid: errors.length === 0, errors };
+  }
+}
+
+function sanitizeSymbol(symbol?: string): string | null {
+  if (!symbol) return null;
+  return symbol.trim().toUpperCase();
+}
+
+async function fetchTokenUsdPrice(
+  tokenSymbol: string
+): Promise<{ priceUsd: number; address: string } | null> {
+  const normalized = sanitizeSymbol(tokenSymbol);
+  if (!normalized) return null;
+  const tokenInfo = availableTokens[normalized]?.[0];
+  if (!tokenInfo?.address) return null;
+
+  const address = tokenInfo.address;
+  const cacheKey = address.toLowerCase();
+  const cached = tokenPriceCache.get(cacheKey);
+  const now = Date.now();
+  if (cached && now - cached.fetchedAt < TOKEN_PRICE_CACHE_TTL_MS) {
+    return { priceUsd: cached.priceUsd, address };
+  }
+
+  try {
+    const endpoint = `https://api.coingecko.com/api/v3/simple/token_price/arbitrum-one?contract_addresses=${encodeURIComponent(
+      address
+    )}&vs_currencies=usd`;
+    const response = await fetch(endpoint, { method: "GET" });
+    if (!response.ok) {
+      console.warn(
+        "[TokenPrice] Coingecko request failed",
+        response.status,
+        await response.text()
+      );
+      return null;
+    }
+    const data = await response.json();
+    const lookupKey = address.toLowerCase();
+    const price =
+      data?.[lookupKey]?.usd ??
+      data?.[address]?.usd ??
+      data?.[lookupKey]?.USD ??
+      data?.[address]?.USD;
+
+    if (typeof price !== "number" || !isFinite(price)) {
+      return null;
+    }
+
+    tokenPriceCache.set(cacheKey, { priceUsd: price, fetchedAt: now });
+    return { priceUsd: price, address };
+  } catch (error) {
+    console.error("[TokenPrice] Failed to fetch USD price:", error);
+    return null;
+  }
+}
+
+export interface DollarIntentResult {
+  detected: boolean;
+  usdAmount?: number;
+}
+
+export function detectDollarIntent(message: string): DollarIntentResult {
+  if (!message) return { detected: false };
+  const normalized = message.replace(/,/g, "");
+  const hasDollarSymbol = /\$/.test(normalized);
+  const hasUsdWord = /usd|dollar/.test(normalized.toLowerCase());
+  let usdAmount: number | undefined;
+
+  if (hasDollarSymbol) {
+    const match = normalized.match(/\$\s*(\d+(?:\.\d+)?)/);
+    if (match) {
+      usdAmount = parseFloat(match[1]);
+    }
+  }
+
+  if (usdAmount === undefined) {
+    const match = normalized.match(/(\d+(?:\.\d+)?)\s*(usd|dollars?)/i);
+    if (match) {
+      usdAmount = parseFloat(match[1]);
+    }
+  }
+
+  return { detected: hasDollarSymbol || hasUsdWord, usdAmount };
+}
+
+export async function applyUsdIntelligence(
+  planData: DCAPlanData,
+  usdInputAmount?: number
+): Promise<void> {
+  const priceInfo = await fetchTokenUsdPrice(planData.fromToken);
+  if (!priceInfo) return;
+
+  if (usdInputAmount && usdInputAmount > 0) {
+    const tokenAmount = usdInputAmount / priceInfo.priceUsd;
+    const formattedTokenAmount = Number(tokenAmount.toFixed(8)).toString();
+    planData.amount = formattedTokenAmount;
+    planData.usdEstimate = {
+      amountUsd: usdInputAmount,
+      tokenPriceUsd: priceInfo.priceUsd,
+    };
+  } else {
+    const tokenAmount = Number(planData.amount);
+    if (!isFinite(tokenAmount) || tokenAmount <= 0) return;
+    planData.usdEstimate = {
+      amountUsd: tokenAmount * priceInfo.priceUsd,
+      tokenPriceUsd: priceInfo.priceUsd,
+    };
   }
 }
 

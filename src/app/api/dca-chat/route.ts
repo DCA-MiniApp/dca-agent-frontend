@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { gptIntelligence, type DCAPlanData } from '../../../lib/gptIntelligence';
+import { gptIntelligence, type DCAPlanData, detectDollarIntent, applyUsdIntelligence } from '../../../lib/gptIntelligence';
 import { planSessionManager } from '../../../lib/planSessionManager';
 
 // Request/Response schemas
@@ -60,6 +60,8 @@ export async function POST(request: NextRequest) {
 
     console.log('[DCA Chat API] Received:', { message, userAddress, confirmationId, action, isPlanCreationRequest });
 
+    const dollarIntent = detectDollarIntent(message || "");
+
     // Handle confirmation actions first
     if (confirmationId && action) {
       const confirmationResponse = await handleConfirmationAction(confirmationId, action, userAddress, fid);
@@ -104,7 +106,13 @@ export async function POST(request: NextRequest) {
         
         const completePlanData = extractionResult.planData as DCAPlanData;
         const confirmationId = generateConfirmationId(completePlanData);
-        const confirmationMessage = gptIntelligence.generatePlanSummary(completePlanData);
+        await applyUsdIntelligence(
+          completePlanData,
+          dollarIntent.usdAmount
+        );
+        planSessionManager.updateSessionPlanData(session.id, completePlanData);
+        const confirmationMessage =
+          gptIntelligence.generatePlanSummary(completePlanData);
         
         // Add assistant response to conversation
         planSessionManager.addToConversationHistory(session.id, 'assistant', confirmationMessage);
