@@ -348,6 +348,7 @@ export function ActionsTab() {
 
   // --- Layout/Refs for better UX ---
   const endOfMessagesRef = useRef<HTMLDivElement | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const inputContainerRef = useRef<HTMLDivElement | null>(null);
   const [inputContainerHeight, setInputContainerHeight] = useState<number>(72);
 
@@ -369,6 +370,8 @@ export function ActionsTab() {
   const [planSimulation, setPlanSimulation] =
     useState<PlanSimulationState | null>(null);
   const [microTicker, setMicroTicker] = useState(0);
+  const [showScrollToLatest, setShowScrollToLatest] = useState(false);
+  const messagesPinnedRef = useRef(true);
 
   // Contract interactions for token approval
   const {
@@ -504,17 +507,74 @@ export function ActionsTab() {
     }
   }, []);
 
-  const scrollToBottom = (smooth = true) => {
-    endOfMessagesRef.current?.scrollIntoView({
-      behavior: smooth ? "smooth" : "auto",
-      block: "end",
-    });
-  };
+  const scrollToBottom = useCallback(
+    (smooth = true) => {
+      const container = messagesContainerRef.current;
+      if (container) {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: smooth ? "smooth" : "auto",
+        });
+      } else {
+        endOfMessagesRef.current?.scrollIntoView({
+          behavior: smooth ? "smooth" : "auto",
+          block: "end",
+        });
+      }
+    },
+    []
+  );
+
+  const handleMessagesScroll = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    const threshold = 120;
+    const isPinned = distanceFromBottom <= threshold;
+    messagesPinnedRef.current = isPinned;
+    setShowScrollToLatest(!isPinned);
+  }, []);
 
   useEffect(() => {
-    // Auto-scroll on new messages or while loading
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    container.addEventListener("scroll", handleMessagesScroll, {
+      passive: true,
+    });
+    handleMessagesScroll();
+    return () => container.removeEventListener("scroll", handleMessagesScroll);
+  }, [handleMessagesScroll]);
+
+  useEffect(() => {
+    if (messagesPinnedRef.current) {
+      scrollToBottom(messages.length < 4);
+    }
+  }, [messages, scrollToBottom]);
+
+  useEffect(() => {
+    if (isLoading && messagesPinnedRef.current) {
+      scrollToBottom(true);
+    }
+  }, [isLoading, scrollToBottom]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.visualViewport) return;
+    const handler = () => {
+      if (messagesPinnedRef.current) {
+        setTimeout(() => scrollToBottom(false), 60);
+      }
+    };
+    window.visualViewport.addEventListener("resize", handler);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", handler);
+    };
+  }, [scrollToBottom]);
+
+  const handleJumpToLatest = useCallback(() => {
+    messagesPinnedRef.current = true;
     scrollToBottom(true);
-  }, [messages, isLoading]);
+  }, [scrollToBottom]);
 
   useEffect(() => {
     // Update chat context when wallet connection changes
@@ -1532,7 +1592,8 @@ export function ActionsTab() {
 
         {/* Chat Messages - Scrollable */}
         <div
-          className="flex-1 overflow-y-auto overflow-x-hidden px-3 pb-4 space-y-3"
+          ref={messagesContainerRef}
+          className="relative flex-1 overflow-y-auto overflow-x-hidden px-3 pb-4 space-y-3"
           style={{
             scrollbarWidth: "thin",
             scrollbarColor: "#c199e4 transparent",
@@ -1853,6 +1914,30 @@ export function ActionsTab() {
 
           {/* Anchor to scroll to bottom */}
           <div ref={endOfMessagesRef} />
+
+          {showScrollToLatest && (
+            <div className="sticky bottom-3 flex justify-center pointer-events-none">
+              <button
+                onClick={handleJumpToLatest}
+                className="pointer-events-auto inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-[#c199e4]/90 to-[#b380db]/90 text-white text-xs font-semibold shadow-lg border border-white/30"
+              >
+                Jump to latest
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 5v14m0 0l-6-6m6 6l6-6"
+                  />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Chat Input - Fixed at Bottom */}

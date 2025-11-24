@@ -217,7 +217,7 @@ export function ContextTab() {
       </div>
 
       {/* Compact toolbar to toggle filters and see quick state */}
-      {!selectedTx && (
+      {!selectedTx && transactions.length > 0 && (
         <div className="sticky top-0 z-[40] -mt-2 mb-4">
           <div className="flex items-center justify-between bg-gradient-to-r from-[#4a2b7a]/30 to-[#341e64]/20 backdrop-blur-xl border border-white/20 rounded-2xl px-3 py-2">
             <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -274,7 +274,7 @@ export function ContextTab() {
       )}
 
       {/* Task ID Search (always visible) */}
-      {!selectedTx && (
+      {!selectedTx && transactions.length > 0 && (
         <div className="mb-4">
           <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl p-4 border border-white/20">
             <label className="text-sm text-[#c199e4]/90 mb-2 font-medium block">
@@ -686,7 +686,7 @@ export function ContextTab() {
                     Job ID (TriggerX)
                   </p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
-                    {selectedTx.jobId.slice(0, 8)}...
+                    {selectedTx.jobId.slice(0, 5)}...
                     {selectedTx.jobId.slice(-3)}
                   </p>
                 </div>
@@ -696,14 +696,6 @@ export function ContextTab() {
                   </p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300 font-mono">
                     {selectedTx.taskId ? `${selectedTx.taskId}` : "N/A"}
-                  </p>
-                </div>
-                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">
-                    Slippage Tolerance
-                  </p>
-                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
-                    {selectedTx.slippage} %
                   </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">

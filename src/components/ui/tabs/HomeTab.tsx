@@ -770,7 +770,7 @@ export function HomeTab() {
     return () => window.removeEventListener("keydown", handleKeyPress);
   }, []);
 
-  const userGreeting = `Welcome back, ${context?.user?.username} 👋`;
+  const userGreeting = `Welcome back, ${context?.user?.username ?? "John Doe"} 👋`;
   const walletBalanceDisplay =
     walletTotalUsd !== null
       ? `$${walletTotalUsd.toLocaleString(undefined, {
@@ -864,17 +864,11 @@ export function HomeTab() {
                     setShowConnectWalletModal(false);
                     setActiveTab("wallet" as any);
                   }}
-                  className="w-full bg-gradient-to-r from-[#c199e4]/40 to-[#b380db]/40 hover:from-[#c199e4]/55 hover:to-[#b380db]/55 text-white font-medium py-2 px-4 rounded-md transition-all duration-200 border border-[#c199e4]/40 hover:border-[#c199e4]/60 flex items-center justify-center gap-2 text-sm"
+                  className="w-full bg-gradient-to-r from-[#c199e4]/40 to-[#b380db]/40 hover:from-[#c199e4]/55 hover:to-[#b380db]/55 text-white font-medium py-1 px-2 rounded-md transition-all duration-200 border border-[#c199e4]/40 hover:border-[#c199e4]/60 flex items-center justify-center gap-2 text-sm"
                 >
                   <HiOutlineWallet className="w-4 h-4" />
-                  <span>Go to Wallet Tab</span>
+                  <span>Connect Wallet</span>
                   <HiOutlineArrowNarrowRight className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setShowConnectWalletModal(false)}
-                  className="w-full bg-white/5 hover:bg-white/10 text-white/80 text-[11px] font-medium py-1.5 px-4 rounded-md transition-all duration-200 border border-white/10 hover:border-white/20"
-                >
-                  Maybe Later
                 </button>
               </div>
             </div>
@@ -1418,16 +1412,21 @@ export function HomeTab() {
                   }`}
                 />
               </button>
+               <code className="text-xs px-1 rounded-full transition-all duration-300">
+                {chain?.name === "Arbitrum One"
+                  ? <img
+                      src="https://cdn3d.iconscout.com/3d/premium/thumb/arbitrum-arb-3d-icon-png-download-11757502.png"
+                      alt="Arbitrum Logo"
+                      className="inline-block w-5 h-5 mr-1 -mt-0.3 transition-all duration-300"
+                    />
+                  : "Wrong network"}
+              </code>
             </div>
 
             {/* Network Display */}
             <div className="flex items-center gap-1.5 text-white/70 ml-3.5">
-              <span className="text-sm">Network:</span>
-              <code className="text-xs bg-white/20 px-2 py-1 rounded-md">
-                {chain?.name === "Arbitrum One"
-                  ? "Arbitrum One"
-                  : "Wrong network"}
-              </code>
+              {/* <span className="text-sm">Network:</span> */}
+             
             </div>
           </div>
         )}
@@ -1464,8 +1463,8 @@ export function HomeTab() {
                           }}
                         />
 
-                        <div className="absolute z-[70] left-1/2 -translate-x-1/2 top-full mt-2 w-72 rounded-lg bg-black/95 text-xs text-white/90 px-4 py-3 shadow-2xl border border-green-400/20 pointer-events-none">
-                          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-black/95 border-l border-t border-green-400/20 rotate-45" />
+                        <div className="absolute z-[10] left-1/2 -translate-x-1/2 top-full mt-2 w-72 rounded-lg bg-[#c199e4] text-xs text-white/90 px-1 py-1 shadow-2xl border border-green-400/20 pointer-events-none">
+                          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#c199e4]  border-l border-t border-green-400/20 rotate-45" />
                           <div className="text-center w-full relative z-10">
                             This amount reflects the total value of all tokens
                             <br />
@@ -1550,7 +1549,7 @@ export function HomeTab() {
                 )} */}
               </div>
 
-              <div className="flex items-center gap-6 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
                   <span className="text-sm text-white/90 font-medium whitespace-nowrap">
@@ -1759,17 +1758,17 @@ export function HomeTab() {
                       <p className="text-sm text-white/90 font-medium">
                         Total Invested
                       </p>
-                      <p className="text-sm text-[#c199e4] font-medium">
-                        {userPlans[currentPlanIndex].successCount}/
-                        {userPlans[currentPlanIndex].totalExecutions} executions
+                      <p className="text-sm text-[#c199e4] font-medium">  
+                        {userPlans[currentPlanIndex].successCount > 0 ? `${userPlans[currentPlanIndex].successCount}/${userPlans[currentPlanIndex].totalExecutions} executions` : "No executions"}
                       </p>
                     </div>
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-2xl font-bold text-[#c199e4]">
-                        {(
-                          parseFloat(userPlans[currentPlanIndex].amount) *
+                        {userPlans[currentPlanIndex].successCount > 0 ? (
+                          (parseFloat(userPlans[currentPlanIndex].amount) *
                             userPlans[currentPlanIndex].successCount || 0
-                        ).toFixed(5)}
+                        ).toFixed(5)
+                        ) : "0.00"}
                       </p>
                     </div>
                     <div className="w-full bg-white/20 rounded-full h-3">
@@ -1941,7 +1940,7 @@ export function HomeTab() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleDeletePlan(selectedPlan)}
-                    className={`w-full bg-gradient-to-r from-red-500/20 to-red-500/10 hover:from-red-500/30 hover:to-red-500/20 text-white font-semibold py-3 px-5 rounded-2xl transition-all duration-300 text-sm border border-red-500/30 hover:border-red-500/50 hover:shadow-lg group-hover:scale-[1.02] cursor-pointer ${
+                    className={`w-full bg-gradient-to-r from-red-500/20 to-red-500/10 hover:from-red-500/30 hover:to-red-500/20 text-white font-semibold py-2 px-4 rounded-full transition-all duration-300 text-sm border border-red-500/30 hover:border-red-500/50 hover:shadow-lg group-hover:scale-[1.02] cursor-pointer ${
                       isDeleting ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                     disabled={isDeleting}
