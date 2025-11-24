@@ -17,7 +17,7 @@ import { Button } from "../Button";
 import { truncateAddress } from "../../../lib/truncateAddress";
 import { renderError } from "../../../lib/errorUtils";
 import { USE_WALLET, APP_NAME } from "../../../lib/constants";
-// import { useMiniApp } from "@neynar/react";
+import { useMiniApp } from "@neynar/react";
 import { storeUser } from "../../../lib/api";
 import { sdk } from "@farcaster/miniapp-sdk";
 
@@ -236,6 +236,19 @@ function ConnectionControls({
   connectors,
   disconnect,
 }: ConnectionControlsProps) {
+  const { haptics } = useMiniApp();
+
+  const triggerHaptic = useCallback(() => {
+    try {
+      const result = haptics?.impactOccurred?.("light");
+      if (result instanceof Promise) {
+        result.catch(() => undefined);
+      }
+    } catch (err) {
+      console.warn("Haptics error:", err);
+    }
+  }, [haptics]);
+
   if (isConnected) {
     return (
       <div className="p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 mb-6">
@@ -258,7 +271,10 @@ function ConnectionControls({
           Wallet Connected
         </h4>
         <Button
-          onClick={() => disconnect()}
+          onClick={() => {
+            triggerHaptic();
+            disconnect();
+          }}
           className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#b380db]/10 hover:from-[#c199e4]/30 hover:to-[#b380db]/20 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg"
         >
           Disconnect Wallet
@@ -292,6 +308,7 @@ function ConnectionControls({
           <>
             <Button
               onClick={() => {
+                triggerHaptic();
                 const farcasterConnector = connectors.find(
                   (c) => c.id === "farcaster"
                 );
@@ -302,7 +319,10 @@ function ConnectionControls({
               Connect Farcaster Wallet
             </Button>
             <Button
-              onClick={() => connect({ connector: connectors[2] })}
+              onClick={() => {
+                triggerHaptic();
+                connect({ connector: connectors[2] });
+              }}
               className="w-full bg-gradient-to-br from-white/20 to-white/5 hover:from-white/30 hover:to-white/10 border border-white/30 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 hover:scale-105"
             >
               Connect MetaMask
@@ -311,13 +331,19 @@ function ConnectionControls({
         ) : (
           <>
             <Button
-              onClick={() => connect({ connector: connectors[1] })}
+              onClick={() => {
+                triggerHaptic();
+                connect({ connector: connectors[1] });
+              }}
               className="w-full bg-gradient-to-br from-[#c199e4]/40 to-[#b380db]/40 hover:from-[#c199e4]/60 hover:to-[#b380db]/60 border border-[#c199e4]/30 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 hover:scale-105"
             >
               Connect Coinbase Wallet
             </Button>
             <Button
-              onClick={() => connect({ connector: connectors[2] })}
+              onClick={() => {
+                triggerHaptic();
+                connect({ connector: connectors[2] });
+              }}
               className="w-full bg-gradient-to-br from-white/20 to-white/5 hover:from-white/30 hover:to-white/10 border border-white/30 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 hover:scale-105"
             >
               Connect MetaMask
