@@ -536,6 +536,18 @@ export function ActionsTab() {
     setShowScrollToLatest(!isPinned);
   }, []);
 
+  const triggerHaptic = useCallback(() => {
+    try {
+      const result = haptics?.impactOccurred?.("light");
+      if (result instanceof Promise) {
+        result.catch(() => undefined);
+      }
+    } catch (err) {
+      console.warn("Haptics error:", err);
+    }
+  }, [haptics]);
+
+
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
@@ -1060,12 +1072,18 @@ export function ActionsTab() {
                 // Add success message about automation
 
                 const shareLines = [
-                  "Took the next step in smart investing with DCA Agent 🚀",
-                  `• Swap: ${result.data.agentResponse.amount} ${result.data.agentResponse.fromToken} → ${result.data.agentResponse.toToken}`,
-                  "Automated,Protected by TriggerX & powered by Vibekit on Arbitrum.",
-                  "",
-                  "Set it. Forget it. Grow it. 🌿",
-                  APP_URL,
+                  // Generate the share lines without any trailing whitespace or empty elements
+                  ...[
+                    "Took the next step in smart investing with DCA Agent 🚀",
+                    `• Swap: ${result.data.agentResponse.amount} ${result.data.agentResponse.fromToken} → ${result.data.agentResponse.toToken}`,
+                    "Automated,Protected by TriggerX & powered by Vibekit on Arbitrum.",
+                    "",
+                    "Set it. Forget it. Grow it. 🌿",
+                    APP_URL
+                  ]
+                  // Filter out any empty lines and trim whitespace from each line, then join
+                  .map(line => line.trim())
+                  .filter(line => line.length > 0)
                 ];
                 const shareText = shareLines.join("\n");
                 const automationMessage: ChatMessage = {
@@ -1338,6 +1356,7 @@ export function ActionsTab() {
       const confirmationMessage = messages.find(
         (msg) => msg.confirmationId === confirmationId
       );
+      triggerHaptic();
       const planData = confirmationMessage?.confirmationData;
 
       if (planData) {
@@ -1350,6 +1369,7 @@ export function ActionsTab() {
 
   const handleCancelPlan = useCallback(
     async (confirmationId: string) => {
+      triggerHaptic();
       if (!confirmationId) return;
 
       // Mark this confirmation as completed
@@ -1658,47 +1678,50 @@ export function ActionsTab() {
                   )}
                   {message.isCreatingPlan &&
                     (planSimulation ? (
-                      <div className="mt-3 space-y-3 rounded-2xl border border-white/10 bg-black/20 p-3">
-                        <div className="flex items-center justify-between text-xs text-white/70">
-                          <span>
-                            Step {planSimulation.activeStepIndex + 1} of{" "}
-                            {PLAN_SIMULATION_STEPS.length}
+                      <div className="mt-3 space-y-4 rounded-2xl border border-white/15 bg-gradient-to-b from-black/50 to-black/10 p-4 shadow-[0_15px_40px_rgba(0,0,0,0.35)]">
+                        <div className="flex items-center justify-between text-[13px] font-semibold text-white">
+                          <span className="tracking-wide">
+                            Step{" "}
+                            <span className="text-[#c199e4]">
+                              {planSimulation.activeStepIndex + 1}
+                            </span>{" "}
+                            of {PLAN_SIMULATION_STEPS.length}
                           </span>
-                          <span>ETA {formatFastEta(planSimulation.etaMs, microTicker)}</span>
+                          <span className="text-sm font-bold text-[#c199e4]">
+                            ETA {formatFastEta(planSimulation.etaMs, microTicker)}
+                          </span>
                         </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-[#c199e4] to-[#b380db] transition-all duration-700"
+                            className="h-full rounded-full bg-gradient-to-r from-[#c199e4] via-[#b380db] to-[#8c6fd5] transition-all duration-500"
                             style={{
                               width: `${Math.max(
                                 planSimulation.progress * 100,
                                 4
-                              ).toFixed(2)}%`,
+                              ).toFixed(1)}%`,
                             }}
                           />
                         </div>
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           {PLAN_SIMULATION_STEPS.map((step, index) => {
                             const status =
                               planSimulation.stepStatuses[index] || "pending";
                             const statusClasses =
                               status === "complete"
-                                ? "border-emerald-300/60 text-emerald-200 bg-emerald-400/20"
+                                ? "border-emerald-400/50 bg-emerald-400/10 text-emerald-200"
                                 : status === "active"
-                                ? "border-[#c199e4]/60 text-[#c199e4] bg-[#c199e4]/10"
-                                : "border-white/10 text-white/40 bg-white/5";
+                                ? "border-[#c199e4] bg-[#c199e4]/10 text-white"
+                                : "border-white/15 bg-white/5 text-white/50";
 
                             return (
                               <div
                                 key={step.id}
-                                className="flex items-start gap-2 text-xs text-white/80"
+                                className={`flex items-start gap-3 rounded-2xl border px-3 py-2 transition-colors ${statusClasses}`}
                               >
-                                <span
-                                  className={`mt-0.5 flex size-5 items-center justify-center rounded-full border ${statusClasses}`}
-                                >
+                                <span className="mt-0.5 flex size-6 items-center justify-center rounded-full border border-white/20 bg-black/30">
                                   {status === "complete" ? (
                                     <svg
-                                      className="size-3"
+                                      className="size-3.5"
                                       fill="none"
                                       stroke="currentColor"
                                       viewBox="0 0 24 24"
@@ -1711,16 +1734,22 @@ export function ActionsTab() {
                                       />
                                     </svg>
                                   ) : status === "active" ? (
-                                    <span className="size-2 rounded-full bg-current animate-pulse" />
+                                    <span className="size-2.5 rounded-full bg-current animate-ping" />
                                   ) : (
-                                    <span className="size-1 rounded-full bg-current/60" />
+                                    <span className="size-1.5 rounded-full bg-current/60" />
                                   )}
                                 </span>
                                 <div className="flex-1">
-                                  <div className="font-medium text-white">
+                                  <div
+                                    className={`text-sm font-semibold ${
+                                      status === "pending"
+                                        ? "text-white/70"
+                                        : "text-white"
+                                    }`}
+                                  >
                                     {step.label}
                                   </div>
-                                  <div className="text-[11px] text-white/60">
+                                  <div className="text-[12px] text-white/70 leading-snug">
                                     {step.description}
                                   </div>
                                 </div>
@@ -1728,7 +1757,7 @@ export function ActionsTab() {
                             );
                           })}
                         </div>
-                        <div className="text-[11px] text-white/50">
+                        <div className="text-[12px] text-white/60">
                           Almost there,we&apos;re running deep checks so your
                           automation launches safely.
                         </div>

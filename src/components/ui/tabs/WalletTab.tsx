@@ -283,6 +283,15 @@ function ConnectionControls({
     );
   }
 
+  const baseButtonClasses =
+    "w-full h-12 rounded-2xl font-semibold text-base tracking-wide flex items-center justify-center transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-black/10";
+  const primaryButtonClasses =
+    baseButtonClasses +
+    " bg-gradient-to-br from-[#c199e4]/70 to-[#b380db]/70 hover:from-[#c199e4] hover:to-[#b380db] border border-white/20 shadow-[0_10px_25px_rgba(193,153,228,0.25)]";
+  const secondaryButtonClasses =
+    baseButtonClasses +
+    " bg-gradient-to-br from-white/15 to-white/5 hover:from-white/25 hover:to-white/10 border border-white/30 text-white/90";
+
   return (
     <div className="p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500">
       <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
@@ -307,6 +316,8 @@ function ConnectionControls({
         {context?.user?.fid ? (
           <>
             <Button
+              type="button"
+              className={primaryButtonClasses}
               onClick={() => {
                 triggerHaptic();
                 const farcasterConnector = connectors.find(
@@ -319,11 +330,12 @@ function ConnectionControls({
               Connect Farcaster Wallet
             </Button>
             <Button
+              type="button"
+              className={secondaryButtonClasses}
               onClick={() => {
                 triggerHaptic();
                 connect({ connector: connectors[2] });
               }}
-              className="w-full bg-gradient-to-br from-white/20 to-white/5 hover:from-white/30 hover:to-white/10 border border-white/30 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 hover:scale-105"
             >
               Connect MetaMask
             </Button>
@@ -331,20 +343,22 @@ function ConnectionControls({
         ) : (
           <>
             <Button
+              type="button"
+              className={primaryButtonClasses}
               onClick={() => {
                 triggerHaptic();
                 connect({ connector: connectors[1] });
               }}
-              className="w-full bg-gradient-to-br from-[#c199e4]/40 to-[#b380db]/40 hover:from-[#c199e4]/60 hover:to-[#b380db]/60 border border-[#c199e4]/30 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 hover:scale-105"
             >
               Connect Coinbase Wallet
             </Button>
             <Button
+              type="button"
+              className={secondaryButtonClasses}
               onClick={() => {
                 triggerHaptic();
                 connect({ connector: connectors[2] });
               }}
-              className="w-full bg-gradient-to-br from-white/20 to-white/5 hover:from-white/30 hover:to-white/10 border border-white/30 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 hover:scale-105"
             >
               Connect MetaMask
             </Button>

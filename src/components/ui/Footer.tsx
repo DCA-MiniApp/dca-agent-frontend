@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { Tab } from "~/components/App";
 import { IconType } from "react-icons";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { IoChatbubbleEllipses } from "react-icons/io5";
+import { useMiniApp } from "@neynar/react";
 
 interface FooterProps {
   activeTab: Tab;
@@ -16,10 +17,20 @@ interface FooterProps {
 export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWallet = false }) => {
   const router = useRouter();
   const [isAnimating, setIsAnimating] = useState(false);
+  const { haptics } = useMiniApp();
   
+  const triggerHaptic = useCallback(() => {
+    try {
+      const result = haptics?.impactOccurred?.("light");
+      if (result instanceof Promise) {
+        result.catch(() => undefined);
+      }
+    } catch (err) {
+      console.warn("Haptics error:", err);
+    }
+  }, [haptics]);
   const handleChatClick = () => {
     if (isAnimating) return;
-    
     setIsAnimating(true);
     
     // After animation delay, navigate to chat
@@ -62,7 +73,10 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
 
         {/* Home Tab - Top */}
         <button
-          onClick={() => setActiveTab(Tab.Home)}
+          onClick={() => {
+            triggerHaptic();
+            setActiveTab(Tab.Home);
+          }}
           className="absolute text-white text-[11px] font-medium hover:text-white/80 transition-all duration-200"
           style={getTabPosition(Tab.Home)}
         >
@@ -71,7 +85,10 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
 
         {/* Actions Tab - Right */}
         <button
-          onClick={handleChatClick}
+          onClick={() => {
+            triggerHaptic();
+            handleChatClick();
+          }}
           className="absolute text-white text-[11px] font-medium hover:text-white/80 transition-all duration-200"
           style={getTabPosition(Tab.Actions)}
         >
@@ -80,7 +97,10 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
 
         {/* Context Tab - Bottom */}
         <button
-          onClick={() => setActiveTab(Tab.Context)}
+          onClick={() => {
+            triggerHaptic();
+            setActiveTab(Tab.Context);
+          }}
           className="absolute text-white text-[11px] font-medium hover:text-white/80 transition-all duration-200"
           style={getTabPosition(Tab.Context)}
         >
@@ -90,7 +110,10 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
         {/* Wallet Tab - Left */}
         {showWallet && (
           <button
-            onClick={() => setActiveTab(Tab.Wallet)}
+            onClick={() => {
+              triggerHaptic();
+              setActiveTab(Tab.Wallet);
+            }}
             className="absolute text-white text-[11px] font-medium hover:text-white/80 transition-all duration-200"
             style={getTabPosition(Tab.Wallet)}
           >
