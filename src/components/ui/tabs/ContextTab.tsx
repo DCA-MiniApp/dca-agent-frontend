@@ -26,7 +26,7 @@ import { fetchUserExecutionHistory } from "../../../lib/api";
  */
 export function ContextTab() {
   const { address } = useAccount();
-  const { setActiveTab } = useMiniApp();
+  const { setActiveTab, haptics } = useMiniApp();
 
   // Types aligned with new backend response
   type TaskStatus = string;
@@ -96,6 +96,18 @@ export function ContextTab() {
   useEffect(() => {
     fetchUserHistory();
   }, [fetchUserHistory]);
+
+  const triggerHaptic = useCallback(() => {
+    console.log("triggerHaptic");
+    try {
+      const result = haptics?.impactOccurred?.("light");
+      if (result instanceof Promise) {
+        result.catch(() => undefined);
+      }
+    } catch (err) {
+      console.warn("Haptics error:", err);
+    }
+  }, [haptics]);
 
   // Convert ExecutionHistory to TransactionRow format
   const transactions: TransactionRow[] = useMemo(() => {
@@ -521,7 +533,10 @@ export function ContextTab() {
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm">
                       <button
-                        onClick={() => openModal(tx)}
+                        onClick={() => {
+                          triggerHaptic();
+                          openModal(tx);
+                        }}
                         className="inline-flex items-center justify-center w-8 h-8 bg-gradient-to-br from-[#c199e4]/20 to-[#b380db]/20 hover:from-[#c199e4]/30 hover:to-[#b380db]/30 rounded-xl border border-[#c199e4]/30 text-[#c199e4] hover:text-white transition-all duration-300 hover:scale-110"
                         aria-label="View transaction details"
                       >

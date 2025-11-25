@@ -23,6 +23,7 @@ import {
 } from "react-icons/hi2";
 
 import { HiOutlineArrowNarrowRight } from "react-icons/hi";
+import { AiOutlineExport } from "react-icons/ai";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { useRouter } from "next/navigation";
 import {
@@ -73,6 +74,7 @@ function getTimeGreeting() {
 export function HomeTab() {
   const { address, isConnected, chain } = useAccount();
   const { data: wagmiWalletClient } = useWalletClient();
+  const { haptics } = useMiniApp();
   const {
     // context,
     setActiveTab,
@@ -112,6 +114,17 @@ export function HomeTab() {
     []
   );
 
+  const triggerHaptic = useCallback(() => {
+    try {
+      const result = haptics?.impactOccurred?.("light");
+      if (result instanceof Promise) {
+        result.catch(() => undefined);
+      }
+    } catch (err) {
+      console.warn("Haptics error:", err);
+    }
+  }, [haptics]);
+
   // Dynamic data state
   const [userPlans, setUserPlans] = useState<DCAPlan[]>([]);
   const [platformStats, setPlatformStats] = useState<PlatformStats | null>(
@@ -127,6 +140,7 @@ export function HomeTab() {
   const [selectedPlan, setSelectedPlan] = useState<DCAPlan | null>(null);
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [showConnectWalletModal, setShowConnectWalletModal] = useState(false);
+  const [showWrongNetworkTooltip, setShowWrongNetworkTooltip] = useState(false);
 
   //Plan status state
   const [isDeleting, setIsDeleting] = useState(false);
@@ -1419,7 +1433,40 @@ export function HomeTab() {
                       alt="Arbitrum Logo"
                       className="inline-block w-5 h-5 mr-1 -mt-0.3 transition-all duration-300"
                     />
-                  : "Wrong network"}
+                  : (
+                    <span className="relative">
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 text-yellow-400 hover:underline focus:outline-none"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowWrongNetworkTooltip((prev: boolean) => !prev);
+                        }}
+                        title="Wrong network"
+                      >
+                        <svg className="w-4 h-4 mr-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none"/>
+                          <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                          <circle cx="12" cy="16" r="1" fill="currentColor"/>
+                        </svg>
+                      </button>
+                      {showWrongNetworkTooltip && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-40"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowWrongNetworkTooltip(false);
+                            }}
+                          />
+                          <div className="absolute z-50 right-0 top-full mt-2 translate-x-0 sm:-translate-x-2 max-w-[min(calc(100vw-1rem),250px)] w-[280px] rounded-lg bg-[#c199e4] text-xs text-white px-2 py-2 shadow-2xl border border-green-400/20 whitespace-normal break-words">
+                            Please switch to Arbitrum One !
+                          </div>
+                        </>
+                      )}
+                    </span>
+                  )}
+                
               </code>
             </div>
 
@@ -1465,10 +1512,8 @@ export function HomeTab() {
 
                         <div className="absolute z-[10] left-1/2 -translate-x-1/2 top-full mt-2 w-72 rounded-lg bg-[#c199e4] text-xs text-white/90 px-1 py-1 shadow-2xl border border-green-400/20 pointer-events-none">
                           <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#c199e4]  border-l border-t border-green-400/20 rotate-45" />
-                          <div className="text-center w-full relative z-10">
-                            This amount reflects the total value of all tokens
-                            <br />
-                            converted to USDC using current market prices.
+                          <div className="text-left w-full relative z-10 ">
+                          This amount reflects the total value of all tokens converted to USDC using current market prices.
                           </div>
                         </div>
                       </>
@@ -1501,18 +1546,18 @@ export function HomeTab() {
       </div>
 
       {/* Total Investment Summary */}
-      <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-lg rounded-3xl p-6 border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 hover:shadow-lg hover:from-[#c199e4]/5 hover:to-white/5 group">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
+      <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-lg rounded-3xl p-6 border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 hover:shadow-lg hover:from-[#c199e4]/5 hover:to-white/5 group overflow-hidden">
+        <div className="flex items-start justify-between gap-3 sm:gap-4">
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center group-hover:from-[#c199e4]/30 group-hover:to-[#c199e4]/20 transition-all duration-300 border border-[#c199e4]/20">
+              <div className="w-12 h-12 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center group-hover:from-[#c199e4]/30 group-hover:to-[#c199e4]/20 transition-all duration-300 border border-[#c199e4]/20 flex-shrink-0">
                 <HiOutlineChartBar className="text-[#c199e4] size-6" />
               </div>
-              <div>
-                <h2 className="text-xl font-bold text-white group-hover:text-[#c199e4] transition-colors duration-300">
+              <div className="min-w-0 flex-1">
+                <h2 className="text-xl font-bold text-white group-hover:text-[#c199e4] transition-colors duration-300 break-words">
                   Portfolio Overview
                 </h2>
-                <p className="text-sm text-white/70">
+                <p className="text-sm text-white/70 break-words">
                   Your investment performance
                 </p>
               </div>
@@ -1520,7 +1565,7 @@ export function HomeTab() {
 
             <div className="space-y-4">
               <div>
-                <div className="flex items-baseline gap-2 mb-1">
+                <div className="flex items-baseline gap-2 mb-1 flex-wrap">
                   <p className="text-3xl font-bold text-[#c199e4]">
                     {isLoading || portfolioUsd === null || !isConnected
                       ? "$0.00"
@@ -1549,33 +1594,26 @@ export function HomeTab() {
                 )} */}
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
-                  <span className="text-sm text-white/90 font-medium whitespace-nowrap">
+              <div className="flex items-center gap-2 sm:gap-3 flex-nowrap">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                  <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse flex-shrink-0"></div>
+                  <span className="text-xs sm:text-sm text-white/90 font-medium whitespace-nowrap">
                     {isLoading
                       ? "Loading..."
                       : `Active Strategies: ${runningPlans.length}`}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-                  <span className="text-sm text-white/90 font-medium whitespace-nowrap">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                  <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse flex-shrink-0"></div>
+                  <span className="text-xs sm:text-sm text-white/90 font-medium whitespace-nowrap">
                     Plan created: {activePlans.length}
                   </span>
                 </div>
-
-                {/* <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                  <span className="text-sm text-white/90 font-medium">
-                    {pausedPlans.length} Paused Plans
-                  </span>
-                </div> */}
               </div>
             </div>
           </div>
 
-          <div className="ml-6 flex flex-col items-end">
+          <div className="ml-2 sm:ml-4 md:ml-6 flex flex-col items-end flex-shrink-0">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center border border-purple-400/30 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 overflow-hidden">
               {context?.user?.pfpUrl ? (
                 <img
@@ -1787,12 +1825,15 @@ export function HomeTab() {
                 </div>
 
                 <button
-                  onClick={() => openPlanModal(userPlans[currentPlanIndex])}
+                  onClick={() => {
+                    triggerHaptic();
+                    openPlanModal(userPlans[currentPlanIndex]);
+                  }}
                   className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 text-sm border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg group-hover:scale-[1.02]"
                 >
                   <div className="flex items-center justify-center gap-2">
                     <span>View Strategy Details</span>
-                    <HiOutlineArrowNarrowRight className="size-5" />
+                    <AiOutlineExport className="size-5"/>
                   </div>
                 </button>
               </div>
