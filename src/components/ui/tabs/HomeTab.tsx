@@ -12,6 +12,7 @@ import {
 import { HiOutlineChartBar } from "react-icons/hi";
 import { PiStrategyBold } from "react-icons/pi";
 import { FaCircleUser } from "react-icons/fa6";
+import { LiaDonateSolid } from "react-icons/lia";
 import {
   HiOutlineWallet,
   HiOutlineDocumentChartBar,
@@ -23,9 +24,12 @@ import {
 } from "react-icons/hi2";
 
 import { HiOutlineArrowNarrowRight } from "react-icons/hi";
+import { RiStockLine } from "react-icons/ri";
 import { AiOutlineExport } from "react-icons/ai";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { useRouter } from "next/navigation";
+import { Tab } from "../../App";
+import { QUICKSTART_PREFILL_KEY } from "../../../lib/constants";
 import {
   fetchUserDCAPlans,
   fetchPlatformStats,
@@ -33,10 +37,12 @@ import {
   deletePlan,
   updatePlanJobId,
   calculateTotalInvested,
+  fetchQuickStats,
   formatInterval,
   formatDuration,
   type DCAPlan,
   type PlatformStats,
+  QuickStats,
 } from "../../../lib/api";
 import {
   computePlansInvestedUsd,
@@ -63,6 +69,39 @@ import sdk, {
  * <HomeTab />
  * ```
  */
+
+const QUICK_START_TOKENS = [
+  {
+    symbol: "wstETH",
+    gradient: "from-[#8ec5ff]/40 to-[#4776e6]/40",
+    logo: "https://s2.coinmarketcap.com/static/img/coins/200x200/12409.png",
+  },
+  {
+    symbol: "ARB",
+    gradient: "from-[#b19cff]/40 to-[#6f3bf4]/40",
+    logo: "https://cdn3d.iconscout.com/3d/premium/thumb/arbitrum-arb-3d-icon-png-download-11757502.png",
+  },
+  {
+    symbol: "WBTC",
+    gradient: "from-[#ffcf8f]/40 to-[#d0963f]/40",
+    logo: "https://res.coinpaper.com/coinpaper/wrapped_bitcoin_wbtc_logo_b8ecd60f3f.png",
+  },
+  {
+    symbol: "GMX",
+    gradient: "from-[#5fb3ff]/40 to-[#1e3a8a]/40",
+    logo: "https://s2.coinmarketcap.com/static/img/coins/200x200/11857.png",
+  },
+  {
+    symbol: "LINK",
+    gradient: "from-[#8ab4ff]/40 to-[#1a56db]/40",
+    logo: "https://cryptologos.cc/logos/chainlink-link-logo.png",
+  },
+  {
+    symbol: "AAVE",
+    gradient: "from-[#b794f4]/40 to-[#553c9a]/40",
+    logo: "https://cryptologos.cc/logos/aave-aave-logo.png",
+  },
+];
 
 function getTimeGreeting() {
   const hour = new Date().getHours();
@@ -124,6 +163,22 @@ export function HomeTab() {
       console.warn("Haptics error:", err);
     }
   }, [haptics]);
+
+  const handleQuickStartToken = useCallback(
+    (symbol: string) => {
+      triggerHaptic();
+      const template = `Create a DCA plan with 10 USDC into ${symbol} every 24 hours for 10 days`;
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(QUICKSTART_PREFILL_KEY, template);
+      }
+      if (router) {
+        router.push("/chat");
+      } else {
+        setActiveTab?.(Tab.Actions);
+      }
+    },
+    [router, setActiveTab, triggerHaptic]
+  );
 
   // Dynamic data state
   const [userPlans, setUserPlans] = useState<DCAPlan[]>([]);
@@ -416,6 +471,44 @@ export function HomeTab() {
     isEnabling: false,
   });
   const [showFinalBanner, setShowFinalBanner] = useState(false);
+  const [totalExecutions, setTotalExecutions] = useState(0);
+  const [totalValueSwapped, setTotalValueSwapped] = useState(0);
+
+  // Fetch quick stats (executions & volume) periodically
+  useEffect(() => {
+    let isCancelled = false;
+
+    const loadQuickStats = async () => {
+      try {
+        const stats = await fetchQuickStats();
+        if (isCancelled) return;
+
+        if (stats) {
+          setTotalExecutions(stats.total_job_live_count ?? 0);
+          setTotalValueSwapped(stats.total_value_swapped ?? 0);
+        } else {
+          setTotalExecutions(0);
+          setTotalValueSwapped(0);
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setTotalExecutions(0);
+          setTotalValueSwapped(0);
+        }
+      }
+    };
+
+    loadQuickStats();
+    const intervalId = setInterval(loadQuickStats, 60_000);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(intervalId);
+    };
+  }, []);
+
+
+
 
   // Derive notifications availability defensively (covers browser vs client)
   // const hasNotificationsDerived =
@@ -487,7 +580,7 @@ export function HomeTab() {
     } finally {
       setIsLoading(false);
     }
-  }, [address, currentPlanIndex]);
+  }, [address]);
 
   // Fetch data on mount and address change
   useEffect(() => {
@@ -784,7 +877,9 @@ export function HomeTab() {
     return () => window.removeEventListener("keydown", handleKeyPress);
   }, []);
 
-  const userGreeting = `Welcome back, ${context?.user?.username ?? "John Doe"} 👋`;
+  const userGreeting = `Welcome back, ${
+    context?.user?.username ?? "John Doe"
+  } 👋`;
   const walletBalanceDisplay =
     walletTotalUsd !== null
       ? `$${walletTotalUsd.toLocaleString(undefined, {
@@ -1426,217 +1521,144 @@ export function HomeTab() {
                   }`}
                 />
               </button>
-               <code className="text-xs px-1 rounded-full transition-all duration-300">
-                {chain?.name === "Arbitrum One"
-                  ? <img
-                      src="https://cdn3d.iconscout.com/3d/premium/thumb/arbitrum-arb-3d-icon-png-download-11757502.png"
-                      alt="Arbitrum Logo"
-                      className="inline-block w-5 h-5 mr-1 -mt-0.3 transition-all duration-300"
-                    />
-                  : (
-                    <span className="relative">
-                      <button
-                        type="button"
-                        className="flex items-center gap-1 text-yellow-400 hover:underline focus:outline-none"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowWrongNetworkTooltip((prev: boolean) => !prev);
-                        }}
-                        title="Wrong network"
+              <code className="text-xs px-1 rounded-full transition-all duration-300">
+                {chain?.name === "Arbitrum One" ? (
+                  <img
+                    src="https://cdn3d.iconscout.com/3d/premium/thumb/arbitrum-arb-3d-icon-png-download-11757502.png"
+                    alt="Arbitrum Logo"
+                    className="inline-block w-5 h-5 mr-1 -mt-0.3 transition-all duration-300"
+                  />
+                ) : (
+                  <span className="relative">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 text-yellow-400 hover:underline focus:outline-none"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowWrongNetworkTooltip((prev: boolean) => !prev);
+                      }}
+                      title="Wrong network"
+                    >
+                      <svg
+                        className="w-4 h-4 mr-0.5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
                       >
-                        <svg className="w-4 h-4 mr-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none"/>
-                          <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                          <circle cx="12" cy="16" r="1" fill="currentColor"/>
-                        </svg>
-                      </button>
-                      {showWrongNetworkTooltip && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-40"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowWrongNetworkTooltip(false);
-                            }}
-                          />
-                          <div className="absolute z-50 right-0 top-full mt-2 translate-x-0 sm:-translate-x-2 max-w-[min(calc(100vw-1rem),250px)] w-[280px] rounded-lg bg-[#c199e4] text-xs text-white px-2 py-2 shadow-2xl border border-green-400/20 whitespace-normal break-words">
-                            Please switch to Arbitrum One !
-                          </div>
-                        </>
-                      )}
-                    </span>
-                  )}
-                
+                        <circle
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          fill="none"
+                        />
+                        <line
+                          x1="12"
+                          y1="8"
+                          x2="12"
+                          y2="12"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                        />
+                        <circle cx="12" cy="16" r="1" fill="currentColor" />
+                      </svg>
+                    </button>
+                    {showWrongNetworkTooltip && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowWrongNetworkTooltip(false);
+                          }}
+                        />
+                        <div className="absolute z-50 right-0 top-full mt-2 translate-x-0 sm:-translate-x-2 max-w-[min(calc(100vw-1rem),250px)] w-[280px] rounded-lg bg-[#c199e4] text-xs text-white px-2 py-2 shadow-2xl border border-green-400/20 whitespace-normal break-words">
+                          Please switch to Arbitrum One !
+                        </div>
+                      </>
+                    )}
+                  </span>
+                )}
               </code>
             </div>
 
             {/* Network Display */}
             <div className="flex items-center gap-1.5 text-white/70 ml-3.5">
               {/* <span className="text-sm">Network:</span> */}
-             
             </div>
           </div>
         )}
       </div>
 
-      {/* Wallet Total Value Card */}
-      <div className="bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-3xl p-6 text-white border border-[#c199e4]/30 shadow-lg hover:shadow-xl hover:border-[#c199e4]/50 transition-all duration-500 hover:scale-[1.02] group">
-        <div className="flex justify-between items-start">
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#c199e4]/30 to-[#c199e4]/20 rounded-full flex items-center justify-center group-hover:from-[#c199e4]/40 group-hover:to-[#c199e4]/30 transition-all duration-300">
-                <HiCurrencyDollar className="text-[#c199e4] size-6" />
-              </div>
-              <div>
-                <span className="text-sm text-white/90 font-medium inline-flex items-center">
-                  Total Wallet Value 
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowTooltip(!showTooltip);
-                    }}
-                    className="relative inline-flex items-center ml-2 align-middle"
-                    type="button"
-                  >
-                    <HiInformationCircle className="w-4 h-4 text-white/50 transition hover:text-green-400 hover:scale-110" />
-
-                    {showTooltip && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-[60]"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowTooltip(false);
-                          }}
-                        />
-
-                        <div className="absolute z-[10] left-1/2 -translate-x-1/2 top-full mt-2 w-72 rounded-lg bg-[#c199e4] text-xs text-white/90 px-1 py-1 shadow-2xl border border-green-400/20 pointer-events-none">
-                          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#c199e4]  border-l border-t border-green-400/20 rotate-45" />
-                          <div className="text-left w-full relative z-10 ">
-                          This amount reflects the total value of all tokens converted to USDC using current market prices.
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </button>
-                </span>
-                {/* <div className="flex items-center gap-2 mt-1">
-                  <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
-                  <span className="text-xs text-white/70">Real-time</span>
-                </div> */}
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-4xl font-bold text-white group-hover:text-[#c199e4] transition-colors duration-300">
-                {walletBalanceDisplay}
-              </p>
-              <p className="text-sm text-white/70">
-                Total value of all assets in your connected wallet
-              </p>
-            </div>
+      <div className="bg-gradient-to-r from-[#c199e4]/10 to-white/5 rounded-3xl p-6 border border-[#c199e4]/30 shadow-lg flex flex-col md:flex-row items-center justify-between gap-6 mb-2 hover:shadow-xl hover:border-[#c199e4]/50 transition-all duration-500">
+        <div className="flex items-start gap-4 flex-1 min-w-0">
+          <div className="w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-2xl bg-gradient-to-br from-[#c199e4]/40 to-[#c199e4]/20 border border-[#c199e4]/25 text-[#c199e4]">
+            <RiStockLine className="w-7 h-7" />
           </div>
-          <div className="flex flex-col items-end">
-            <span
-              className={`text-xs font-bold px-4 py-2 rounded-full transition-all duration-300 bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30 uppercase`}
-            >
-              TOTAL
+          <div className="flex-1 min-w-0">
+            <h4 className="text-lg font-bold text-white mb-1">DCA Execution Overview</h4>
+            <p className="text-sm text-white/70 leading-tight">
+              Automated strategies across DCA Agent have completed so far.
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap md:flex-nowrap items-center justify-between md:justify-end gap-4 w-full md:w-auto flex-shrink-0 md:ml-auto">
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-[#c199e4]">{totalExecutions}</span>
+            <span className="text-sm text-white/70 font-medium">
+              Executions
+            </span>
+          </div>
+          <div className="hidden md:block h-6 w-px bg-white/15" />
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-emerald-400">
+              ${totalValueSwapped.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
+            <span className="text-sm text-white/70 font-medium">
+              Volume
             </span>
           </div>
         </div>
       </div>
 
-      {/* Total Investment Summary */}
-      <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-lg rounded-3xl p-6 border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 hover:shadow-lg hover:from-[#c199e4]/5 hover:to-white/5 group overflow-hidden">
-        <div className="flex items-start justify-between gap-3 sm:gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center group-hover:from-[#c199e4]/30 group-hover:to-[#c199e4]/20 transition-all duration-300 border border-[#c199e4]/20 flex-shrink-0">
-                <HiOutlineChartBar className="text-[#c199e4] size-6" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h2 className="text-xl font-bold text-white group-hover:text-[#c199e4] transition-colors duration-300 break-words">
-                  Portfolio Overview
-                </h2>
-                <p className="text-sm text-white/70 break-words">
-                  Your investment performance
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <div className="flex items-baseline gap-2 mb-1 flex-wrap">
-                  <p className="text-3xl font-bold text-[#c199e4]">
-                    {isLoading || portfolioUsd === null || !isConnected
-                      ? "$0.00"
-                      : `$${portfolioUsd?.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}`}
-                  </p>
-                  <span className="text-sm text-white/60 font-medium">
-                    Total Invested
-                  </span>
-                </div>
-                {/* <p className="text-sm text-white/70">
-                  {isLoading
-                    ? "Loading..."
-                    : `Running ${runningPlans.length} ${
-                        runningPlans.length === 1
-                          ? "strategy in process"
-                          : "strategies in process"
-                      }`}
-                </p> */}
-                {/* {portfolioUsd !== null && (
-                  <p className="text-xs text-white/60 mt-1">
-                    Est. USD Value: ${portfolioUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                )} */}
-              </div>
-
-              <div className="flex items-center gap-2 sm:gap-3 flex-nowrap">
-                <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                  <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse flex-shrink-0"></div>
-                  <span className="text-xs sm:text-sm text-white/90 font-medium whitespace-nowrap">
-                    {isLoading
-                      ? "Loading..."
-                      : `Active Strategies: ${runningPlans.length}`}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                  <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse flex-shrink-0"></div>
-                  <span className="text-xs sm:text-sm text-white/90 font-medium whitespace-nowrap">
-                    Plan created: {activePlans.length}
-                  </span>
-                </div>
-              </div>
-            </div>
+      <div className="bg-gradient-to-r from-[#c199e4]/10 to-white/5 rounded-3xl p-6 border border-[#c199e4]/30 shadow-lg flex flex-col gap-4 mb-4 hover:shadow-xl hover:border-[#c199e4]/50 transition-all duration-500">
+        <div className="flex items-start gap-3">
+          <div className="w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-2xl bg-gradient-to-br from-[#c199e4]/40 to-[#c199e4]/20 border border-[#c199e4]/25 text-[#c199e4]">
+            <LiaDonateSolid className="w-7 h-7" />
           </div>
-
-          <div className="ml-2 sm:ml-4 md:ml-6 flex flex-col items-end flex-shrink-0">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center border border-purple-400/30 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 overflow-hidden">
-              {context?.user?.pfpUrl ? (
-                <img
-                  src={context.user.pfpUrl}
-                  alt="Farcaster Profile"
-                  className="w-11 h-11 rounded-2xl object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                // <FaCircleUser className="text-emerald-400 size-6" />
-                <img
-                  src={"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTvAyrN5PLmvXRRHsJOVxJZN1SRscvJQLL33Q&s"}
-                  alt="Farcaster Profile"
-                  className="w-11 h-11 rounded-2xl object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              )}
-            </div>
-            {/* <div className="mt-2 text-center">
-              <div className="text-xs text-emerald-400 font-semibold">+24.5%</div>
-              <div className="text-xs text-white/60">This month</div>
-            </div> */}
+          <div className="flex-1">
+            <h4 className="text-lg font-bold text-white mb-1">Quick Start</h4>
+            <p className="text-sm text-white/70 leading-tight">
+              Jump into DCA planning with community favorites. Tap a token to continue the flow instantly.
+            </p>
           </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 w-full">
+          {QUICK_START_TOKENS.map((token) => (
+            <button
+              key={token.symbol}
+              type="button"
+              onClick={() => handleQuickStartToken(token.symbol)}
+              className={`w-full rounded-2xl border border-white/15 bg-gradient-to-br ${token.gradient} px-3 py-2.5 text-left text-white/90 hover:border-white/40 hover:shadow-xl transition-all duration-300 backdrop-blur-sm`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl border border-white/30 flex items-center justify-center bg-black/20 text-white font-semibold">
+                  <img src={token.logo} alt={token.symbol} className="w-6 h-6" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-base font-semibold text-white">
+                    {token.symbol.toUpperCase()}
+                  </div>
+                </div>
+              </div>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -1796,17 +1818,20 @@ export function HomeTab() {
                       <p className="text-sm text-white/90 font-medium">
                         Total Invested
                       </p>
-                      <p className="text-sm text-[#c199e4] font-medium">  
-                        {userPlans[currentPlanIndex].successCount > 0 ? `${userPlans[currentPlanIndex].successCount}/${userPlans[currentPlanIndex].totalExecutions} executions` : "No executions"}
+                      <p className="text-sm text-[#c199e4] font-medium">
+                        {userPlans[currentPlanIndex].successCount > 0
+                          ? `${userPlans[currentPlanIndex].successCount}/${userPlans[currentPlanIndex].totalExecutions} executions`
+                          : "No executions"}
                       </p>
                     </div>
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-2xl font-bold text-[#c199e4]">
-                        {userPlans[currentPlanIndex].successCount > 0 ? (
-                          (parseFloat(userPlans[currentPlanIndex].amount) *
-                            userPlans[currentPlanIndex].successCount || 0
-                        ).toFixed(5)
-                        ) : "0.00"}
+                        {userPlans[currentPlanIndex].successCount > 0
+                          ? (
+                              parseFloat(userPlans[currentPlanIndex].amount) *
+                                userPlans[currentPlanIndex].successCount || 0
+                            ).toFixed(5)
+                          : "0.00"}
                       </p>
                     </div>
                     <div className="w-full bg-white/20 rounded-full h-3">
@@ -1833,7 +1858,7 @@ export function HomeTab() {
                 >
                   <div className="flex items-center justify-center gap-2">
                     <span>View Strategy Details</span>
-                    <AiOutlineExport className="size-5"/>
+                    <AiOutlineExport className="size-5" />
                   </div>
                 </button>
               </div>
@@ -1883,6 +1908,170 @@ export function HomeTab() {
         {/* <div className="text-center text-sm text-white/60">
           {currentPlanIndex + 1} of {investmentPlans.length} strategies
         </div> */}
+      </div>
+
+      {/* Total Investment Summary */}
+      <div className="bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-lg rounded-3xl p-6 border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 hover:shadow-lg hover:from-[#c199e4]/5 hover:to-white/5 group overflow-hidden">
+        <div className="flex items-start justify-between gap-3 sm:gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center group-hover:from-[#c199e4]/30 group-hover:to-[#c199e4]/20 transition-all duration-300 border border-[#c199e4]/20 flex-shrink-0">
+                <HiOutlineChartBar className="text-[#c199e4] size-6" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-xl font-bold text-white group-hover:text-[#c199e4] transition-colors duration-300 break-words">
+                  Portfolio Overview
+                </h2>
+                <p className="text-sm text-white/70 break-words">
+                  Your investment performance
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-baseline gap-2 mb-1 flex-wrap">
+                  <p className="text-3xl font-bold text-[#c199e4]">
+                    {isLoading || portfolioUsd === null || !isConnected
+                      ? "$0.00"
+                      : `$${portfolioUsd?.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}`}
+                  </p>
+                  <span className="text-sm text-white/60 font-medium">
+                    Total Invested
+                  </span>
+                </div>
+                {/* <p className="text-sm text-white/70">
+                  {isLoading
+                    ? "Loading..."
+                    : `Running ${runningPlans.length} ${
+                        runningPlans.length === 1
+                          ? "strategy in process"
+                          : "strategies in process"
+                      }`}
+                </p> */}
+                {/* {portfolioUsd !== null && (
+                  <p className="text-xs text-white/60 mt-1">
+                    Est. USD Value: ${portfolioUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                )} */}
+              </div>
+
+              <div className="flex items-center gap-2 sm:gap-3 flex-nowrap">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                  <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse flex-shrink-0"></div>
+                  <span className="text-xs sm:text-sm text-white/90 font-medium whitespace-nowrap">
+                    {isLoading
+                      ? "Loading..."
+                      : `Active Strategies: ${runningPlans.length}`}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                  <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse flex-shrink-0"></div>
+                  <span className="text-xs sm:text-sm text-white/90 font-medium whitespace-nowrap">
+                    Plan created: {activePlans.length}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="ml-2 sm:ml-4 md:ml-6 flex flex-col items-end flex-shrink-0">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center border border-purple-400/30 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 overflow-hidden">
+              {context?.user?.pfpUrl ? (
+                <img
+                  src={context.user.pfpUrl}
+                  alt="Farcaster Profile"
+                  className="w-11 h-11 rounded-2xl object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                // <FaCircleUser className="text-emerald-400 size-6" />
+                <img
+                  src={
+                    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTvAyrN5PLmvXRRHsJOVxJZN1SRscvJQLL33Q&s"
+                  }
+                  alt="Farcaster Profile"
+                  className="w-11 h-11 rounded-2xl object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              )}
+            </div>
+            {/* <div className="mt-2 text-center">
+              <div className="text-xs text-emerald-400 font-semibold">+24.5%</div>
+              <div className="text-xs text-white/60">This month</div>
+            </div> */}
+          </div>
+        </div>
+      </div>
+
+      {/* Wallet Total Value Card */}
+      <div className="bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-3xl p-6 text-white border border-[#c199e4]/30 shadow-lg hover:shadow-xl hover:border-[#c199e4]/50 transition-all duration-500 hover:scale-[1.02] group">
+        <div className="flex justify-between items-start">
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-[#c199e4]/30 to-[#c199e4]/20 rounded-full flex items-center justify-center group-hover:from-[#c199e4]/40 group-hover:to-[#c199e4]/30 transition-all duration-300">
+                <HiCurrencyDollar className="text-[#c199e4] size-6" />
+              </div>
+              <div>
+                <span className="text-sm text-white/90 font-medium inline-flex items-center">
+                  Total Wallet Value
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowTooltip(!showTooltip);
+                    }}
+                    className="relative inline-flex items-center ml-2 align-middle"
+                    type="button"
+                  >
+                    <HiInformationCircle className="w-4 h-4 text-white/50 transition hover:text-green-400 hover:scale-110" />
+
+                    {showTooltip && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-[60]"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowTooltip(false);
+                          }}
+                        />
+
+                        <div className="absolute z-[10] left-1/2 -translate-x-1/2 top-full mt-2 w-72 rounded-lg bg-[#c199e4] text-xs text-white/90 px-1 py-1 shadow-2xl border border-green-400/20 pointer-events-none">
+                          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#c199e4]  border-l border-t border-green-400/20 rotate-45" />
+                          <div className="text-left w-full relative z-10 ">
+                            This amount reflects the total value of all tokens
+                            converted to USDC using current market prices on Arbitrum.
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </button>
+                </span>
+                {/* <div className="flex items-center gap-2 mt-1">
+                  <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
+                  <span className="text-xs text-white/70">Real-time</span>
+                </div> */}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-4xl font-bold text-white group-hover:text-[#c199e4] transition-colors duration-300">
+                {walletBalanceDisplay}
+              </p>
+              <p className="text-sm text-white/70">
+                Total value of all assets in your connected wallet
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col items-end">
+            <span
+              className={`text-xs font-bold px-4 py-2 rounded-full transition-all duration-300 bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30 uppercase`}
+            >
+              TOTAL
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Plan Details Modal */}

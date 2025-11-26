@@ -36,6 +36,7 @@ export interface ExecutionHistory {
   txHash: string | null;
   status: 'SUCCESS' | 'FAILED' | 'PENDING';
   errorMessage: string | null;
+  tgCostETH?: string | null;
   plan?: {
     id: string;
     fromToken: string;
@@ -109,6 +110,12 @@ export interface JobMonitorData {
   last_update: string;
 }
 
+export interface QuickStats {
+  total_job_live_count: number;
+  total_value_swapped: number;
+  last_update: string;
+}
+
 
 export interface StoreUserPayload {
   fid: string;
@@ -176,6 +183,7 @@ export async function fetchUserDCAPlans(userAddress: string): Promise<DCAPlan[]>
     return [];
   }
 }
+
 
 /**
  * Fetch all execution history for a user (across all plans)
@@ -467,6 +475,34 @@ export async function fetchPlatformStatsForMonitor(): Promise<JobMonitorData | n
     }
   } catch (error) {
     console.error('Error fetching platform stats for monitor:', error);
+    return null;
+  }
+}
+
+export async function fetchQuickStats(): Promise<QuickStats | null> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/dca/platform-stats`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        ishome: "true",
+      },
+    });
+
+    if (!response.ok) {
+      console.error("Failed to fetch quick stats:", response.status);
+      return null;
+    }
+
+    const result: ApiResponse<QuickStats> = await response.json();
+    if (result.success && result.data) {
+      return result.data;
+    } else {
+      console.error("Failed to fetch quick stats:", result.message);
+      return null;
+    }
+  } catch (error) {
+    console.error("Error fetching quick stats:", error);
     return null;
   }
 }

@@ -111,6 +111,12 @@ export const APP_WEBHOOK_URL: string =
 export const USE_WALLET: boolean = true;
 
 /**
+ * Session storage key used to pre-fill the chat input when a user selects
+ * a quick-start action (e.g., from the Home tab token shortcuts).
+ */
+export const QUICKSTART_PREFILL_KEY = "dca-quickstart-prefill";
+
+/**
  * Flag to enable/disable analytics tracking.
  *
  * When true, usage analytics are collected and sent to Neynar.

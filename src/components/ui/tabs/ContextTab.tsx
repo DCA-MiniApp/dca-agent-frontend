@@ -11,6 +11,7 @@ import {
 import { StatusSelect } from "./StatusSelect";
 import { useAccount } from "wagmi";
 import { fetchUserExecutionHistory } from "../../../lib/api";
+import { LiaExternalLinkAltSolid } from "react-icons/lia";
 
 /**
  * ContextTab component displays a transaction history with filters and pagination.
@@ -42,6 +43,7 @@ export function ContextTab() {
     txUrl: string;
     slippage: string;
     gasFee: string | null;
+    tgCostETH?: string | null;
   }
 
   // Dynamic data state
@@ -65,6 +67,7 @@ export function ContextTab() {
     txUrl: string | null; // optional
     slippage: string | null; // optional
     gasFee: string | null;
+    tgCostETH?: string | null;
   }
 
   const truncateHash = (hash: string) =>
@@ -127,6 +130,7 @@ export function ContextTab() {
         txUrl: item.txUrl || null,
         slippage: item.slippage || null,
         gasFee: item.gasFee || null,
+        tgCostETH: item.tgCostETH || null,
       };
     });
   }, [executionHistory]);
@@ -719,7 +723,40 @@ export function ContextTab() {
                   </p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
                     {selectedTx.txHash
-                      ? truncateHash(selectedTx.txHash)
+                      ? (
+                        <span className="flex items-center gap-2">
+                          {truncateHash(selectedTx.txHash)}
+                          <button
+                            type="button"
+                            className="ml-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-[#c199e4] hover:text-[#a674d7] hover:border-[#c199e4]/40 bg-white/5 hover:bg-white/10 transition-colors"
+                            title="Open in Arbiscan"
+                            onClick={() =>
+                              openTxExternal(
+                                null,
+                                selectedTx.txHash ?? undefined
+                              )
+                            }
+                          >
+                            <LiaExternalLinkAltSolid className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            className="ml-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-[#c199e4] hover:text-[#a674d7] hover:border-[#c199e4]/40 bg-white/5 hover:bg-white/10 transition-colors"
+                            title="Copy Transaction Hash"
+                            onClick={() => {
+                              if (selectedTx.txHash) {
+                                navigator.clipboard.writeText(selectedTx.txHash);
+                                // Optionally show a toast/notification here
+                              }
+                            }}
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                              <rect x="9" y="9" width="13" height="13" rx="2" />
+                              <rect x="3" y="3" width="13" height="13" rx="2" />
+                            </svg>
+                          </button>
+                        </span>
+                      )
                       : "N/A"}
                   </p>
                 </div>
@@ -731,29 +768,24 @@ export function ContextTab() {
                     {selectedTx.slippage} %
                   </p>
                 </div>
-                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">
+                   <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">
                   <p className="text-sm text-gray-400 mb-2 font-medium">
-                    Transaction Fee (ETH)
+                    TG Cost (TriggerX)
                   </p>
                   <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
-                    {selectedTx.gasFee ? `${selectedTx.gasFee}` : "N/A"}
+                    {selectedTx.tgCostETH? `${selectedTx.tgCostETH} (ETH)` : "N/A"}
+                  </p>
+                </div>
+                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">
+                  <p className="text-sm text-gray-400 mb-2 font-medium">
+                    Transaction Fee 
+                  </p>
+                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
+                    {selectedTx.gasFee ? `${selectedTx.gasFee} (ETH)` : "N/A"}
                   </p>
                 </div>
               </div>
 
-              {/* Transaction Hash */}
-              <div className="rounded-2xl p-3 border border-[#c199e4]/20">
-                <p className="text-sm text-gray-300 font-medium mb-2">
-                  Transaction Hash
-                </p>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-mono text-gray-100 text-sm">
-                    {selectedTx.txHash
-                      ? truncateHash(selectedTx.txHash)
-                      : "No hash available"}
-                  </span>
-                </div>
-              </div>
 
               {/* Error Message (if failed) */}
               {/* {selectedTx.status === "FAILED" && selectedTx.statusMessage && (

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useMiniApp } from "@neynar/react";
 
 import { type Haptics } from "@farcaster/miniapp-sdk";
-import { APP_URL } from "~/lib/constants";
+import { APP_URL, QUICKSTART_PREFILL_KEY } from "~/lib/constants";
 import {
   useAccount,
   useWriteContract,
@@ -348,6 +348,7 @@ export function ActionsTab() {
 
   // --- Layout/Refs for better UX ---
   const endOfMessagesRef = useRef<HTMLDivElement | null>(null);
+  const quickStartInputRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const inputContainerRef = useRef<HTMLDivElement | null>(null);
   const [inputContainerHeight, setInputContainerHeight] = useState<number>(72);
@@ -372,6 +373,7 @@ export function ActionsTab() {
   const [microTicker, setMicroTicker] = useState(0);
   const [showScrollToLatest, setShowScrollToLatest] = useState(false);
   const messagesPinnedRef = useRef(true);
+  const [showCreatePlanTokens, setShowCreatePlanTokens] = useState(false);
 
   // Contract interactions for token approval
   const {
@@ -1483,6 +1485,42 @@ export function ActionsTab() {
     setTimeout(() => scrollToBottom(false), 50);
   };
 
+  const adjustInputHeight = useCallback(() => {
+    const el = quickStartInputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const maxHeight = 140;
+    const nextHeight = Math.min(el.scrollHeight, maxHeight);
+    el.style.height = `${nextHeight}px`;
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storedPrefill = sessionStorage.getItem(QUICKSTART_PREFILL_KEY);
+    if (storedPrefill) {
+      sessionStorage.removeItem(QUICKSTART_PREFILL_KEY);
+      setInputMessage(storedPrefill);
+      setTimeout(() => {
+        quickStartInputRef.current?.focus();
+        adjustInputHeight();
+        handleInputFocus();
+      }, 50);
+    }
+  }, [handleInputFocus, adjustInputHeight]);
+
+  const handleQuickCreateToken = useCallback(
+    (symbol: string) => {
+      const template = `Create a DCA plan with 10 USDC into ${symbol.toUpperCase()} every 24 hours for 10 days`;
+      setInputMessage(template);
+      setShowCreatePlanTokens(false);
+      setTimeout(() => {
+        quickStartInputRef.current?.focus();
+        adjustInputHeight();
+      }, 0);
+    },
+    [adjustInputHeight]
+  );
+
   // --- Original Handlers (Commented for now) ---
   /**
    * Sends a notification to the current user's Farcaster account.
@@ -1977,34 +2015,79 @@ export function ActionsTab() {
         >
           {/* Quick Action Buttons */}
           <div className="flex flex-wrap gap-2 mb-2">
-            <button
-              onClick={() => setInputMessage("Show my DCA plans")}
-              className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
-            >
-              My Plans
-            </button>
-            <button
-              onClick={() =>
-                setInputMessage(
-                  "Create a DCA plan with 0.1 USDC into WETH every 15 minutes for 1 hour"
-                )
-              }
-              className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
-            >
-              Create Plan
-            </button>
-            <button
-              onClick={() => setInputMessage("Platform statistics")}
-              className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
-            >
-              Stats
-            </button>
-            <button
-              onClick={() => setInputMessage("Help me understand DCA")}
-              className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
-            >
-              Help
-            </button>
+            {!showCreatePlanTokens ? (
+              <>
+                <button
+                  onClick={() => setInputMessage("Show my DCA plans")}
+                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
+                >
+                  My Plans
+                </button>
+                <button
+                  onClick={() => setShowCreatePlanTokens(true)}
+                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
+                >
+                  Create Plan
+                </button>
+                <button
+                  onClick={() => setInputMessage("Platform statistics")}
+                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
+                >
+                  Stats
+                </button>
+                <button
+                  onClick={() => setInputMessage("Help me understand DCA")}
+                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
+                >
+                  Help
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => setShowCreatePlanTokens(false)}
+                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-white/10 to-white/5 text-white/80 border border-white/25 rounded-full hover:from-white/20 hover:to-white/10 transition-all duration-300"
+                >
+                  ← Back
+                </button>
+                <button
+                  onClick={() => handleQuickCreateToken("WETH")}
+                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/25 to-[#c199e4]/15 text-white/90 border border-[#c199e4]/40 rounded-full hover:from-[#c199e4]/35 hover:to-[#c199e4]/25 transition-all duration-300"
+                >
+                  WETH plan
+                </button>
+                <button
+                  onClick={() => handleQuickCreateToken("ARB")}
+                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/25 to-[#c199e4]/15 text-white/90 border border-[#c199e4]/40 rounded-full hover:from-[#c199e4]/35 hover:to-[#c199e4]/25 transition-all duration-300"
+                >
+                  ARB plan
+                </button>
+                <button
+                  onClick={() => handleQuickCreateToken("WBTC")}
+                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/25 to-[#c199e4]/15 text-white/90 border border-[#c199e4]/40 rounded-full hover:from-[#c199e4]/35 hover:to-[#c199e4]/25 transition-all duration-300"
+                >
+                  WBTC plan
+                </button>
+                <button
+                  onClick={() => handleQuickCreateToken("GMX")}
+                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/25 to-[#c199e4]/15 text-white/90 border border-[#c199e4]/40 rounded-full hover:from-[#c199e4]/35 hover:to-[#c199e4]/25 transition-all duration-300"
+                >
+                  GMX plan
+                </button>
+                <button
+                  onClick={() => handleQuickCreateToken("AAVE")}
+                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/25 to-[#c199e4]/15 text-white/90 border border-[#c199e4]/40 rounded-full hover:from-[#c199e4]/35 hover:to-[#c199e4]/25 transition-all duration-300"
+                >
+                  AAVE plan
+                </button>
+                <button
+                  onClick={() => handleQuickCreateToken("wstETH")}
+                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/25 to-[#c199e4]/15 text-white/90 border border-[#c199e4]/40 rounded-full hover:from-[#c199e4]/35 hover:to-[#c199e4]/25 transition-all duration-300"
+                >
+                  wstETH plan
+                </button>
+              </>
+            )}
           </div>
 
           {/* Plan Creation Mode Indicator */}
@@ -2019,10 +2102,13 @@ export function ActionsTab() {
 
           <div className="flex items-center space-x-3">
             <div className="flex-1 relative">
-              <input
-                type="text"
+            <textarea
+                ref={quickStartInputRef}
                 value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
+              onChange={(e) => {
+                setInputMessage(e.target.value);
+                adjustInputHeight();
+              }}
                 onKeyDown={(e) => {
                   const canSend =
                     isConnected &&
@@ -2032,10 +2118,10 @@ export function ActionsTab() {
                     !isApprovalConfirming &&
                     !isPlanCreationLoading &&
                     inputMessage.trim().length > 0;
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    if (canSend) handleSendMessage();
-                  }
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  if (canSend) handleSendMessage();
+                }
                 }}
                 onFocus={handleInputFocus}
                 placeholder={
@@ -2045,8 +2131,9 @@ export function ActionsTab() {
                     ? "Ask me anything about DCA investing..."
                     : "Connect wallet first, then ask about DCA strategies"
                 }
-                className="w-full px-4 py-1.5 border border-white/30 rounded-2xl bg-white/10 backdrop-blur-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-[#c199e4]/50 focus:border-[#c199e4]/50 transition-all duration-300"
-                style={{ minHeight: 44 }}
+              className="w-full px-4 py-2 border border-white/30 rounded-2xl bg-white/10 backdrop-blur-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-[#c199e4]/50 focus:border-[#c199e4]/50 transition-all duration-300 resize-none leading-relaxed"
+              rows={1}
+              style={{ minHeight: 44, maxHeight: 180, overflowY: "auto" }}
               />
             </div>
             <button
