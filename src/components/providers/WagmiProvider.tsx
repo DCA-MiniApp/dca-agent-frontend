@@ -7,37 +7,60 @@ import { APP_NAME, APP_ICON_URL, APP_URL } from "~/lib/constants";
 import { useEffect, useState } from "react";
 import { useConnect, useAccount } from "wagmi";
 import React from "react";
+import { sdk } from "@farcaster/miniapp-sdk";
 
-// Custom hook for Coinbase Wallet detection and auto-connection
-function useCoinbaseWalletAutoConnect() {
-  const [isCoinbaseWallet, setIsCoinbaseWallet] = useState(false);
-  const { connect, connectors } = useConnect();
+// Custom hook for MetaMask detection and auto-connection
+// function useMetaMaskAutoConnect() {
+//   const [isMetaMask, setIsMetaMask] = useState(false);
+//   const { connect, connectors } = useConnect();
+//   const { isConnected } = useAccount();
+
+//   useEffect(() => {
+//     const checkMetaMask = () => {
+//       const provider = window.ethereum;
+//       setIsMetaMask(!!provider?.isMetaMask);
+//     };
+
+//     checkMetaMask();
+//     window.addEventListener("ethereum#initialized", checkMetaMask);
+
+//     return () => {
+//       window.removeEventListener("ethereum#initialized", checkMetaMask);
+//     };
+//   }, []);
+
+//   useEffect(() => {
+//     if (isMetaMask && !isConnected) {
+//       const metaMaskConnector = connectors.find(
+//         (connector) => connector.id === "metaMask" || connector.name === "MetaMask"
+//       );
+//       if (metaMaskConnector) {
+//         connect({ connector: metaMaskConnector });
+//       }
+//     }
+//   }, [isMetaMask, isConnected, connect, connectors]);
+
+//   return isMetaMask;
+// }
+
+function useFarcasterAutoConnect() {
   const { isConnected } = useAccount();
+  const { connect, connectors } = useConnect();
 
   useEffect(() => {
-    const checkCoinbaseWallet = () => {
-      const isInCoinbaseWallet =
-        window.ethereum?.isCoinbaseWallet ||
-        window.ethereum?.isCoinbaseWalletExtension ||
-        window.ethereum?.isCoinbaseWalletBrowser;
-      setIsCoinbaseWallet(!!isInCoinbaseWallet);
-    };
+    const isMiniApp =
+      typeof window !== "undefined" &&
+      (sdk?.isInMiniApp || window.location.href.includes("neynar.app")); // adjust detection
 
-    checkCoinbaseWallet();
-    window.addEventListener("ethereum#initialized", checkCoinbaseWallet);
+    if (!isMiniApp || isConnected) return;
 
-    return () => {
-      window.removeEventListener("ethereum#initialized", checkCoinbaseWallet);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (isCoinbaseWallet && !isConnected) {
-      connect({ connector: connectors[1] });
+    const farcasterConnector = connectors.find(
+      (connector) => connector.id === "farcaster" || connector.name === "Farcaster"
+    );
+    if (farcasterConnector) {
+      connect({ connector: farcasterConnector });
     }
-  }, [isCoinbaseWallet, isConnected, connect, connectors]);
-
-  return isCoinbaseWallet;
+  }, [isConnected, connect, connectors]);
 }
 
 export const config = createConfig({
@@ -64,12 +87,18 @@ export const config = createConfig({
 
 const queryClient = new QueryClient();
 
-function CoinbaseWalletAutoConnect({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  useCoinbaseWalletAutoConnect();
+// function MetaMaskAutoConnect({
+//   children,
+// }: {
+//   children: React.ReactNode;
+// }) {
+//   useMetaMaskAutoConnect();
+//   return <>{children}</>;
+// }
+
+function AutoConnectWrapper({ children }: { children: React.ReactNode }) {
+  // useMetaMaskAutoConnect();
+  useFarcasterAutoConnect();
   return <>{children}</>;
 }
 
@@ -77,7 +106,7 @@ export default function Provider({ children }: { children: React.ReactNode }) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <CoinbaseWalletAutoConnect>{children}</CoinbaseWalletAutoConnect>
+        <AutoConnectWrapper>{children}</AutoConnectWrapper>
       </QueryClientProvider>
     </WagmiProvider>
   );

@@ -5,7 +5,7 @@
  * DCA plans with job details and IPFS metadata.
  */
 
-import { TriggerXClient, createJob, JobType, ArgType, type TimeBasedJobInput, type CreateJobInput, deleteJob } from 'sdk-triggerx';
+import { TriggerXClient, createJob, JobType, ArgType, type TimeBasedJobInput, type CreateJobInput, deleteJob,checkTgBalance } from 'sdk-triggerx';
 import { BrowserProvider } from 'ethers';
 import {
   SWAP_EXECUTOR_ABI,
@@ -681,4 +681,9 @@ export async function checkPlanJobStatus(planId: string) {
     console.error('Failed to check plan job status:', error);
     throw error;
   }
+}
+
+export async function checkTgBalanceForUser(signer: any, chainId: string = '42161') {
+  const balance = await checkTgBalance(signer, chainId);
+  return balance;
 }

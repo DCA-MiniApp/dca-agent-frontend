@@ -60,8 +60,8 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
   };
 
   return (
-    <div className="h-full flex flex-col items-center justify-center relative bg-transparent pt-5 pb-3">
-      <div className="relative mb-5">
+    <div className="h-full flex flex-col items-center justify-end relative bg-transparent pt-3 pb-4 gap-3">
+      <div className="relative mb-2">
         {/* Central Circle */}
         <div className="size-[70px] rounded-full border-2 border-white/40 bg-transparent relative">
           {/* Animated White Dot Indicator */}

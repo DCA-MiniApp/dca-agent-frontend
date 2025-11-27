@@ -2,7 +2,7 @@
 
 import { useAccount, useWalletClient } from "wagmi";
 import { useMiniApp } from "@neynar/react";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   HiCurrencyDollar,
@@ -13,6 +13,7 @@ import { HiOutlineChartBar } from "react-icons/hi";
 import { PiStrategyBold } from "react-icons/pi";
 import { FaCircleUser } from "react-icons/fa6";
 import { LiaDonateSolid } from "react-icons/lia";
+import { IoCopySharp } from "react-icons/io5";
 import {
   HiOutlineWallet,
   HiOutlineDocumentChartBar,
@@ -21,7 +22,9 @@ import {
   HiOutlineXMark,
   HiOutlineBell,
   HiInformationCircle,
+  HiOutlineMagnifyingGlass,
 } from "react-icons/hi2";
+import tokenMapData from "../../../tokenMap_arbitrum.json";
 
 import { HiOutlineArrowNarrowRight } from "react-icons/hi";
 import { RiStockLine } from "react-icons/ri";
@@ -33,8 +36,6 @@ import { QUICKSTART_PREFILL_KEY } from "../../../lib/constants";
 import {
   fetchUserDCAPlans,
   fetchPlatformStats,
-  updatePlanStatus,
-  deletePlan,
   updatePlanJobId,
   calculateTotalInvested,
   fetchQuickStats,
@@ -42,13 +43,12 @@ import {
   formatDuration,
   type DCAPlan,
   type PlatformStats,
-  QuickStats,
 } from "../../../lib/api";
 import {
   computePlansInvestedUsd,
   calculateWalletTotalUsdValue,
 } from "../../../lib/utils";
-import { deleteTriggerXJobForPlan } from "../../../lib/triggerXIntegration";
+import { deleteTriggerXJobForPlan, checkTgBalanceForUser } from "../../../lib/triggerXIntegration";
 import sdk, {
   AddMiniApp,
   ComposeCast,
@@ -102,6 +102,8 @@ const QUICK_START_TOKENS = [
     logo: "https://cryptologos.cc/logos/aave-aave-logo.png",
   },
 ];
+
+const FEATURED_TOKENS = QUICK_START_TOKENS.slice(0, 6);
 
 function getTimeGreeting() {
   const hour = new Date().getHours();
@@ -164,6 +166,21 @@ export function HomeTab() {
     }
   }, [haptics]);
 
+  const formatContractAddress = useCallback((address?: string | null) => {
+    if (!address) return "Address unavailable";
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  }, []);
+
+  const getTokenAddressForSymbol = useCallback((symbol: string) => {
+    const listing =
+      (tokenMapData.tokenMap as Record<string, { address: string }[]>)[
+        symbol.toUpperCase()
+      ];
+    return listing?.[0]?.address ?? "";
+  }, []);
+
+
+
   const handleQuickStartToken = useCallback(
     (symbol: string) => {
       triggerHaptic();
@@ -179,6 +196,18 @@ export function HomeTab() {
     },
     [router, setActiveTab, triggerHaptic]
   );
+
+  const handleTokenSearchSelect = useCallback(
+    (symbol: string) => {
+      handleQuickStartToken(symbol);
+      setShowTokenSearch(false);
+    },
+    [handleQuickStartToken]
+  );
+
+  const closeTokenSearch = useCallback(() => {
+    setShowTokenSearch(false);
+  }, []);
 
   // Dynamic data state
   const [userPlans, setUserPlans] = useState<DCAPlan[]>([]);
@@ -196,6 +225,18 @@ export function HomeTab() {
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [showConnectWalletModal, setShowConnectWalletModal] = useState(false);
   const [showWrongNetworkTooltip, setShowWrongNetworkTooltip] = useState(false);
+  const [tgBalance, setTgBalance] = useState<number | null>(null);
+  const [showTgTooltip, setShowTgTooltip] = useState(false);
+  const [showTokenSearch, setShowTokenSearch] = useState(false);
+  const [tokenSearchQuery, setTokenSearchQuery] = useState("");
+  const [tokenSearchResults, setTokenSearchResults] = useState<
+    { symbol: string; address: string; name?: string }[]
+  >([]);
+  const tokenSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const tokenEntries = useMemo(
+    () => Object.entries(tokenMapData.tokenMap || {}),
+    []
+  );
 
   //Plan status state
   const [isDeleting, setIsDeleting] = useState(false);
@@ -259,7 +300,87 @@ export function HomeTab() {
     detailsRef.current = notificationDetails;
   }, [notificationDetails]);
 
-  // Check notification status when SDK is ready
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchTgBalance = async () => {
+      if (!isConnected || !wagmiWalletClient) return;
+
+      try {
+        const { BrowserProvider } = await import("ethers");
+        let signer: any = null;
+
+        if (
+          wagmiWalletClient.transport &&
+          (wagmiWalletClient.transport as any).request
+        ) {
+          const provider = new BrowserProvider(
+            wagmiWalletClient.transport as any
+          );
+          const addr = wagmiWalletClient.account?.address;
+          signer = addr ? await provider.getSigner(addr) : await provider.getSigner();
+        } else if (
+          typeof window !== "undefined" &&
+          (window as any).ethereum
+        ) {
+          const provider = new BrowserProvider((window as any).ethereum);
+          try {
+            const accounts = await provider.send("eth_accounts", []);
+            if (!accounts || accounts.length === 0) {
+              await provider.send("eth_requestAccounts", []);
+            }
+          } catch {
+            // ignore account fetch errors
+          }
+          signer = await provider.getSigner();
+        }
+
+        if (!cancelled && signer) {
+          const balance = await checkTgBalanceForUser(signer);
+          setTgBalance(Number(balance.data?.tgBalance ?? 0));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setTgBalance(0);
+        }
+      }
+    };
+
+    fetchTgBalance();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isConnected, wagmiWalletClient]);
+
+  useEffect(() => {
+    if (!tokenSearchQuery.trim()) {
+      setTokenSearchResults([]);
+      return;
+    }
+    const normalized = tokenSearchQuery.trim().toLowerCase();
+    const matches = tokenEntries
+      .filter(([symbol]) => symbol.toLowerCase().includes(normalized))
+      .slice(0, 25)
+      .map(([symbol, infos]) => ({
+        symbol,
+        address: infos?.[0]?.address ?? "",
+        name: infos?.[0]?.name ?? symbol,
+      }));
+    setTokenSearchResults(matches);
+  }, [tokenSearchQuery, tokenEntries]);
+
+  useEffect(() => {
+    if (showTokenSearch) {
+      const timeout = setTimeout(
+        () => tokenSearchInputRef.current?.focus(),
+        80
+      );
+      return () => clearTimeout(timeout);
+    }
+    setTokenSearchQuery("");
+    setTokenSearchResults([]);
+  }, [showTokenSearch]);
   useEffect(() => {
     if (!isSDKLoaded) {
       setIsNotificationResolving(true);
@@ -473,6 +594,7 @@ export function HomeTab() {
   const [showFinalBanner, setShowFinalBanner] = useState(false);
   const [totalExecutions, setTotalExecutions] = useState(0);
   const [totalValueSwapped, setTotalValueSwapped] = useState(0);
+  const [isQuickStatsLoading, setIsQuickStatsLoading] = useState(true);
 
   // Fetch quick stats (executions & volume) periodically
   useEffect(() => {
@@ -480,6 +602,7 @@ export function HomeTab() {
 
     const loadQuickStats = async () => {
       try {
+        setIsQuickStatsLoading(true);
         const stats = await fetchQuickStats();
         if (isCancelled) return;
 
@@ -495,11 +618,15 @@ export function HomeTab() {
           setTotalExecutions(0);
           setTotalValueSwapped(0);
         }
+      } finally {
+        if (!isCancelled) {
+          setIsQuickStatsLoading(false);
+        }
       }
     };
 
     loadQuickStats();
-    const intervalId = setInterval(loadQuickStats, 60_000);
+    const intervalId = setInterval(loadQuickStats, 600_000); // 10 minutes
 
     return () => {
       isCancelled = true;
@@ -896,7 +1023,7 @@ export function HomeTab() {
   const hasFarcasterContext = !!context?.user?.fid;
 
   return (
-    <div className="flex flex-col h-full py-3 px-2 space-y-6 overflow-y-auto">
+    <div className="flex flex-col h-full py-3 px-2 pb-28 space-y-6 overflow-y-auto">
       {/* Connect Wallet Modal */}
       {showConnectWalletModal && !isConnected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-3 py-6">
@@ -1593,35 +1720,41 @@ export function HomeTab() {
         )}
       </div>
 
-      <div className="bg-gradient-to-r from-[#c199e4]/10 to-white/5 rounded-3xl p-6 border border-[#c199e4]/30 shadow-lg flex flex-col md:flex-row items-center justify-between gap-6 mb-2 hover:shadow-xl hover:border-[#c199e4]/50 transition-all duration-500">
-        <div className="flex items-start gap-4 flex-1 min-w-0">
-          <div className="w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-2xl bg-gradient-to-br from-[#c199e4]/40 to-[#c199e4]/20 border border-[#c199e4]/25 text-[#c199e4]">
-            <RiStockLine className="w-7 h-7" />
+      <div className={`bg-gradient-to-r from-[#c199e4]/10 to-white/5 rounded-3xl p-4 sm:p-6 border border-[#c199e4]/30 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6 mb-2 hover:shadow-xl hover:border-[#c199e4]/50 transition-all duration-500 ${isQuickStatsLoading ? 'opacity-60' : 'opacity-100'}`}>
+        <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 flex items-center justify-center rounded-2xl bg-gradient-to-br from-[#c199e4]/40 to-[#c199e4]/20 border border-[#c199e4]/25 text-[#c199e4]">
+            <RiStockLine className="w-5 h-5 sm:w-7 sm:h-7" />
           </div>
           <div className="flex-1 min-w-0">
-            <h4 className="text-lg font-bold text-white mb-1">DCA Execution Overview</h4>
-            <p className="text-sm text-white/70 leading-tight">
+            <h4 className="text-base sm:text-lg font-bold text-white mb-1 break-words">DCA Execution Overview </h4>
+            <p className="text-xs sm:text-sm text-white/70 leading-tight break-words">
               Automated strategies across DCA Agent have completed so far.
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap md:flex-nowrap items-center justify-between md:justify-end gap-4 w-full md:w-auto flex-shrink-0 md:ml-auto">
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-[#c199e4]">{totalExecutions}</span>
-            <span className="text-sm text-white/70 font-medium">
-              Executions
+        <div className="flex flex-col items-end gap-2 w-full md:w-auto flex-shrink-0 md:ml-auto">
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            <span className="text-xl sm:text-2xl font-bold text-[#c199e4]">
+              {isQuickStatsLoading ? (
+                <span className="inline-block w-8 h-6 sm:w-12 sm:h-7 bg-white/20 rounded animate-pulse" />
+              ) : ( 
+                totalExecutions
+              )}
+            </span>
+            <span className="text-xs sm:text-sm text-white/70 font-medium">
+              Successful Executions
             </span>
           </div>
-          <div className="hidden md:block h-6 w-px bg-white/15" />
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-emerald-400">
-              ${totalValueSwapped.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            <span className="text-xl sm:text-2xl font-bold text-emerald-400">
+              {isQuickStatsLoading ? (
+                <span className="inline-block w-12 h-6 sm:w-20 sm:h-7 bg-white/20 rounded animate-pulse" />
+              ) : (
+                `$${Math.round(totalValueSwapped).toLocaleString()}`
+              )}
             </span>
-            <span className="text-sm text-white/70 font-medium">
-              Volume
+            <span className="text-xs sm:text-sm text-white/70 font-medium">
+              Total Volume Swapped
             </span>
           </div>
         </div>
@@ -1635,42 +1768,118 @@ export function HomeTab() {
           <div className="flex-1">
             <h4 className="text-lg font-bold text-white mb-1">Quick Start</h4>
             <p className="text-sm text-white/70 leading-tight">
-              Jump into DCA planning with community favorites. Tap a token to continue the flow instantly.
+              Jump into DCA planning with community favorites or search the full Arbitrum token list.
             </p>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3 w-full">
-          {QUICK_START_TOKENS.map((token) => (
-            <button
-              key={token.symbol}
-              type="button"
-              onClick={() => handleQuickStartToken(token.symbol)}
-              className={`w-full rounded-2xl border border-white/15 bg-gradient-to-br ${token.gradient} px-3 py-2.5 text-left text-white/90 hover:border-white/40 hover:shadow-xl transition-all duration-300 backdrop-blur-sm`}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl border border-white/30 flex items-center justify-center bg-black/20 text-white font-semibold">
-                  <img src={token.logo} alt={token.symbol} className="w-6 h-6" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-base font-semibold text-white">
-                    {token.symbol.toUpperCase()}
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => setShowTokenSearch(true)}
+            className="w-full flex items-center justify-between rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-left text-white/80 hover:border-white/40 hover:bg-white/10 transition-all duration-300"
+          >
+            <div className="flex items-center gap-3">
+              <HiOutlineMagnifyingGlass className="w-5 h-5 text-white/60" />
+              <span className="text-sm font-medium">Search tokens by symbol</span>
+            </div>
+            <span className="text-xs text-white/50">Tap to open</span>
+          </button>
+          <div className="grid grid-cols-2 gap-2">
+            {FEATURED_TOKENS.map((token) => {
+              const address = getTokenAddressForSymbol(token.symbol);
+              return (
+                <button
+                  key={token.symbol}
+                  type="button"
+                  onClick={() => handleQuickStartToken(token.symbol)}
+                  className={`w-full rounded-2xl border border-white/15 bg-gradient-to-br ${token.gradient} px-3 py-3 text-left text-white/90 hover:border-white/40 hover:shadow-xl transition-all duration-300 backdrop-blur-sm`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl border border-white/30 flex items-center justify-center bg-black/20 text-white font-semibold">
+                      <img src={token.logo} alt={token.symbol} className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-base font-semibold text-white">
+                        {token.symbol}
+                      </div>
+                      <div className="text-[10px] text-white/70 truncate max-w-[110px]">
+                        {formatContractAddress(address)}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            </button>
-          ))}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
+
+      {showTokenSearch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={closeTokenSearch}
+          />
+          <div className="relative z-10 w-full max-w-md mx-auto bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl rounded-3xl shadow-2xl border border-[#c199e4]/30 p-5">
+            <div className="flex items-center gap-3 border border-white/20 rounded-2xl px-4 py-2.5 bg-white/5">
+              <HiOutlineMagnifyingGlass className="w-5 h-5 text-white/60" />
+              <input
+                ref={tokenSearchInputRef}
+                value={tokenSearchQuery}
+                onChange={(e) => setTokenSearchQuery(e.target.value)}
+                placeholder="Search by token symbol"
+                className="bg-transparent flex-1 text-white text-sm focus:outline-none"
+              />
+              {tokenSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setTokenSearchQuery("")}
+                  className="text-xs text-white/60 hover:text-white"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="mt-4 max-h-[320px] overflow-y-auto space-y-2 pr-1">
+              {!tokenSearchQuery && (
+                <p className="text-xs text-white/60">
+                  Search tokens by symbol to start a DCA plan.
+                </p>
+              )}
+              {tokenSearchQuery && tokenSearchResults.length === 0 && (
+                <p className="text-sm text-white/70 text-center py-6">
+                  No tokens found for &quot;{tokenSearchQuery}&quot;.
+                </p>
+              )}
+              {tokenSearchResults.map((token) => (
+                <button
+                  key={token.symbol}
+                  type="button"
+                  onClick={() => handleTokenSearchSelect(token.symbol)}
+                  className="w-full text-left rounded-2xl border border-white/10 hover:border-[#c199e4]/40 bg-white/5 px-4 py-3 transition-all duration-200"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-white">
+                        {token.symbol}
+                      </p>
+                      <p className="text-xs text-white/60">{token.name}</p>
+                      <p className="text-[10px] text-white/50 mt-1">
+                        {formatContractAddress(token.address)}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Investment Plans Slider */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold text-white">Active Strategies</h3>
-          <div className="flex items-center gap-2">
-            <div className="w-1 h-1 bg-white/40 rounded-full"></div>
-            <div className="w-1 h-1 bg-white/40 rounded-full"></div>
-            <div className="w-1 h-1 bg-white rounded-full"></div>
-          </div>
         </div>
 
         {/* Plan Card Container */}
@@ -1971,7 +2180,7 @@ export function HomeTab() {
                 <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
                   <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse flex-shrink-0"></div>
                   <span className="text-xs sm:text-sm text-white/90 font-medium whitespace-nowrap">
-                    Plan created: {activePlans.length}
+                    Plan Created: {activePlans.length}
                   </span>
                 </div>
               </div>
@@ -2018,36 +2227,23 @@ export function HomeTab() {
               <div>
                 <span className="text-sm text-white/90 font-medium inline-flex items-center">
                   Total Wallet Value
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowTooltip(!showTooltip);
-                    }}
+                  <div
+                    onMouseEnter={() => setShowTooltip(true)}
+                    onMouseLeave={() => setShowTooltip(false)}
                     className="relative inline-flex items-center ml-2 align-middle"
-                    type="button"
                   >
                     <HiInformationCircle className="w-4 h-4 text-white/50 transition hover:text-green-400 hover:scale-110" />
 
                     {showTooltip && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-[60]"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowTooltip(false);
-                          }}
-                        />
-
-                        <div className="absolute z-[10] left-1/2 -translate-x-1/2 top-full mt-2 w-72 rounded-lg bg-[#c199e4] text-xs text-white/90 px-1 py-1 shadow-2xl border border-green-400/20 pointer-events-none">
-                          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#c199e4]  border-l border-t border-green-400/20 rotate-45" />
-                          <div className="text-left w-full relative z-10 ">
-                            This amount reflects the total value of all tokens
-                            converted to USDC using current market prices on Arbitrum.
-                          </div>
+                      <div className="absolute z-[10] left-1/2 -translate-x-1/2 top-full mt-2 w-72 rounded-lg bg-[#c199e4] text-xs text-white/90 px-1 py-1 shadow-2xl border border-green-400/20 pointer-events-none">
+                        <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#c199e4]  border-l border-t border-green-400/20 rotate-45" />
+                        <div className="text-left w-full relative z-10 ">
+                          This amount reflects the total value of all tokens
+                          converted to USDC using current market prices on Arbitrum.
                         </div>
-                      </>
+                      </div>
                     )}
-                  </button>
+                  </div>
                 </span>
                 {/* <div className="flex items-center gap-2 mt-1">
                   <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
@@ -2059,9 +2255,30 @@ export function HomeTab() {
               <p className="text-4xl font-bold text-white group-hover:text-[#c199e4] transition-colors duration-300">
                 {walletBalanceDisplay}
               </p>
-              <p className="text-sm text-white/70">
-                Total value of all assets in your connected wallet
-              </p>
+              <div className="flex flex-wrap items-center gap-2 text-sm text-white/70">
+                <span>Total TG balance:</span>
+                <span className="font-semibold text-white">
+                  {tgBalance === null
+                    ? "0.0000 TG"
+                    : `${Number(tgBalance).toFixed(4)} TG`}
+                </span>
+                <div
+                  onMouseEnter={() => setShowTgTooltip(true)}
+                  onMouseLeave={() => setShowTgTooltip(false)}
+                  className="relative inline-flex items-center"
+                >
+                  <HiInformationCircle className="w-4 h-4 text-white/50 transition hover:text-green-400 hover:scale-110" />
+                  {showTgTooltip && (
+                    <div className="absolute z-[10] left-1/2 -translate-x-1/2 top-full mt-2 w-64 rounded-lg bg-[#c199e4] text-xs text-white/90 px-2 py-2 shadow-2xl border border-green-400/20 pointer-events-none">
+                      <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#c199e4] border-l border-t border-green-400/20 rotate-45" />
+                      <div className="text-left w-full relative z-10">
+                        TG balance fuels TriggerX to execute your plan on time.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
             </div>
           </div>
           <div className="flex flex-col items-end">

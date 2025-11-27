@@ -1213,22 +1213,28 @@ export function ActionsTab() {
 
       // --- Helpers to normalize user-provided interval/duration into minutes ---
       function parseIntervalToMinutes(interval: any): number {
-        const s = String(interval ?? planData.interval ?? "")
-          .toLowerCase()
-          .trim();
+        const raw = interval ?? planData.interval ?? "";
+        const s = String(raw).toLowerCase().trim();
+        if (!s) return NaN;
 
-        // numeric value fallback
+        const match = s.match(/(\d+(\.\d+)?)\s*(minute|hour|day|week|month)/i);
+        if (match) {
+          const value = parseFloat(match[1]);
+          const unit = match[3].toLowerCase();
+          if (unit.startsWith("minute")) return value;
+          if (unit.startsWith("hour")) return value * 60;
+          if (unit.startsWith("day")) return value * 24 * 60;
+          if (unit.startsWith("week")) return value * 7 * 24 * 60;
+          if (unit.startsWith("month")) return value * 30 * 24 * 60;
+        }
+
+        if (s.includes("hour")) return 60;
+        if (s.includes("day") || s.includes("daily")) return 24 * 60;
+        if (s.includes("week") || s.includes("weekly")) return 7 * 24 * 60;
+        if (s.includes("month") || s.includes("monthly")) return 30 * 24 * 60;
+
         const num = parseFloat(s);
         if (!isNaN(num) && num > 0) return num;
-
-        if (s.includes("minute")) return num || 1; // default 1 min
-        if (s.includes("hour")) return (num || 1) * 60;
-        if (s.includes("day") || s.includes("daily"))
-          return (num || 1) * 24 * 60;
-        if (s.includes("week") || s.includes("weekly"))
-          return (num || 1) * 7 * 24 * 60;
-        if (s.includes("month") || s.includes("monthly"))
-          return (num || 1) * 30 * 24 * 60;
 
         return NaN;
       }
@@ -1294,7 +1300,10 @@ export function ActionsTab() {
         }
 
         // Compute total executions
-        const totalExecutions = Math.floor(durationMinutes / intervalMinutes);
+        const totalExecutions = Math.max(
+          1,
+          Math.floor(durationMinutes / intervalMinutes)
+        );
         // console.log("totalExecutions", totalExecutions);
         // Compute approval amount
         const amountWeiPerExec = parseUnits(amountPerExecutionStr, decimals);

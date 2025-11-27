@@ -607,27 +607,42 @@ export function ContextTab() {
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="relative z-10 w-full max-w-md mx-auto bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl shadow-2xl border border-[#c199e4]/20 max-h-[65vh] overflow-y-auto -top-[40px]"
+            className="relative z-10 w-full max-w-md mx-auto bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl shadow-2xl border border-[#c199e4]/20 -top-[40px]"
           >
-            <div className="p-6 space-y-4">
+            <div className="p-4 sm:p-5 space-y-3">
               {/* Header */}
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center group-hover:from-[#c199e4]/30 group-hover:to-[#c199e4]/20 transition-all duration-300 border border-[#c199e4]/20 group-hover:scale-110">
-                    <HiOutlineDocumentText className="text-[#c199e4] size-6" />
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 flex-shrink-0 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center border border-[#c199e4]/20">
+                    <HiOutlineDocumentText className="text-[#c199e4] size-5" />
                   </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-[#c199e4] transition-colors duration-300">
-                      Execution Details
-                    </h3>
-                    <p className="text-sm text-white/70">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <h3 className="text-lg font-bold text-[#c199e4]">
+                        Execution Details
+                      </h3>
+                      <span
+                        className={`text-xs font-bold px-2.5 py-1 rounded-full transition-all duration-300 whitespace-nowrap ${
+                          selectedTx.status === "completed"
+                            ? "bg-green-400/20 text-green-300 border border-green-400/40"
+                            : selectedTx.status === "PENDING"
+                            ? "bg-blue-400/20 text-blue-300 border border-blue-400/40"
+                            : selectedTx.status === "failed"
+                            ? "bg-red-400/20 text-red-300 border border-red-400/40"
+                            : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
+                        }`}
+                      >
+                        {selectedTx.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-white/70">
                       {selectedTx.fromToken} → {selectedTx.toToken}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={closeModal}
-                  className="text-white/70 hover:text-white transition-colors duration-200 p-2 hover:bg-white/10 rounded-xl"
+                  className="text-white/70 hover:text-white transition-colors duration-200 p-1.5 hover:bg-white/10 rounded-lg flex-shrink-0"
                   aria-label="Close"
                 >
                   <svg
@@ -645,167 +660,93 @@ export function ContextTab() {
                 </button>
               </div>
 
-              {/* Status and Actions */}
-              <div className="flex items-center justify-between p-3 backdrop-blur-lg rounded-2xl border border-[#c199e4]/20">
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`text-xs font-bold px-4 py-2 rounded-full transition-all duration-300 ${
-                      selectedTx.status === "completed"
-                        ? "bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30"
-                        : selectedTx.status === "PENDING"
-                        ? "bg-blue-400/20 text-blue-300 border border-blue-400/40 group-hover:bg-blue-400/30"
-                        : selectedTx.status === "failed"
-                        ? "bg-red-400/20 text-red-300 border border-red-400/40 group-hover:bg-red-400/30"
-                        : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
-                    }`}
-                  >
-                    {selectedTx.status}
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() =>
-                      openTxExternal(selectedTx.txUrl, selectedTx.txHash)
-                    }
-                    className={`${
-                      selectedTx.status === "success"
-                        ? "bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30"
-                        : selectedTx.status === "PENDING"
-                        ? "bg-blue-400/20 text-blue-300 border border-blue-400/40 group-hover:bg-blue-400/30"
-                        : selectedTx.status === "failed"
-                        ? "bg-red-400/20 text-red-300 border border-red-400/40 group-hover:bg-red-400/30 cursor-not-allowed"
-                        : "bg-gray-400/20 text-gray-300 border border-gray-400/40 group-hover:bg-gray-400/30"
-                    } bg-gradient-to-r from-[#c199e4]/20 to-[#c199e4]/10 hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 text-white font-semibold py-3 px-5 rounded-xl transition-all duration-300 text-xs border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg`}
-                  >
-                    View Explorer
-                  </button>
-                </div>
-              </div>
-
               {/* Transaction Details Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">
-                    From Amount
-                  </p>
-                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
-                    {selectedTx.fromToken}
-                  </p>
-                </div>
-                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">
-                    To Amount
-                  </p>
-                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
-                    {selectedTx.toToken}
-                  </p>
-                </div>
-                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
+                  <p className="text-xs text-gray-400 mb-1 font-medium">
                     Job ID (TriggerX)
                   </p>
-                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
+                  <p className="text-sm font-bold text-white font-mono">
                     {selectedTx.jobId.slice(0, 5)}...
                     {selectedTx.jobId.slice(-3)}
                   </p>
                 </div>
-                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">
+                <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
+                  <p className="text-xs text-gray-400 mb-1 font-medium">
                     Task ID (TriggerX)
                   </p>
-                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300 font-mono">
+                  <p className="text-sm font-bold text-white font-mono">
                     {selectedTx.taskId ? `${selectedTx.taskId}` : "N/A"}
                   </p>
                 </div>
-                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">
+                <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20 col-span-2">
+                  <p className="text-xs text-gray-400 mb-1 font-medium">
                     Transaction Hash
                   </p>
-                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
-                    {selectedTx.txHash
-                      ? (
-                        <span className="flex items-center gap-2">
-                          {truncateHash(selectedTx.txHash)}
-                          <button
-                            type="button"
-                            className="ml-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-[#c199e4] hover:text-[#a674d7] hover:border-[#c199e4]/40 bg-white/5 hover:bg-white/10 transition-colors"
-                            title="Open in Arbiscan"
-                            onClick={() =>
-                              openTxExternal(
-                                null,
-                                selectedTx.txHash ?? undefined
-                              )
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-bold text-white font-mono flex-1 min-w-0 truncate">
+                      {selectedTx.txHash ? truncateHash(selectedTx.txHash) : "N/A"}
+                    </p>
+                    {selectedTx.txHash && (
+                      <>
+                        <button
+                          type="button"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-[#c199e4] hover:text-[#a674d7] hover:border-[#c199e4]/40 bg-white/5 hover:bg-white/10 transition-colors flex-shrink-0"
+                          title="Open in Arbiscan"
+                          onClick={() =>
+                            openTxExternal(null, selectedTx.txHash ?? undefined)
+                          }
+                        >
+                          <LiaExternalLinkAltSolid className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-[#c199e4] hover:text-[#a674d7] hover:border-[#c199e4]/40 bg-white/5 hover:bg-white/10 transition-colors flex-shrink-0"
+                          title="Copy Transaction Hash"
+                          onClick={() => {
+                            if (selectedTx.txHash) {
+                              navigator.clipboard.writeText(selectedTx.txHash);
                             }
+                          }}
+                        >
+                          <svg
+                            className="w-3.5 h-3.5"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            viewBox="0 0 24 24"
                           >
-                            <LiaExternalLinkAltSolid className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            className="ml-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-[#c199e4] hover:text-[#a674d7] hover:border-[#c199e4]/40 bg-white/5 hover:bg-white/10 transition-colors"
-                            title="Copy Transaction Hash"
-                            onClick={() => {
-                              if (selectedTx.txHash) {
-                                navigator.clipboard.writeText(selectedTx.txHash);
-                                // Optionally show a toast/notification here
-                              }
-                            }}
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                              <rect x="9" y="9" width="13" height="13" rx="2" />
-                              <rect x="3" y="3" width="13" height="13" rx="2" />
-                            </svg>
-                          </button>
-                        </span>
-                      )
+                            <rect x="9" y="9" width="13" height="13" rx="2" />
+                            <rect x="3" y="3" width="13" height="13" rx="2" />
+                          </svg>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20 col-span-2">
+                  <p className="text-xs text-gray-400 mb-1 font-medium">
+                    TG Cost (TriggerX)
+                  </p>
+                  <p className="text-sm font-bold text-white">
+                    {selectedTx.tgCostETH
+                      ? `${selectedTx.tgCostETH} (ETH)`
                       : "N/A"}
                   </p>
                 </div>
-                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">
-                    Slippage Tolerance
+                <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20 col-span-2">
+                  <p className="text-xs text-gray-400 mb-1 font-medium">
+                    Transaction Fee
                   </p>
-                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
-                    {selectedTx.slippage} %
-                  </p>
-                </div>
-                   <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">
-                    TG Cost (TriggerX)
-                  </p>
-                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
-                    {selectedTx.tgCostETH? `${selectedTx.tgCostETH} (ETH)` : "N/A"}
-                  </p>
-                </div>
-                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">
-                    Transaction Fee 
-                  </p>
-                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
+                  <p className="text-sm font-bold text-white">
                     {selectedTx.gasFee ? `${selectedTx.gasFee} (ETH)` : "N/A"}
                   </p>
                 </div>
-              </div>
-
-
-              {/* Error Message (if failed) */}
-              {/* {selectedTx.status === "FAILED" && selectedTx.statusMessage && (
-                <div className="rounded-2xl p-3 border border-red-400/20 bg-red-400/5">
-                  <p className="text-sm text-red-300 font-medium mb-2">
-                    Status Message
-                  </p>
-                  <p className="text-sm text-red-100 break-words">
-                    {selectedTx.statusMessage}
-                  </p>
-                </div>                                                                                                                  
-              )} */}
-
-              {/* Timeline Details */}
-              <div className="space-y-3">
-                <div className="rounded-2xl p-3 border border-[#c199e4]/20">
-                  <p className="text-sm text-gray-300 font-medium mb-2">
+                <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20 col-span-2">
+                  <p className="text-xs text-gray-400 mb-1 font-medium">
                     Executed At
                   </p>
-                  <p className="text-sm font-bold text-gray-100">
+                  <p className="text-sm font-bold text-white">
                     {new Date(selectedTx.executedAtISO).toLocaleString(
                       "en-US",
                       {
