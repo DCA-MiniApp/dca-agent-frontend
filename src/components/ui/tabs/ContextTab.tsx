@@ -214,7 +214,7 @@ export function ContextTab() {
   const closeModal = () => setSelectedTx(null);
 
   return (
-    <div className="flex flex-col h-full py-3 overflow-y-auto relative">
+    <div className="flex flex-col h-full py-3 pb-10 overflow-y-auto relative">
       {/* Header */}
       <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20 mb-8">
         <div className="flex items-center gap-3">
@@ -597,7 +597,7 @@ export function ContextTab() {
 
       {/* Details Modal */}
       {selectedTx && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-[100] flex items-start justify-center px-4 pt-20 pb-24">
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={closeModal}
@@ -607,7 +607,7 @@ export function ContextTab() {
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="relative z-10 w-full max-w-md mx-auto bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl shadow-2xl border border-[#c199e4]/20 -top-[40px]"
+            className="relative z-10 w-full max-w-md mx-auto bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl shadow-2xl border border-[#c199e4]/20 max-h-[calc(100vh-140px)] overflow-y-auto"
           >
             <div className="p-4 sm:p-5 space-y-3">
               {/* Header */}

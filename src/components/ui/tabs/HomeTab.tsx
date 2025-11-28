@@ -1023,7 +1023,7 @@ export function HomeTab() {
   const hasFarcasterContext = !!context?.user?.fid;
 
   return (
-    <div className="flex flex-col h-full py-3 px-2 pb-28 space-y-6 overflow-y-auto">
+    <div className="flex flex-col h-full py-3 px-2 pb-20 space-y-6 overflow-y-auto">
       {/* Connect Wallet Modal */}
       {showConnectWalletModal && !isConnected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-3 py-6">
@@ -1720,41 +1720,35 @@ export function HomeTab() {
         )}
       </div>
 
-      <div className={`bg-gradient-to-r from-[#c199e4]/10 to-white/5 rounded-3xl p-4 sm:p-6 border border-[#c199e4]/30 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6 mb-2 hover:shadow-xl hover:border-[#c199e4]/50 transition-all duration-500 ${isQuickStatsLoading ? 'opacity-60' : 'opacity-100'}`}>
-        <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 flex items-center justify-center rounded-2xl bg-gradient-to-br from-[#c199e4]/40 to-[#c199e4]/20 border border-[#c199e4]/25 text-[#c199e4]">
-            <RiStockLine className="w-5 h-5 sm:w-7 sm:h-7" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h4 className="text-base sm:text-lg font-bold text-white mb-1 break-words">DCA Execution Overview </h4>
-            <p className="text-xs sm:text-sm text-white/70 leading-tight break-words">
-              Automated strategies across DCA Agent have completed so far.
-            </p>
+      <div
+        className={`bg-gradient-to-r from-[#c199e4]/10 to-white/5 rounded-3xl p-4 sm:p-6 border border-[#c199e4]/30 shadow-lg flex flex-col gap-3 mb-2 hover:shadow-xl hover:border-[#c199e4]/50 transition-all duration-500 ${
+          isQuickStatsLoading ? "opacity-60" : "opacity-100"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 flex-shrink-0 flex items-center justify-center rounded-2xl bg-gradient-to-br from-[#c199e4]/40 to-[#c199e4]/20 border border-[#c199e4]/25 text-[#c199e4]">
+            <RiStockLine className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
         </div>
-        <div className="flex flex-col items-end gap-2 w-full md:w-auto flex-shrink-0 md:ml-auto">
-          <div className="flex items-center gap-2 whitespace-nowrap">
-            <span className="text-xl sm:text-2xl font-bold text-[#c199e4]">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between gap-3 py-0.1">
+            <span className="text-sm text-white/70">Successful executions</span>
+            <span className="text-3xl font-bold text-[#c199e4] leading-tight">
               {isQuickStatsLoading ? (
-                <span className="inline-block w-8 h-6 sm:w-12 sm:h-7 bg-white/20 rounded animate-pulse" />
-              ) : ( 
+                <span className="inline-block w-16 h-8 bg-white/20 rounded animate-pulse" />
+              ) : (
                 totalExecutions
               )}
             </span>
-            <span className="text-xs sm:text-sm text-white/70 font-medium">
-              Successful Executions
-            </span>
           </div>
-          <div className="flex items-center gap-2 whitespace-nowrap">
-            <span className="text-xl sm:text-2xl font-bold text-emerald-400">
+          <div className="flex items-center justify-between gap-3 py-0.1">
+            <span className="text-sm text-white/70">Total volume swapped</span>
+            <span className="text-3xl font-bold text-emerald-400 leading-tight">
               {isQuickStatsLoading ? (
-                <span className="inline-block w-12 h-6 sm:w-20 sm:h-7 bg-white/20 rounded animate-pulse" />
+                <span className="inline-block w-24 h-8 bg-white/20 rounded animate-pulse" />
               ) : (
                 `$${Math.round(totalValueSwapped).toLocaleString()}`
               )}
-            </span>
-            <span className="text-xs sm:text-sm text-white/70 font-medium">
-              Total Volume Swapped
             </span>
           </div>
         </div>
@@ -1780,9 +1774,8 @@ export function HomeTab() {
           >
             <div className="flex items-center gap-3">
               <HiOutlineMagnifyingGlass className="w-5 h-5 text-white/60" />
-              <span className="text-sm font-medium">Search tokens by symbol</span>
+              <span className="text-sm font-medium">Search tokens</span>
             </div>
-            <span className="text-xs text-white/50">Tap to open</span>
           </button>
           <div className="grid grid-cols-2 gap-2">
             {FEATURED_TOKENS.map((token) => {
@@ -1794,15 +1787,17 @@ export function HomeTab() {
                   onClick={() => handleQuickStartToken(token.symbol)}
                   className={`w-full rounded-2xl border border-white/15 bg-gradient-to-br ${token.gradient} px-3 py-3 text-left text-white/90 hover:border-white/40 hover:shadow-xl transition-all duration-300 backdrop-blur-sm`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl border border-white/30 flex items-center justify-center bg-black/20 text-white font-semibold">
-                      <img src={token.logo} alt={token.symbol} className="w-6 h-6" />
-                    </div>
-                    <div className="flex-1">
+                  <div className="flex items-center gap-2.5">
+                    <img 
+                      src={token.logo} 
+                      alt={token.symbol} 
+                      className="w-8 h-8 flex-shrink-0 object-contain" 
+                    />
+                    <div className="flex-1 min-w-0">
                       <div className="text-base font-semibold text-white">
                         {token.symbol}
                       </div>
-                      <div className="text-[10px] text-white/70 truncate max-w-[110px]">
+                      <div className="text-[10px] text-white/70 truncate">
                         {formatContractAddress(address)}
                       </div>
                     </div>
@@ -1815,12 +1810,12 @@ export function HomeTab() {
       </div>
 
       {showTokenSearch && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-[100] flex items-start justify-center px-4 pt-16 pb-24">
           <div
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"
             onClick={closeTokenSearch}
           />
-          <div className="relative z-10 w-full max-w-md mx-auto bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl rounded-3xl shadow-2xl border border-[#c199e4]/30 p-5">
+          <div className="relative z-10 w-full max-w-md mx-auto bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl rounded-3xl shadow-2xl border border-[#c199e4]/30 p-5 max-h-[calc(100vh-140px)] overflow-y-auto">
             <div className="flex items-center gap-3 border border-white/20 rounded-2xl px-4 py-2.5 bg-white/5">
               <HiOutlineMagnifyingGlass className="w-5 h-5 text-white/60" />
               <input
