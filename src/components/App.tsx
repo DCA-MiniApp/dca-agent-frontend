@@ -19,6 +19,7 @@ import {
   IoTime,
   IoWallet,
 } from "react-icons/io5";
+import { FooterVisibilityContext } from "./ui/FooterVisibilityContext";
 
 // --- Types ---
 export enum Tab {
@@ -75,6 +76,7 @@ export default function App(
   const [isAnimating, setIsAnimating] = useState(false);
   const [animatingTab, setAnimatingTab] = useState<Tab | null>(null);
   const [showContent, setShowContent] = useState(true);
+  const [isFooterVisible, setFooterVisible] = useState(true);
 
   // Tab icon mapping
   const getTabIcon = (tab: Tab) => {
@@ -137,7 +139,10 @@ export default function App(
 
   // --- Render ---
   return (
-    <div className="relative font-titillium h-screen overflow-hidden">
+    <FooterVisibilityContext.Provider
+      value={{ visible: isFooterVisible, setVisible: setFooterVisible }}
+    >
+      <div className="relative font-titillium h-screen overflow-hidden">
       {/* Background Elements - Fixed */}
       {/* White dots overlay at bottom */}
       <div className="absolute bottom-0 left-0 right-0 h-[20vh] pointer-events-none z-0">
@@ -273,16 +278,21 @@ export default function App(
         )}
       </AnimatePresence>
 
-      {/* Footer - Fixed at bottom with increased height for attribution */}
-      <div className="fixed bottom-0 left-0 right-0 h-53 z-40">
-        <Footer
-          activeTab={currentTab as Tab}
-          setActiveTab={handleTabChange}
-          showWallet={USE_WALLET}
-          getTabIcon={getTabIcon}
-          isAnimating={isAnimating}
-        />
+        {/* Footer - Fixed at bottom with increased height for attribution */}
+        <div
+          className={`fixed bottom-0 left-0 right-0 h-53 z-40 transition-opacity duration-300 ${
+            isFooterVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          }`}
+        >
+          <Footer
+            activeTab={currentTab as Tab}
+            setActiveTab={handleTabChange}
+            showWallet={USE_WALLET}
+            getTabIcon={getTabIcon}
+            isAnimating={isAnimating}
+          />
+        </div>
       </div>
-    </div>
+    </FooterVisibilityContext.Provider>
   );
 }

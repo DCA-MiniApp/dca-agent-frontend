@@ -12,6 +12,7 @@ import { StatusSelect } from "./StatusSelect";
 import { useAccount } from "wagmi";
 import { fetchUserExecutionHistory } from "../../../lib/api";
 import { LiaExternalLinkAltSolid } from "react-icons/lia";
+import { useFooterVisibility } from "../FooterVisibilityContext";
 
 /**
  * ContextTab component displays a transaction history with filters and pagination.
@@ -28,6 +29,7 @@ import { LiaExternalLinkAltSolid } from "react-icons/lia";
 export function ContextTab() {
   const { address } = useAccount();
   const { setActiveTab, haptics } = useMiniApp();
+  const { setVisible: setFooterVisible } = useFooterVisibility();
 
   // Types aligned with new backend response
   type TaskStatus = string;
@@ -212,6 +214,11 @@ export function ContextTab() {
   const [selectedTx, setSelectedTx] = useState<TransactionRow | null>(null);
   const openModal = (tx: TransactionRow) => setSelectedTx(tx);
   const closeModal = () => setSelectedTx(null);
+
+  useEffect(() => {
+    setFooterVisible(!selectedTx);
+    return () => setFooterVisible(true);
+  }, [selectedTx, setFooterVisible]);
 
   return (
     <div className="flex flex-col h-full py-3 pb-10 overflow-y-auto relative">

@@ -48,7 +48,10 @@ import {
   computePlansInvestedUsd,
   calculateWalletTotalUsdValue,
 } from "../../../lib/utils";
-import { deleteTriggerXJobForPlan, checkTgBalanceForUser } from "../../../lib/triggerXIntegration";
+import {
+  deleteTriggerXJobForPlan,
+  checkTgBalanceForUser,
+} from "../../../lib/triggerXIntegration";
 import sdk, {
   AddMiniApp,
   ComposeCast,
@@ -56,6 +59,7 @@ import sdk, {
   SignIn as SignInCore,
   type Context,
 } from "@farcaster/miniapp-sdk";
+import { useFooterVisibility } from "../FooterVisibilityContext";
 
 // Legacy interface for compatibility - will be replaced with DCAPlan
 /**
@@ -125,6 +129,7 @@ export function HomeTab() {
     /* actions available in SDK */ actions,
   } = useMiniApp() as any;
   const router = useRouter();
+  const { setVisible: setFooterVisible } = useFooterVisibility();
 
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
   const [context, setContext] = useState<Context.MiniAppContext>();
@@ -172,14 +177,11 @@ export function HomeTab() {
   }, []);
 
   const getTokenAddressForSymbol = useCallback((symbol: string) => {
-    const listing =
-      (tokenMapData.tokenMap as Record<string, { address: string }[]>)[
-        symbol.toUpperCase()
-      ];
+    const listing = (
+      tokenMapData.tokenMap as Record<string, { address: string }[]>
+    )[symbol.toUpperCase()];
     return listing?.[0]?.address ?? "";
   }, []);
-
-
 
   const handleQuickStartToken = useCallback(
     (symbol: string) => {
@@ -318,11 +320,10 @@ export function HomeTab() {
             wagmiWalletClient.transport as any
           );
           const addr = wagmiWalletClient.account?.address;
-          signer = addr ? await provider.getSigner(addr) : await provider.getSigner();
-        } else if (
-          typeof window !== "undefined" &&
-          (window as any).ethereum
-        ) {
+          signer = addr
+            ? await provider.getSigner(addr)
+            : await provider.getSigner();
+        } else if (typeof window !== "undefined" && (window as any).ethereum) {
           const provider = new BrowserProvider((window as any).ethereum);
           try {
             const accounts = await provider.send("eth_accounts", []);
@@ -381,6 +382,10 @@ export function HomeTab() {
     setTokenSearchQuery("");
     setTokenSearchResults([]);
   }, [showTokenSearch]);
+  useEffect(() => {
+    setFooterVisible(!showTokenSearch);
+    return () => setFooterVisible(true);
+  }, [showTokenSearch, setFooterVisible]);
   useEffect(() => {
     if (!isSDKLoaded) {
       setIsNotificationResolving(true);
@@ -633,9 +638,6 @@ export function HomeTab() {
       clearInterval(intervalId);
     };
   }, []);
-
-
-
 
   // Derive notifications availability defensively (covers browser vs client)
   // const hasNotificationsDerived =
@@ -1721,36 +1723,33 @@ export function HomeTab() {
       </div>
 
       <div
-        className={`bg-gradient-to-r from-[#c199e4]/10 to-white/5 rounded-3xl p-4 sm:p-6 border border-[#c199e4]/30 shadow-lg flex flex-col gap-3 mb-2 hover:shadow-xl hover:border-[#c199e4]/50 transition-all duration-500 ${
+        className={`bg-gradient-to-r from-[#c199e4]/10 to-white/5 rounded-3xl p-4 sm:p-5 border border-[#c199e4]/30 shadow-lg flex flex-col gap-1.5 mb-2 hover:shadow-xl hover:border-[#c199e4]/50 transition-all duration-500 ${
           isQuickStatsLoading ? "opacity-60" : "opacity-100"
         }`}
       >
-        <div className="flex items-center justify-between gap-3">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 flex-shrink-0 flex items-center justify-center rounded-2xl bg-gradient-to-br from-[#c199e4]/40 to-[#c199e4]/20 border border-[#c199e4]/25 text-[#c199e4]">
-            <RiStockLine className="w-5 h-5 sm:w-6 sm:h-6" />
-          </div>
+        <div className="flex items-baseline gap-2">
+          <span className="text-3xl font-bold text-[#c199e4] leading-tight">
+            {isQuickStatsLoading ? (
+              <span className="inline-block w-16 h-8 bg-white/20 rounded animate-pulse" />
+            ) : (
+              totalExecutions
+            )}
+          </span>
+          <span className="text-sm text-white/70 whitespace-nowrap">
+            successful executions
+          </span>
         </div>
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between gap-3 py-0.1">
-            <span className="text-sm text-white/70">Successful executions</span>
-            <span className="text-3xl font-bold text-[#c199e4] leading-tight">
-              {isQuickStatsLoading ? (
-                <span className="inline-block w-16 h-8 bg-white/20 rounded animate-pulse" />
-              ) : (
-                totalExecutions
-              )}
-            </span>
-          </div>
-          <div className="flex items-center justify-between gap-3 py-0.1">
-            <span className="text-sm text-white/70">Total volume swapped</span>
-            <span className="text-3xl font-bold text-emerald-400 leading-tight">
-              {isQuickStatsLoading ? (
-                <span className="inline-block w-24 h-8 bg-white/20 rounded animate-pulse" />
-              ) : (
-                `$${Math.round(totalValueSwapped).toLocaleString()}`
-              )}
-            </span>
-          </div>
+        <div className="flex items-baseline gap-2">
+          <span className="text-3xl font-bold text-emerald-400 leading-tight">
+            {isQuickStatsLoading ? (
+              <span className="inline-block w-24 h-8 bg-white/20 rounded animate-pulse" />
+            ) : (
+              `$${Math.round(totalValueSwapped).toLocaleString()}`
+            )}
+          </span>
+          <span className="text-sm text-white/70 whitespace-nowrap">
+            total volume swapped
+          </span>
         </div>
       </div>
 
@@ -1762,7 +1761,8 @@ export function HomeTab() {
           <div className="flex-1">
             <h4 className="text-lg font-bold text-white mb-1">Quick Start</h4>
             <p className="text-sm text-white/70 leading-tight">
-              Jump into DCA planning with community favorites or search the full Arbitrum token list.
+              Jump into DCA planning with community favorites or search the full
+              Arbitrum token list.
             </p>
           </div>
         </div>
@@ -1788,10 +1788,10 @@ export function HomeTab() {
                   className={`w-full rounded-2xl border border-white/15 bg-gradient-to-br ${token.gradient} px-3 py-3 text-left text-white/90 hover:border-white/40 hover:shadow-xl transition-all duration-300 backdrop-blur-sm`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <img 
-                      src={token.logo} 
-                      alt={token.symbol} 
-                      className="w-8 h-8 flex-shrink-0 object-contain" 
+                    <img
+                      src={token.logo}
+                      alt={token.symbol}
+                      className="w-8 h-8 flex-shrink-0 object-contain"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="text-base font-semibold text-white">
@@ -2234,7 +2234,8 @@ export function HomeTab() {
                         <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#c199e4]  border-l border-t border-green-400/20 rotate-45" />
                         <div className="text-left w-full relative z-10 ">
                           This amount reflects the total value of all tokens
-                          converted to USDC using current market prices on Arbitrum.
+                          converted to USDC using current market prices on
+                          Arbitrum.
                         </div>
                       </div>
                     )}
@@ -2267,13 +2268,12 @@ export function HomeTab() {
                     <div className="absolute z-[10] left-1/2 -translate-x-1/2 top-full mt-2 w-64 rounded-lg bg-[#c199e4] text-xs text-white/90 px-2 py-2 shadow-2xl border border-green-400/20 pointer-events-none">
                       <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#c199e4] border-l border-t border-green-400/20 rotate-45" />
                       <div className="text-left w-full relative z-10">
-                        TG balance fuels TriggerX to execute your plan on time.
+                        TG balance fuels TriggerX to execute your plan.
                       </div>
                     </div>
                   )}
                 </div>
               </div>
-
             </div>
           </div>
           <div className="flex flex-col items-end">
