@@ -979,6 +979,12 @@ export function HomeTab() {
     setSelectedPlan(null);
   };
 
+  // Hide footer when plan modal is open
+  useEffect(() => {
+    setFooterVisible(!showPlanModal);
+    return () => setFooterVisible(true);
+  }, [showPlanModal, setFooterVisible]);
+
   // Slider navigation functions
   const goToNextPlan = () => {
     setCurrentPlanIndex((prev) =>
@@ -1723,10 +1729,17 @@ export function HomeTab() {
       </div>
 
       <div
-        className={`bg-gradient-to-r from-[#c199e4]/10 to-white/5 rounded-3xl p-4 sm:p-5 border border-[#c199e4]/30 shadow-lg flex flex-col gap-1.5 mb-2 hover:shadow-xl hover:border-[#c199e4]/50 transition-all duration-500 ${
+        className={`bg-gradient-to-r from-[#c199e4]/10 to-white/5 rounded-3xl p-4 sm:p-5 border border-[#c199e4]/30 shadow-lg flex flex-col gap-3 mb-2 hover:shadow-xl hover:border-[#c199e4]/50 transition-all duration-500 ${
           isQuickStatsLoading ? "opacity-60" : "opacity-100"
         }`}
       >
+        {/* Header */}
+        <div className="flex items-center gap-2 mb-1">
+          <h2 className="text-base font-bold text-white">Platform Statistics</h2>
+          <span className="text-xs text-white/50">(Across All Users)</span>
+        </div>
+        
+        {/* Stats */}
         <div className="flex items-baseline gap-2">
           <span className="text-3xl font-bold text-[#c199e4] leading-tight">
             {isQuickStatsLoading ? (
@@ -2298,28 +2311,43 @@ export function HomeTab() {
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="relative z-10 w-full max-w-md mx-auto bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl shadow-2xl border border-[#c199e4]/20 max-h-[65vh] overflow-y-auto -top-[40px]"
+            className="relative z-10 w-full max-w-md mx-auto bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl shadow-2xl border border-[#c199e4]/20 max-h-[calc(100vh-2rem)] overflow-y-auto"
           >
-            <div className="p-6 space-y-4">
+            <div className="p-4 sm:p-5 space-y-3">
               {/* Header */}
-              <div className="flex items-start justify-between">
+              <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center group-hover:from-[#c199e4]/30 group-hover:to-[#c199e4]/20 transition-all duration-300 border border-[#c199e4]/20 group-hover:scale-110">
-                    <PiStrategyBold className="text-[#c199e4] size-6" />
+                  <div className="w-10 h-10 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center border border-[#c199e4]/20">
+                    <PiStrategyBold className="text-[#c199e4] size-5" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-[#c199e4] transition-colors duration-300">
+                    <h3 className="text-lg font-bold text-[#c199e4]">
                       DCA Strategy
                     </h3>
-                    <p className="text-sm text-white/70">
-                      {selectedPlan.fromToken} → {selectedPlan.toToken}{" "}
-                      Investment Plan
+                    <p className="text-xs text-white/70 flex items-center gap-2">
+                      {selectedPlan.fromToken} → {selectedPlan.toToken}
+                      <span
+                        className={`text-xs font-bold px-2 py-1 rounded-full ${
+                          selectedPlan.jobStatus === "completed"
+                            ? "bg-green-400/20 text-green-300 border border-green-400/40"
+                            : selectedPlan.jobStatus === "running"
+                            ? "bg-blue-400/20 text-blue-300 border border-blue-400/40"
+                            : selectedPlan.jobStatus === "pending"
+                            ? "bg-yellow-400/20 text-yellow-300 border border-yellow-400/40"
+                            : selectedPlan.jobStatus === "deleted"
+                            ? "bg-red-400/20 text-red-300 border border-red-400/40"
+                            : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
+                        }`}
+                      >
+                        {selectedPlan.jobStatus || selectedPlan.status || "Unknown"}
+                      </span>
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={closePlanModal}
-                  className="text-white/70 hover:text-white transition-colors duration-200 p-2 hover:bg-white/10 rounded-xl"
+                  className="text-white/70 hover:text-white transition-colors duration-200 p-1.5 hover:bg-white/10 rounded-lg flex-shrink-0"
+                  aria-label="Close"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -2336,153 +2364,75 @@ export function HomeTab() {
                 </button>
               </div>
 
-              {/* Status and Actions */}
-              <div className="flex items-center justify-between p-3 backdrop-blur-lg rounded-2xl border border-[#c199e4]/20">
-                {/* Left: Plan ID label */}
-                <span className="text-sm text-gray-400 font-medium">
-                  JOB ID (TriggerX):
-                </span>
-                {/* Right: Plan ID value and copy icon */}
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-white">
-                    {selectedPlan.jobId.slice(0, 6)}...
-                    {selectedPlan.jobId.slice(-4)}
-                  </span>
-                  <button
-                    onClick={handleCopyPlanId}
-                    className="ml-2 text-[#c199e4] hover:text-white transition-colors"
-                    title="Copy Plan ID"
-                  >
-                    {copied ? (
-                      <HiOutlineCheck className="w-5 h-5 text-green-400" />
-                    ) : (
-                      <HiOutlineClipboard className="w-5 h-5" />
-                    )}
-                  </button>
-                </div>
-              </div>
-              <div className="flex items-center justify-between p-3  backdrop-blur-lg rounded-2xl border border-[#c199e4]/20">
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`text-xs font-bold px-4 py-2 rounded-full transition-all duration-300 ${
-                      selectedPlan.jobStatus === "completed"
-                        ? "bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30"
-                        : selectedPlan.jobStatus === "running"
-                        ? "bg-blue-400/20 text-blue-300 border border-blue-400/40 group-hover:bg-blue-400/30"
-                        : selectedPlan.jobStatus === "pending"
-                        ? "bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 group-hover:bg-yellow-400/30"
-                        : selectedPlan.jobStatus === "deleted"
-                        ? "bg-red-400/20 text-red-300 border border-red-400/40 group-hover:bg-red-400/30"
-                        : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
-                    }`}
-                  >
-                    {selectedPlan.jobStatus || selectedPlan.status || "Unknown"}
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleDeletePlan(selectedPlan)}
-                    className={`w-full bg-gradient-to-r from-red-500/20 to-red-500/10 hover:from-red-500/30 hover:to-red-500/20 text-white font-semibold py-2 px-4 rounded-full transition-all duration-300 text-sm border border-red-500/30 hover:border-red-500/50 hover:shadow-lg group-hover:scale-[1.02] cursor-pointer ${
-                      isDeleting ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
-                    disabled={isDeleting}
-                  >
-                    {isDeleting ? "Deleting..." : "Delete Plan"}
-                  </button>
-                </div>
-              </div>
-
               {/* Plan Details Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">
-                    From Token
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
+                  <p className="text-xs text-gray-400 mb-1 font-medium">
+                    Job ID (TriggerX)
                   </p>
-                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
-                    {selectedPlan.fromToken}
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-bold text-white font-mono flex-1 min-w-0 truncate">
+                      {selectedPlan.jobId.slice(0, 5)}...
+                      {selectedPlan.jobId.slice(-3)}
+                    </p>
+                    <button
+                      onClick={handleCopyPlanId}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-[#c199e4] hover:text-[#a674d7] hover:border-[#c199e4]/40 bg-white/5 hover:bg-white/10 transition-colors flex-shrink-0"
+                      title="Copy Job ID"
+                    >
+                      {copied ? (
+                        <HiOutlineCheck className="w-3.5 h-3.5 text-green-400" />
+                      ) : (
+                        <HiOutlineClipboard className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
-                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">
-                    To Token
-                  </p>
-                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
-                    {selectedPlan.toToken}
-                  </p>
-                </div>
-                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">
+                <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
+                  <p className="text-xs text-gray-400 mb-1 font-medium">
                     Amount
                   </p>
-                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
+                  <p className="text-sm font-bold text-white">
                     {parseFloat(selectedPlan.amount).toFixed(5)}
                   </p>
                 </div>
-                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">
+                <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
+                  <p className="text-xs text-gray-400 mb-1 font-medium">
                     Interval
                   </p>
-                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
+                  <p className="text-sm font-bold text-white">
                     {formatInterval(selectedPlan.intervalMinutes)}
                   </p>
                 </div>
-                <div className="backdrop-blur-lg rounded-2xl p-3 border border-[#c199e4]/20 transition-all duration-300 group col-span-2">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">
+                <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
+                  <p className="text-xs text-gray-400 mb-1 font-medium">
                     Duration
                   </p>
-                  <p className="text-lg font-bold text-white group-hover:text-gray-200 transition-colors duration-300">
+                  <p className="text-sm font-bold text-white">
                     {formatDuration(selectedPlan.durationWeeks)}
                   </p>
                 </div>
-              </div>
-
-              {/* Slippage */}
-              <div className="rounded-2xl p-4 border border-[#c199e4]/20">
-                <p className="text-sm text-gray-300 font-medium mb-2">
-                  Slippage Tolerance
-                </p>
-                <p className="text-lg font-bold text-gray-100">
-                  {parseFloat(selectedPlan.slippage).toFixed(2)}%
-                </p>
-              </div>
-              {/* Progress Section */}
-              <div className="space-y-4">
-                <div className="backdrop-blur-lg rounded-2xl p-4 border border-[#c199e4]/20">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm text-gray-300 font-medium">
-                      Execution Progress
-                    </p>
-                    <p className="text-sm text-gray-200 font-medium">
-                      {selectedPlan.successCount}/{selectedPlan.totalExecutions}
-                    </p>
-                  </div>
-                  <div className="w-full bg-white/20 rounded-full h-3 mb-2">
-                    <div
-                      className="bg-gradient-to-r from-[#c199e4]/40 to-[#c199e4]/30 h-3 rounded-full transition-all duration-700 shadow-sm"
-                      style={{
-                        width: `${
-                          (selectedPlan.successCount /
-                            selectedPlan.totalExecutions) *
-                          100
-                        }%`,
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-400">
-                    {Math.round(
-                      (selectedPlan.successCount /
-                        selectedPlan.totalExecutions) *
-                        100
-                    )}
-                    % Complete
+                <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
+                  <p className="text-xs text-gray-400 mb-1 font-medium">
+                    Slippage
+                  </p>
+                  <p className="text-sm font-bold text-white">
+                    {parseFloat(selectedPlan.slippage).toFixed(2)}%
                   </p>
                 </div>
-
-                <div className=" rounded-2xl p-4 border border-[#c199e4]/20">
-                  <p className="text-sm text-gray-300 font-medium mb-2">
+                <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
+                  <p className="text-xs text-gray-400 mb-1 font-medium">
+                    Progress
+                  </p>
+                  <p className="text-sm font-bold text-white">
+                    {selectedPlan.successCount}/{selectedPlan.totalExecutions}
+                  </p>
+                </div>
+                <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20 col-span-2">
+                  <p className="text-xs text-gray-400 mb-1 font-medium">
                     Total Invested
                   </p>
-                  <p className="text-2xl font-bold text-gray-100">
+                  <p className="text-sm font-bold text-white">
                     {(
                       parseFloat(selectedPlan.amount) *
                       Number(selectedPlan.successCount || 0)
@@ -2490,30 +2440,26 @@ export function HomeTab() {
                     {selectedPlan.fromToken}
                   </p>
                 </div>
-              </div>
-
-              {/* Timeline Details */}
-              <div className="space-y-3">
-                <div className="rounded-2xl p-4 border border-[#c199e4]/20">
-                  <p className="text-sm text-gray-400 mb-2 font-medium">
+                <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
+                  <p className="text-xs text-gray-400 mb-1 font-medium">
                     Created
                   </p>
-                  <p className="text-sm font-semibold text-gray-200">
+                  <p className="text-sm font-bold text-white">
                     {new Date(selectedPlan.createdAt).toLocaleDateString(
                       "en-US",
                       {
-                        year: "numeric",
-                        month: "long",
+                        month: "short",
                         day: "numeric",
+                        year: "numeric",
                       }
                     )}
                   </p>
                 </div>
-                <div className="rounded-2xl p-4 border border-[#c199e4]/20">
-                  <p className="text-sm text-gray-300 font-medium mb-2">
+                <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
+                  <p className="text-xs text-gray-400 mb-1 font-medium">
                     Next Execution
                   </p>
-                  <p className="text-sm font-bold text-gray-100">
+                  <p className="text-sm font-bold text-white">
                     {selectedPlan.nextExecution
                       ? new Date(selectedPlan.nextExecution).toLocaleString(
                           "en-US",
@@ -2524,9 +2470,51 @@ export function HomeTab() {
                             minute: "2-digit",
                           }
                         )
-                      : "No upcoming execution"}
+                      : "N/A"}
                   </p>
                 </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-gray-400 font-medium">
+                    Execution Progress
+                  </p>
+                  <p className="text-xs text-white/70 font-medium">
+                    {Math.round(
+                      (selectedPlan.successCount /
+                        selectedPlan.totalExecutions) *
+                        100
+                    )}
+                    %
+                  </p>
+                </div>
+                <div className="w-full bg-white/20 rounded-full h-2">
+                  <div
+                    className="bg-gradient-to-r from-[#c199e4]/40 to-[#c199e4]/30 h-2 rounded-full transition-all duration-700"
+                    style={{
+                      width: `${
+                        (selectedPlan.successCount /
+                          selectedPlan.totalExecutions) *
+                        100
+                      }%`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Delete Button */}
+              <div className="pt-2">
+                <button
+                  onClick={() => handleDeletePlan(selectedPlan)}
+                  className={`w-full bg-gradient-to-r from-red-500/20 to-red-500/10 hover:from-red-500/30 hover:to-red-500/20 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-300 text-sm border border-red-500/30 hover:border-red-500/50 ${
+                    isDeleting ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? "Deleting..." : "Delete Plan"}
+                </button>
               </div>
             </div>
           </motion.div>

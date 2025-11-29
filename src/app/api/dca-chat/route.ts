@@ -719,10 +719,10 @@ async function waitForSSEResponseWithReader(
  */
 function enhanceResponseWithData(responseText: string, data: any): string {
   // If data looks like platform statistics
-  if (data && typeof data === 'object' && 'totalPlans' in data && 'activePlans' in data) {
+  if (data && typeof data === 'object' && 'totalPlans' in data) {
     return `${responseText}\n\n📊 **Platform Statistics:**\n` +
-           `💰 Total Plans: ${data.totalPlans}\n` +
-           `🔥 Active Plans: ${data.activePlans}\n` +
+           `💰 Total Plans Created: ${data.totalPlans}\n` +
+          //  `🔥 Active Plans: ${data.activePlans}\n` +
            `👥 Total Users: ${data.totalUsers}\n` +
            `⚡ Total Executions: ${data.totalExecutions}\n` +
            `📈 Last 24h: ${data.last24hExecutions} executions\n` +
