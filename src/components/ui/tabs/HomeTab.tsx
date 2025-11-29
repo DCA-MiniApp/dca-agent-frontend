@@ -1736,7 +1736,7 @@ export function HomeTab() {
             )}
           </span>
           <span className="text-sm text-white/70 whitespace-nowrap">
-            successful executions
+            Successful executions
           </span>
         </div>
         <div className="flex items-baseline gap-2">
@@ -1748,7 +1748,7 @@ export function HomeTab() {
             )}
           </span>
           <span className="text-sm text-white/70 whitespace-nowrap">
-            total volume swapped
+            Total volume swapped
           </span>
         </div>
       </div>

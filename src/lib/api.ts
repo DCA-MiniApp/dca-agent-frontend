@@ -32,6 +32,8 @@ export interface ExecutionHistory {
   fromAmount: string;
   toAmount: string;
   exchangeRate: string;
+  inputAmount: string;
+  outputAmount: string;
   gasFee: string | null;
   txHash: string | null;
   status: 'SUCCESS' | 'FAILED' | 'PENDING';

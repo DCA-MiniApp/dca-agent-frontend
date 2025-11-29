@@ -46,6 +46,9 @@ export function ContextTab() {
     slippage: string;
     gasFee: string | null;
     tgCostETH?: string | null;
+    inputAmount: string | null;
+    outputAmount: string;
+    exchangeRate: string | null;
   }
 
   // Dynamic data state
@@ -70,6 +73,9 @@ export function ContextTab() {
     slippage: string | null; // optional
     gasFee: string | null;
     tgCostETH?: string | null;
+    inputAmount: string | null;
+    outputAmount: string | null;
+    exchangeRate: string | null;
   }
 
   const truncateHash = (hash: string) =>
@@ -133,6 +139,9 @@ export function ContextTab() {
         slippage: item.slippage || null,
         gasFee: item.gasFee || null,
         tgCostETH: item.tgCostETH || null,
+        inputAmount: item.inputAmount || null,
+        outputAmount: item.outputAmount || null,
+        exchangeRate: item.exchangeRate || null,
       };
     });
   }, [executionHistory]);
@@ -214,6 +223,9 @@ export function ContextTab() {
   const [selectedTx, setSelectedTx] = useState<TransactionRow | null>(null);
   const openModal = (tx: TransactionRow) => setSelectedTx(tx);
   const closeModal = () => setSelectedTx(null);
+  
+  // Tooltip state for exchange rate details
+  const [showExchangeTooltip, setShowExchangeTooltip] = useState(false);
 
   useEffect(() => {
     setFooterVisible(!selectedTx);
@@ -730,6 +742,33 @@ export function ContextTab() {
                       </>
                     )}
                   </div>
+                </div>
+                <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20 col-span-2">
+                  <p className="text-xs text-gray-400 mb-1 font-medium">
+                    Exchange Rate
+                  </p>
+                  <p className="text-sm font-bold text-white mb-2">
+                    {selectedTx.exchangeRate
+                      ? `1 ${selectedTx.fromToken} = ${selectedTx.exchangeRate} ${selectedTx.toToken}`
+                      : "N/A"}
+                  </p>
+                  {/* Swap details */}
+                  {(selectedTx.inputAmount || selectedTx.amount || selectedTx.outputAmount) && (
+                    <div className="mt-2 pt-2 border-t border-white/10">
+                      <p className="text-[11px] text-white/80 leading-tight">
+                        <span className="text-gray-400 font-medium">For your swap: </span>
+                        <span className="font-semibold text-white/90">
+                          {selectedTx.inputAmount || selectedTx.amount || "N/A"}
+                        </span>{" "}
+                        <span>{selectedTx.fromToken}</span>
+                        <span className="mx-1">→</span>
+                        <span className="font-semibold text-white/90">
+                          {selectedTx.outputAmount || "N/A"}
+                        </span>{" "}
+                        <span>{selectedTx.toToken}</span>
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20 col-span-2">
                   <p className="text-xs text-gray-400 mb-1 font-medium">
