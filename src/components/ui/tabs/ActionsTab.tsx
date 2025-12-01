@@ -25,6 +25,10 @@ import { IoPersonCircle } from "react-icons/io5";
 import { RiRobot2Fill } from "react-icons/ri";
 import { parseUnits } from "viem";
 import sdk from "@farcaster/miniapp-sdk";
+import {
+  MANUAL_DISCONNECT_EVENT,
+  MANUAL_DISCONNECT_FLAG,
+} from "../../providers/WagmiProvider";
 import { BrowserProvider, JsonRpcSigner } from "ethers";
 
 // Chat message interface
@@ -325,6 +329,38 @@ export function ActionsTab() {
   const { address, isConnected, connector, chainId } = useAccount();
   const { data: walletClient } = useWalletClient();
 
+  // Respect manual disconnect flag set from WalletTab / provider.
+  const [hasManualDisconnect, setHasManualDisconnect] = useState(false);
+
+  useEffect(() => {
+    const readFlag = () =>
+      typeof window !== "undefined" &&
+      window.sessionStorage?.getItem(MANUAL_DISCONNECT_FLAG) === "true";
+
+    setHasManualDisconnect(readFlag());
+
+    const handler = () => {
+      setHasManualDisconnect(readFlag());
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener(
+        MANUAL_DISCONNECT_EVENT,
+        handler as EventListener
+      );
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener(
+          MANUAL_DISCONNECT_EVENT,
+          handler as EventListener
+        );
+      }
+    };
+  }, []);
+
+  const isWalletConnected = isConnected && !hasManualDisconnect;
+
   // --- State ---
   const [notificationState, setNotificationState] = useState({
     sendStatus: "",
@@ -337,7 +373,7 @@ export function ActionsTab() {
       id: "1",
       role: "assistant",
       content: `👋 **Hello!** I'm your DCA investment assistant.\n\n🎯 Create automated strategies\n📊 Track portfolio performance\n⚙️ Manage your plans\n\n Please ensure your DCA plan interval is set to a minimum of 1 hour. Make sure your plan follows this requirement for optimal automation.\n\n${
-        isConnected
+        isWalletConnected
           ? `Wallet connected (${formatAddress(address || "")}) - ready to go!`
           : "Connect wallet to access all features."
       }\n\n**Quick start:** "Create a DCA plan with 0.1 USDC into WETH weekly for 1 month"`,
@@ -598,7 +634,7 @@ export function ActionsTab() {
 
   useEffect(() => {
     // Update chat context when wallet connection changes
-    if (isConnected && address) {
+    if (isWalletConnected && address) {
       setConnectionStatus("connected");
       // Add a system message about wallet connection
       const connectionMessage: ChatMessage = {
@@ -620,7 +656,7 @@ export function ActionsTab() {
         }
         return prev;
       });
-    } else if (!isConnected && connectionStatus === "connected") {
+    } else if (!isWalletConnected && connectionStatus === "connected") {
       // Wallet was disconnected
       setConnectionStatus(null);
       const disconnectionMessage: ChatMessage = {
@@ -636,7 +672,7 @@ export function ActionsTab() {
   // --- Chat Handlers ---
   const handleSendMessage = useCallback(async () => {
     const canSend =
-      isConnected &&
+      isWalletConnected &&
       !isLoading &&
       !isApprovalLoading &&
       !isApprovePending &&
@@ -1684,9 +1720,9 @@ export function ActionsTab() {
               </div>
             )}
             {/* {address ? formatAddress(address) : "Not Connected"} */}
-            {!isConnected
+            {!isWalletConnected
               ? "Wallet Not Connected"
-              : isConnected && !address
+              : isWalletConnected && !address
               ? "Connecting..."
               : formatAddress(address as `0x${string}`)}
           </div>
@@ -2155,7 +2191,7 @@ export function ActionsTab() {
               }}
                 onKeyDown={(e) => {
                   const canSend =
-                    isConnected &&
+                isWalletConnected &&
                     !isLoading &&
                     !isApprovalLoading &&
                     !isApprovePending &&
