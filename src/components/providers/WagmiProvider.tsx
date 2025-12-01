@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
 import { coinbaseWallet, metaMask } from "wagmi/connectors";
 import { APP_NAME, APP_ICON_URL, APP_URL } from "~/lib/constants";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useConnect, useAccount } from "wagmi";
 import React from "react";
 import { sdk } from "@farcaster/miniapp-sdk";
@@ -43,31 +43,65 @@ import { sdk } from "@farcaster/miniapp-sdk";
 //   return isMetaMask;
 // }
 
+export const MANUAL_DISCONNECT_FLAG = "dca_manual_disconnect";
+export const MANUAL_DISCONNECT_EVENT = "dca-manual-disconnect-changed";
+
+function useManualDisconnectState() {
+  const readFlag = useCallback(() => {
+    if (typeof window === "undefined") return false;
+    return window.sessionStorage?.getItem(MANUAL_DISCONNECT_FLAG) === "true";
+  }, []);
+
+  const [hasManualDisconnect, setHasManualDisconnect] = useState<boolean>(false);
+
+  useEffect(() => {
+    setHasManualDisconnect(readFlag());
+    const handler = () => setHasManualDisconnect(readFlag());
+    if (typeof window !== "undefined") {
+      window.addEventListener(MANUAL_DISCONNECT_EVENT, handler as EventListener);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener(
+          MANUAL_DISCONNECT_EVENT,
+          handler as EventListener
+        );
+      }
+    };
+  }, [readFlag]);
+
+  return hasManualDisconnect;
+}
+
 function useFarcasterAutoConnect() {
   const { isConnected } = useAccount();
   const { connect, connectors } = useConnect();
+  const hasManualDisconnect = useManualDisconnectState();
 
   useEffect(() => {
     const isMiniApp =
       typeof window !== "undefined" &&
       (sdk?.isInMiniApp || window.location.href.includes("neynar.app")); // adjust detection
 
-    if (!isMiniApp || isConnected) return;
+    if (!isMiniApp || isConnected || hasManualDisconnect) return;
 
     const farcasterConnector = connectors.find(
       (connector) => connector.id === "farcaster" || connector.name === "Farcaster"
     );
     if (farcasterConnector) {
+      // Connect to Farcaster wallet
+      // Note: User will be prompted to switch to Arbitrum if on wrong chain
+      // via the WalletControls component in WalletTab
       connect({ connector: farcasterConnector });
     }
-  }, [isConnected, connect, connectors]);
+  }, [isConnected, connect, connectors, hasManualDisconnect]);
 }
 
 export const config = createConfig({
   chains: [arbitrum, mainnet],
   transports: {
     [arbitrum.id]: http(),
-    [mainnet.id]: http(),
+    [mainnet.id]: http(), // Needed for chain name detection in WalletTab
   },
   connectors: [
     farcasterMiniApp(),
@@ -83,6 +117,7 @@ export const config = createConfig({
       },
     }),
   ],
+  ssr: false,
 });
 
 const queryClient = new QueryClient();

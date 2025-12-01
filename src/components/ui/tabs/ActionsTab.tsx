@@ -322,7 +322,7 @@ export function ActionsTab() {
   // --- Hooks ---
   const { notificationDetails, haptics, context } = useMiniApp();
 
-  const { address, isConnected, connector } = useAccount();
+  const { address, isConnected, connector, chainId } = useAccount();
   const { data: walletClient } = useWalletClient();
 
   // --- State ---
@@ -686,7 +686,7 @@ export function ActionsTab() {
           userAddress: address,
           conversationHistory: messages.slice(-6), // Include last 6 messages for context
           isPlanCreationRequest: isPlanRequest, // Flag to help API determine response type
-          fid: context?.user?.fid || 727291,
+          fid: context?.user?.fid || null,
         }),
       });
 
@@ -872,12 +872,26 @@ export function ActionsTab() {
         approvalError.message.includes("cancelled") ||
         approvalError.message.includes("rejected");
 
+      // Check if it's the getChainId connector error
+      const isConnectorError =
+        approvalError.message.includes("getChainId") ||
+        approvalError.message.includes("is not a function");
+
+      let errorContent: string;
+      if (isUserRejection) {
+        errorContent =
+          "❌ Token approval was cancelled. No plan was created.\n\nYou can try creating the plan again when you're ready.";
+      } else if (isConnectorError) {
+        errorContent =
+          "❌ Token approval failed: Wallet connection issue.\n\nPlease ensure:\n• You're connected to Arbitrum network\n• Your wallet is properly connected\n• Try disconnecting and reconnecting your wallet\n\nThen try creating the plan again.";
+      } else {
+        errorContent = `❌ Token approval failed: ${approvalError.message}\n\nYou need to approve token spending to create the DCA plan. Please try again.`;
+      }
+
       const errorMessage: ChatMessage = {
         id: createMessageId("assistant"),
         role: "assistant",
-        content: isUserRejection
-          ? "❌ Token approval was cancelled. No plan was created.\n\nYou can try creating the plan again when you're ready."
-          : `❌ Token approval failed: ${approvalError.message}\n\nYou need to approve token spending to create the DCA plan. Please try again.`,
+        content: errorContent,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -1341,7 +1355,22 @@ export function ActionsTab() {
         //   totalAmountWei: totalAmountWei.toString(),
         // });
 
+        // Ensure we're on Arbitrum before proceeding
+        if (chainId !== arbitrum.id) {
+          const errorMessage: ChatMessage = {
+            id: createMessageId("assistant"),
+            role: "assistant",
+            content: `❌ **Wrong Network**\n\nPlease switch to Arbitrum mainnet to approve tokens. Your current network is ${chainId === 1 ? "Ethereum" : "Unknown"}.\n\nPlease switch to Arbitrum and try again.`,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, errorMessage]);
+          setApprovalStatus("idle");
+          setIsApprovalLoading(false);
+          return;
+        }
+
         // Trigger wallet approval popup with dynamic total amount
+        // Note: Explicitly pass chainId to help wagmi avoid connector.getChainId() issues
         writeContract({
           address: tokenInfo.address as `0x${string}`,
           abi: ERC20_ABI,
@@ -1363,7 +1392,7 @@ export function ActionsTab() {
         setApprovalStatus("idle");
       }
     },
-    [writeContract]
+    [writeContract, chainId]
   );
 
   // Handle the approve confirmation (after summary)

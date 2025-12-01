@@ -20,6 +20,20 @@ import { USE_WALLET, APP_NAME } from "../../../lib/constants";
 import { useMiniApp } from "@neynar/react";
 import { storeUser } from "../../../lib/api";
 import { sdk } from "@farcaster/miniapp-sdk";
+import {
+  MANUAL_DISCONNECT_EVENT,
+  MANUAL_DISCONNECT_FLAG,
+} from "../../providers/WagmiProvider";
+
+function updateManualDisconnectFlag(value: boolean) {
+  if (typeof window === "undefined") return;
+  if (value) {
+    window.sessionStorage?.setItem(MANUAL_DISCONNECT_FLAG, "true");
+  } else {
+    window.sessionStorage?.removeItem(MANUAL_DISCONNECT_FLAG);
+  }
+  window.dispatchEvent(new Event(MANUAL_DISCONNECT_EVENT));
+}
 
 /**
  * WalletTab component for wallet management with manual connect/disconnect.
@@ -273,6 +287,7 @@ function ConnectionControls({
         <Button
           onClick={() => {
             triggerHaptic();
+            updateManualDisconnectFlag(true);
             disconnect();
           }}
           className="w-full bg-gradient-to-r from-[#c199e4]/20 to-[#b380db]/10 hover:from-[#c199e4]/30 hover:to-[#b380db]/20 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 border border-[#c199e4]/30 hover:border-[#c199e4]/50 hover:shadow-lg"
@@ -323,8 +338,12 @@ function ConnectionControls({
                 const farcasterConnector = connectors.find(
                   (c) => c.id === "farcaster"
                 );
-                if (farcasterConnector)
+                if (farcasterConnector) {
+              updateManualDisconnectFlag(false);
                   connect({ connector: farcasterConnector });
+                  // Note: Chain will be switched to Arbitrum after connection if needed
+                  // via the WalletControls component
+                }
               }}
             >
               Connect Farcaster Wallet
@@ -334,7 +353,10 @@ function ConnectionControls({
               className={secondaryButtonClasses}
               onClick={() => {
                 triggerHaptic();
+            updateManualDisconnectFlag(false);
                 connect({ connector: connectors[2] });
+                // Note: Chain will be switched to Arbitrum after connection if needed
+                // via the WalletControls component
               }}
             >
               Connect MetaMask
@@ -347,7 +369,10 @@ function ConnectionControls({
               className={primaryButtonClasses}
               onClick={() => {
                 triggerHaptic();
+            updateManualDisconnectFlag(false);
                 connect({ connector: connectors[1] });
+                // Note: Chain will be switched to Arbitrum after connection if needed
+                // via the WalletControls component
               }}
             >
               Connect Coinbase Wallet
@@ -357,7 +382,10 @@ function ConnectionControls({
               className={secondaryButtonClasses}
               onClick={() => {
                 triggerHaptic();
+            updateManualDisconnectFlag(false);
                 connect({ connector: connectors[2] });
+                // Note: Chain will be switched to Arbitrum after connection if needed
+                // via the WalletControls component
               }}
             >
               Connect MetaMask
@@ -646,6 +674,26 @@ export function WalletTab() {
     };
     run();
   }, [isConnected, address, user?.fid]);
+
+  // Auto-switch to Arbitrum after connection if on wrong chain
+  useEffect(() => {
+    if (
+      isConnected &&
+      effectiveChainId &&
+      effectiveChainId !== arbitrum.id &&
+      !isChainSwitchPending
+    ) {
+      // Only auto-switch if not already switching and not on Arbitrum
+      console.log(
+        `Auto-switching from chain ${effectiveChainId} to Arbitrum (${arbitrum.id})`
+      );
+      handleSwitchToArbitrum().catch((error) => {
+        console.warn("Auto-switch to Arbitrum failed:", error);
+        // Don't show error to user - they can manually switch via UI
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected, effectiveChainId, isChainSwitchPending]);
 
   // --- Handlers ---
   const handleSwitchToArbitrum = useCallback(async () => {
