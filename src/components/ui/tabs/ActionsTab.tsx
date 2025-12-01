@@ -686,7 +686,7 @@ export function ActionsTab() {
           userAddress: address,
           conversationHistory: messages.slice(-6), // Include last 6 messages for context
           isPlanCreationRequest: isPlanRequest, // Flag to help API determine response type
-          fid: context?.user?.fid || null,
+          fid: context?.user?.fid || 727291,
         }),
       });
 
