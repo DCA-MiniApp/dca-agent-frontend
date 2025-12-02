@@ -96,6 +96,28 @@ export async function POST(request: NextRequest) {
         planSessionManager.getConversationContext(session.id),
         session.planData
       );
+
+      // Treat some fields as optional (e.g. slippage) so they don't
+      // block plan confirmation. If the only missing field is optional,
+      // we auto-fill sensible defaults and continue as "complete".
+      const OPTIONAL_FIELDS = new Set(["slippage"]);
+      const missingRequired =
+        extractionResult.missingFields?.filter(
+          (field) => !OPTIONAL_FIELDS.has(field)
+        ) ?? [];
+
+      if (!extractionResult.isComplete && missingRequired.length === 0) {
+        // Auto‑default slippage when omitted by the user.
+        if (
+          !("slippage" in extractionResult.planData) ||
+          extractionResult.planData.slippage == null
+        ) {
+          // Backend expects slippage in basis points (e.g. 200 = 2%)
+          (extractionResult.planData as any).slippage = "2";
+        }
+        extractionResult.isComplete = true;
+        extractionResult.missingFields = [];
+      }
       
       // Update session with extracted data
       planSessionManager.updateSessionPlanData(session.id, extractionResult.planData);
@@ -133,6 +155,8 @@ export async function POST(request: NextRequest) {
         if (extractionResult.validationErrors && extractionResult.validationErrors.length > 0) {
           responseMessage += `❌ **Issues found:**\n${extractionResult.validationErrors.map(err => `• ${err}`).join('\n')}\n\n`;
         }
+
+        console.log('[Plan Creation] Extraction result:', extractionResult);
         
         if (Object.keys(extractionResult.planData).length > 0) {
           responseMessage += `✅ **Information collected so far:**\n`;

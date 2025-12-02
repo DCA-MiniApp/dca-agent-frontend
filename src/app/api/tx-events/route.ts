@@ -1,20 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-// Incoming payload from your backend when a transaction status changes
 const TxEventSchema = z.object({
-  // Farcaster user fid to notify (preferred), or provide userAddress and map on server if needed
   fid: z.number().int().positive().optional(),
   userAddress: z.string().optional(),
 
-  // Transaction context
-  status: z.enum(["pending", "success", "failed"]),
+  // Transaction / job context
+  status: z.enum(["pending", "success", "failed", "low-balance"]),
   txHash: z.string().optional(),
   chainId: z.string().optional(),
   planId: z.string().optional(),
   reason: z.string().optional(),
   taskId: z.number().int().positive().optional(),
-  // Optional: human text already prepared by backend
+
+  // Low-balance specific (from backend)
+  jobCostPrediction: z.number().optional(),
+  totalTaskCost: z.number().optional(),
+  percentageUsed: z.number().optional(),
+
   message: z.string().optional(),
   notificationtoken: z.string().optional(),
   notification_url: z.string().url().optional(),
@@ -24,8 +27,7 @@ export async function POST(req: NextRequest) {
   try {
     const json = await req.json();
     const parsed = TxEventSchema.safeParse(json);
-    console.log("[tx-events] received payload:", json);
-    console.log("[tx-events] parsed result:", parsed);
+
     if (!parsed.success) {
       return NextResponse.json(
         {
@@ -37,6 +39,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    console.log("[tx-events] received payload:", json);
 
     const {
       fid,
@@ -50,16 +53,12 @@ export async function POST(req: NextRequest) {
       taskId,
       notificationtoken,
       notification_url,
+      jobCostPrediction,
+      totalTaskCost,
+      percentageUsed,
     } = parsed.data;
 
-    // Only notify on failures per requirement
-    if (status !== "failed") {
-      return NextResponse.json({ success: true, skipped: true });
-    }
-
     if (!fid) {
-      // If fid mapping is not provided, you can look it up by userAddress here.
-      // For now, require fid to be present to send notification.
       return NextResponse.json(
         {
           success: false,
@@ -69,22 +68,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const shortHash = txHash
-      ? `${txHash.slice(0, 8)}...${txHash.slice(-6)}`
-      : "N/A";
-    const planLine = planId ? `Plan: ${planId}` : undefined;
-    const chainLine = chainId ? `Chain: ${chainId}` : undefined;
+    // Build notification content based on status
+    let title: string;
+    let body: string;
 
-    const composed =`Open your History tab, search the ${taskId} task ID, and check what went wrong to keep your plan running smoothly.`
-     
+    if (status === "failed") {
+      const composed =
+        message ??
+        `Open your History tab, search the ${taskId} task ID, and check what went wrong to keep your plan running smoothly.`;
+      title = "Plan execution failed ⚠️";
+      body = composed;
+    } else if (status === "low-balance") {
+      const pct = percentageUsed != null ? percentageUsed.toFixed(2) : "70+";
+      title = "TG balance running low ⚠️";
+      body =reason ??
+        `Your Triggered Jobs have used ${pct}% of your TG balance. Consider topping up to ensure uninterrupted plan execution. Job Cost Prediction: ${jobCostPrediction}, Total Task Cost: ${totalTaskCost}.`;
+    } else {
+      // For pending/success or anything else we don't notify
+      return NextResponse.json({ success: true, skipped: true });
+    }
 
-    // Store details as { url, token } or null
     const details: { url: string; token: string } | null =
       notificationtoken && notification_url
         ? { url: notification_url, token: notificationtoken }
         : null;
 
-    // Forward to existing notification endpoint
     const resp = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL || ""}/api/send-notification`,
       {
@@ -92,13 +100,12 @@ export async function POST(req: NextRequest) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fid,
-          title: "Plan execution failed ⚠️",
-          body: composed,
-          notificationDetails:details,
+          title,
+          body,
+          notificationDetails: details,
         }),
       }
     );
-
 
     if (!resp.ok) {
       const text = await resp.text().catch(() => "");

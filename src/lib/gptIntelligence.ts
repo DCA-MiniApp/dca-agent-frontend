@@ -470,12 +470,11 @@ Extract any new DCA parameters from this message and provide the next question f
    * Generate plan summary for confirmation
    */
   generatePlanSummary(planData: DCAPlanData): string {
-    const tokenInfoArray = availableTokens[planData.fromToken];
+    const tokenInfoArray = availableTokens[planData.fromToken?.toUpperCase() || ''];
     const tokenInfo =
       tokenInfoArray && tokenInfoArray.length > 0
         ? tokenInfoArray[0]
         : undefined;
-
     // Format token address for mobile display
     const formatTokenAddress = (address: string) => {
       if (!address) return "N/A";
