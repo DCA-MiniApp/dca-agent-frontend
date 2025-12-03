@@ -463,6 +463,7 @@ export function HomeTab() {
     setFooterVisible(!showTokenSearch);
     return () => setFooterVisible(true);
   }, [showTokenSearch, setFooterVisible]);
+
   useEffect(() => {
     if (!isSDKLoaded) {
       setIsNotificationResolving(true);
@@ -680,6 +681,15 @@ export function HomeTab() {
   const [topupAmount, setTopupAmount] = useState("");
   const [isTopupLoading, setIsTopupLoading] = useState(false);
   const [topupStatus, setTopupStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (showOnboarding) {
+      setFooterVisible(false);
+      return () => setFooterVisible(true);
+    }
+    setFooterVisible(true);
+    return () => setFooterVisible(true);
+  }, [showOnboarding, setFooterVisible]);
 
   // Fetch quick stats (executions & volume) periodically
   useEffect(() => {
@@ -1284,7 +1294,7 @@ export function HomeTab() {
                   </motion.svg>
                 </div>
                 <h3 className="text-white text-lg font-bold">
-                  All set now — let&apos;s go!
+                  All set now let&apos;s go!
                 </h3>
                 <p className="text-white/80 text-sm mt-1">
                   Start your investment journey with DCA Agent.
