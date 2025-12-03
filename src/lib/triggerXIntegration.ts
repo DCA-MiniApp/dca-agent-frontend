@@ -5,7 +5,7 @@
  * DCA plans with job details and IPFS metadata.
  */
 
-import { TriggerXClient, createJob, JobType, ArgType, type TimeBasedJobInput, type CreateJobInput, deleteJob,checkTgBalance } from 'sdk-triggerx';
+import { TriggerXClient, createJob, JobType, ArgType, type TimeBasedJobInput, type CreateJobInput, deleteJob,checkTgBalance,topupTg as triggerxTopupTg } from 'sdk-triggerx';
 import { BrowserProvider } from 'ethers';
 import {
   SWAP_EXECUTOR_ABI,
@@ -695,4 +695,24 @@ export async function checkPlanJobStatus(planId: string) {
 export async function checkTgBalanceForUser(signer: any, chainId: string = '42161') {
   const balance = await checkTgBalance(signer, chainId);
   return balance;
+}
+
+/**
+ * Top up TG for a user using TriggerX SDK.
+ *
+ * This is a thin wrapper around the SDK so the rest of the app
+ * only imports from our internal api layer.
+ */
+export async function topupTg(
+  tgAmount: number,
+  signer: any
+): Promise<{
+  success: boolean;
+  data?: any;
+  error?: string;
+  errorCode?: string;
+  errorType?: string;
+  details?: any;
+}> {
+  return triggerxTopupTg(tgAmount, signer);
 }

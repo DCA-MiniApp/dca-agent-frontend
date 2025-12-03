@@ -43,31 +43,66 @@ import { sdk } from "@farcaster/miniapp-sdk";
 //   return isMetaMask;
 // }
 
+export const MANUAL_DISCONNECT_FLAG = "dca_manual_disconnect";
+export const MANUAL_DISCONNECT_EVENT = "dca-manual-disconnect-changed";
+
+function readManualDisconnectFlag() {
+  if (typeof window === "undefined") return false;
+  return window.sessionStorage?.getItem(MANUAL_DISCONNECT_FLAG) === "true";
+}
+
+function useManualDisconnectState() {
+  const [hasManualDisconnect, setHasManualDisconnect] = useState<boolean>(() =>
+    readManualDisconnectFlag()
+  );
+
+  useEffect(() => {
+    const handler = () => setHasManualDisconnect(readManualDisconnectFlag());
+    if (typeof window !== "undefined") {
+      window.addEventListener(MANUAL_DISCONNECT_EVENT, handler as EventListener);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener(
+          MANUAL_DISCONNECT_EVENT,
+          handler as EventListener
+        );
+      }
+    };
+  }, []);
+
+  return hasManualDisconnect;
+}
+
 function useFarcasterAutoConnect() {
   const { isConnected } = useAccount();
   const { connect, connectors } = useConnect();
+  const hasManualDisconnect = useManualDisconnectState();
 
   useEffect(() => {
     const isMiniApp =
       typeof window !== "undefined" &&
       (sdk?.isInMiniApp || window.location.href.includes("neynar.app")); // adjust detection
 
-    if (!isMiniApp || isConnected) return;
+    if (!isMiniApp || isConnected || hasManualDisconnect) return;
 
     const farcasterConnector = connectors.find(
       (connector) => connector.id === "farcaster" || connector.name === "Farcaster"
     );
     if (farcasterConnector) {
+      // Connect to Farcaster wallet
+      // Note: User will be prompted to switch to Arbitrum if on wrong chain
+      // via the WalletControls component in WalletTab
       connect({ connector: farcasterConnector });
     }
-  }, [isConnected, connect, connectors]);
+  }, [isConnected, connect, connectors, hasManualDisconnect]);
 }
 
 export const config = createConfig({
   chains: [arbitrum, mainnet],
   transports: {
     [arbitrum.id]: http(),
-    [mainnet.id]: http(),
+    [mainnet.id]: http(), // Needed for chain name detection in WalletTab
   },
   connectors: [
     farcasterMiniApp(),
@@ -83,6 +118,7 @@ export const config = createConfig({
       },
     }),
   ],
+  ssr: false,
 });
 
 const queryClient = new QueryClient();
@@ -104,7 +140,7 @@ function AutoConnectWrapper({ children }: { children: React.ReactNode }) {
 
 export default function Provider({ children }: { children: React.ReactNode }) {
   return (
-    <WagmiProvider config={config}>
+    <WagmiProvider config={config} >
       <QueryClientProvider client={queryClient}>
         <AutoConnectWrapper>{children}</AutoConnectWrapper>
       </QueryClientProvider>

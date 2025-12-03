@@ -51,6 +51,7 @@ import {
 import {
   deleteTriggerXJobForPlan,
   checkTgBalanceForUser,
+  topupTg,
 } from "../../../lib/triggerXIntegration";
 import sdk, {
   AddMiniApp,
@@ -354,6 +355,82 @@ export function HomeTab() {
     };
   }, [isConnected, wagmiWalletClient]);
 
+  const handleTopupTg = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!isConnected || !wagmiWalletClient) {
+      setTopupStatus("Please connect your wallet on Arbitrum first.");
+      return;
+    }
+
+    const amountNumber = Number(topupAmount);
+    if (!topupAmount || isNaN(amountNumber) || amountNumber <= 0) {
+      setTopupStatus("Enter a valid TG amount greater than 0.");
+      return;
+    }
+
+    setIsTopupLoading(true);
+    setTopupStatus(null);
+
+    try {
+      const { BrowserProvider } = await import("ethers");
+      let signer: any = null;
+
+      if (
+        wagmiWalletClient.transport &&
+        (wagmiWalletClient.transport as any).request
+      ) {
+        const provider = new BrowserProvider(wagmiWalletClient.transport as any);
+        const addr = wagmiWalletClient.account?.address;
+        signer = addr
+          ? await provider.getSigner(addr)
+          : await provider.getSigner();
+      } else if (typeof window !== "undefined" && (window as any).ethereum) {
+        const provider = new BrowserProvider((window as any).ethereum);
+        try {
+          const accounts = await provider.send("eth_accounts", []);
+          if (!accounts || accounts.length === 0) {
+            await provider.send("eth_requestAccounts", []);
+          }
+        } catch {
+          // ignore account fetch errors
+        }
+        signer = await provider.getSigner();
+      }
+
+      if (!signer) {
+        setTopupStatus("Could not obtain wallet signer. Please reconnect.");
+        setIsTopupLoading(false);
+        return;
+      }
+
+      const result = await topupTg(amountNumber, signer);
+
+      if (result.success) {
+        setTopupStatus("Top-up of TG successfully completed.");
+        setTopupAmount("");
+
+        try {
+          const balance = await checkTgBalanceForUser(signer);
+          setTgBalance(Number(balance.data?.tgBalance ?? 0));
+        } catch {
+          // ignore balance refresh errors
+        }
+      } else {
+        setTopupStatus(
+          result.error || "Top-up failed. Please try again in a moment."
+        );
+      }
+    } catch (error: any) {
+      setTopupStatus(
+        error?.message
+          ? `Top-up failed: ${error.message}`
+          : "Top-up failed due to an unexpected error."
+      );
+    } finally {
+      setIsTopupLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!tokenSearchQuery.trim()) {
       setTokenSearchResults([]);
@@ -600,6 +677,9 @@ export function HomeTab() {
   const [totalExecutions, setTotalExecutions] = useState(0);
   const [totalValueSwapped, setTotalValueSwapped] = useState(0);
   const [isQuickStatsLoading, setIsQuickStatsLoading] = useState(true);
+  const [topupAmount, setTopupAmount] = useState("");
+  const [isTopupLoading, setIsTopupLoading] = useState(false);
+  const [topupStatus, setTopupStatus] = useState<string | null>(null);
 
   // Fetch quick stats (executions & volume) periodically
   useEffect(() => {
@@ -2264,7 +2344,7 @@ export function HomeTab() {
               <p className="text-4xl font-bold text-white group-hover:text-[#c199e4] transition-colors duration-300">
                 {walletBalanceDisplay}
               </p>
-              <div className="flex flex-wrap items-center gap-2 text-sm text-white/70">
+              {/* <div className="flex flex-wrap items-center gap-2 text-sm text-white/70">
                 <span>Total TG balance:</span>
                 <span className="font-semibold text-white">
                   {tgBalance === null
@@ -2286,7 +2366,7 @@ export function HomeTab() {
                     </div>
                   )}
                 </div>
-              </div>
+              </div> */}
             </div>
           </div>
           <div className="flex flex-col items-end">
@@ -2295,6 +2375,66 @@ export function HomeTab() {
             >
               TOTAL
             </span>
+          </div>
+        </div>
+      </div>
+
+      {/* TG Top-Up Card */}
+      <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl p-6 border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 hover:shadow-lg">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-gradient-to-br from-emerald-400/30 to-emerald-400/20 rounded-full flex items-center justify-center">
+                <HiCurrencyDollar className="text-emerald-300 size-6" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white">
+                  Top up ETH
+                </h3>
+                <p className="text-xs text-white/70">
+                  Add ETH to run your plans smoothly.
+                </p>
+              </div>
+            </div>
+
+            <form
+              onSubmit={handleTopupTg}
+              className="mt-3 flex flex-col sm:flex-row gap-3 items-stretch"
+            >
+              <div className="flex-1">
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.0001"
+                    value={topupAmount}
+                    onChange={(e) => setTopupAmount(e.target.value)}
+                    placeholder="Enter ETH amount"
+                    className="w-full rounded-2xl border border-white/25 bg-black/20 px-4 py-2.5 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-[#c199e4]/60 focus:border-[#c199e4]/60"
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={isTopupLoading || !isConnected}
+                className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#c199e4] to-[#b380db] text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all duration-300"
+              >
+                {isTopupLoading ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>Submit</>
+                )}
+              </button>
+            </form>
+
+            {topupStatus && (
+              <p className="mt-2 text-xs text-white/80">
+                {topupStatus}
+              </p>
+            )}
           </div>
         </div>
       </div>
