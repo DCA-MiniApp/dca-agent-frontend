@@ -114,6 +114,9 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
   try {
     // console.log('🚀 Starting TriggerX job creation for plan:', planId);
     console.log("params", params);
+    console.log('🔍 [TRIGGERX INTEGRATION] userAddress from params:', userAddress);
+    console.log('🔍 [TRIGGERX INTEGRATION] Address length:', userAddress?.length);
+    console.log('🔍 [TRIGGERX INTEGRATION] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(userAddress || ''));
 
     // Step 1: Get token addresses and validate script parameters
     const fromTokenInfo = getTokenInfo(fromToken);
@@ -128,6 +131,10 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
       amount,
       slippage,
     };
+
+    console.log('🔍 [TRIGGERX INTEGRATION] scriptParams.userAddress:', scriptParams.userAddress);
+    console.log('🔍 [TRIGGERX INTEGRATION] scriptParams address length:', scriptParams.userAddress?.length);
+    console.log('🔍 [TRIGGERX INTEGRATION] scriptParams address regex test:', /^0x[a-fA-F0-9]{40}$/.test(scriptParams.userAddress || ''));
 
     const validation = validateDCAScriptParams(scriptParams);
     if (!validation.isValid) {
@@ -150,6 +157,7 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
     const scriptIpfsUrl = `https://ipfs.io/ipfs/${uploadResult.scriptIpfsHash}`;
 
     // Step 3: Create TriggerX job input
+    console.log('🔍 [TRIGGERX INTEGRATION] userAddress before createDCAJobInput:', userAddress);
     const jobInput = createDCAJobInput({
       planId,
       contractAddress: EXECUTOR_CONTRACT_ADDRESS,
@@ -161,6 +169,7 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
       amount,
       scriptIpfsUrl: scriptIpfsUrl,
     });
+    console.log('🔍 [TRIGGERX INTEGRATION] jobInput created (check for userAddress in it):', JSON.stringify(jobInput, null, 2));
 
     // Step 4: Create TriggerX job
     // console.log('⚡ Creating TriggerX job...');
@@ -365,82 +374,82 @@ export function createDCAJobInput(params: {
 /**
  * Complete DCA plan creation workflow with TriggerX integration
  */
-export async function createCompleteDCAPlan(params: {
-  message: string;
-  userAddress: string;
-  planData: {
-    fromToken: string;
-    toToken: string;
-    amount: string;
-    intervalMinutes: number;
-    durationWeeks: number;
-    slippage: string;
-  };
-}): Promise<TriggerXJobCreationResult> {
-  const { message, userAddress, planData } = params;
+// export async function createCompleteDCAPlan(params: {
+//   message: string;
+//   userAddress: string;
+//   planData: {
+//     fromToken: string;
+//     toToken: string;
+//     amount: string;
+//     intervalMinutes: number;
+//     durationWeeks: number;
+//     slippage: string;
+//   };
+// }): Promise<TriggerXJobCreationResult> {
+//   const { message, userAddress, planData } = params;
 
-  try {
-    // console.log('🚀 Starting complete DCA plan creation workflow...');
+//   try {
+//     // console.log('🚀 Starting complete DCA plan creation workflow...');
 
-    // 1. Create the DCA plan through chat
-    console.log('📝 Creating DCA plan via chat...');
-    const planResponse = await fetch('/api/dca-chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message,
-        userAddress,
-        isPlanCreationRequest: true,
-      }),
-    });
+//     // 1. Create the DCA plan through chat
+//     console.log('📝 Creating DCA plan via chat...');
+//     const planResponse = await fetch('/api/dca-chat', {
+//       method: 'POST',
+//       headers: { 'Content-Type': 'application/json' },
+//       body: JSON.stringify({
+//         message,
+//         userAddress,
+//         isPlanCreationRequest: true,
+//       }),
+//     });
 
-    const planResult = await planResponse.json();
+//     const planResult = await planResponse.json();
 
-    if (!planResult.success) {
-      throw new Error('Failed to create DCA plan');
-    }
+//     if (!planResult.success) {
+//       throw new Error('Failed to create DCA plan');
+//     }
 
-    const planId = planResult.data.id;
-    console.log('✅ DCA plan created:', planId);
+//     const planId = planResult.data.id;
+//     console.log('✅ DCA plan created:', planId);
 
-    // 2. Get signer and create complete TriggerX job
-    console.log('🔐 Getting wallet signer...');
-    const signer = await getSignerFromWallet();
+//     // 2. Get signer and create complete TriggerX job
+//     console.log('🔐 Getting wallet signer...');
+//     const signer = await getSignerFromWallet();
 
-    console.log('⚡ Creating TriggerX job with dynamic script...');
-    const result = await createTriggerXJobForPlan({
-      planId,
-      userAddress,
-      fromToken: planData.fromToken,
-      toToken: planData.toToken,
-      amount: planData.amount,
-      intervalMinutes: planData.intervalMinutes,
-      durationWeeks: planData.durationWeeks,
-      slippage: planData.slippage,
-      signer,
-    });
+//     console.log('⚡ Creating TriggerX job with dynamic script...');
+//     const result = await createTriggerXJobForPlan({
+//       planId,
+//       userAddress,
+//       fromToken: planData.fromToken,
+//       toToken: planData.toToken,
+//       amount: planData.amount,
+//       intervalMinutes: planData.intervalMinutes,
+//       durationWeeks: planData.durationWeeks,
+//       slippage: planData.slippage,
+//       signer,
+//     });
 
-    if (result.success) {
-      console.log('🎉 Complete DCA workflow finished successfully!');
-      console.log('📊 Job ID:', result.jobId);
-      console.log('🔗 Script IPFS:', result.scriptIpfsUrl);
-    } else {
-      console.error('❌ DCA workflow failed:', result.error);
-    }
+//     if (result.success) {
+//       console.log('🎉 Complete DCA workflow finished successfully!');
+//       console.log('📊 Job ID:', result.jobId);
+//       console.log('🔗 Script IPFS:', result.scriptIpfsUrl);
+//     } else {
+//       console.error('❌ DCA workflow failed:', result.error);
+//     }
 
-    return result;
+//     return result;
 
-  } catch (error) {
-    console.error('❌ Complete DCA plan creation failed:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+//   } catch (error) {
+//     console.error('❌ Complete DCA plan creation failed:', error);
+//     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-    return {
-      success: false,
-      planId: '',
-      error: errorMessage,
-    };
-  }
-}
+//     return {
+//       success: false,
+//       planId: '',
+//       error: errorMessage,
+//     };
+//   }
+// }
 
 /**
  * Get plan details including job and IPFS information

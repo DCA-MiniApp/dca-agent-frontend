@@ -188,6 +188,9 @@ export async function getEthersSigner(
       );
       console.log("Wallet Client:", walletClient);
       console.log("Wallet Client chain ID:", walletClient?.chain?.id);
+      console.log('🔍 [GET ETHERS SIGNER] walletClient.account.address:', walletClient.account?.address);
+      console.log('🔍 [GET ETHERS SIGNER] Address length:', walletClient.account?.address?.length);
+      console.log('🔍 [GET ETHERS SIGNER] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(walletClient.account?.address || ''));
 
       const requestFn = (walletClient.transport as any).request;
       if (typeof requestFn === "function") {
@@ -212,6 +215,9 @@ export async function getEthersSigner(
           console.log("Signer:", signer);
 
           const address = await signer.getAddress();
+          console.log('🔍 [GET ETHERS SIGNER] Signer address (Wagmi path):', address);
+          console.log('🔍 [GET ETHERS SIGNER] Signer address length:', address?.length);
+          console.log('🔍 [GET ETHERS SIGNER] Signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
           try {
             const balance = await provider.getBalance(address);
             console.log(
@@ -258,6 +264,9 @@ export async function getEthersSigner(
       ]);
 
       const address = await signer.getAddress();
+      console.log('🔍 [GET ETHERS SIGNER] Signer address (Farcaster SDK path):', address);
+      console.log('🔍 [GET ETHERS SIGNER] Signer address length:', address?.length);
+      console.log('🔍 [GET ETHERS SIGNER] Signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
       try {
         const balance = await provider.getBalance(address);
         console.log("Balance of signer (Farcaster SDK):", balance.toString());
@@ -307,6 +316,9 @@ export async function getEthersSigner(
       ]);
 
       const address = await signer.getAddress();
+      console.log('🔍 [GET ETHERS SIGNER] Signer address (window.ethereum path):', address);
+      console.log('🔍 [GET ETHERS SIGNER] Signer address length:', address?.length);
+      console.log('🔍 [GET ETHERS SIGNER] Signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
       console.log("Signer obtained via window.ethereum:", address);
       return signer;
     }
@@ -675,6 +687,10 @@ export function ActionsTab() {
       // Determine if this is a plan creation request
       const isPlanRequest = isPlanCreationRequest(currentInput);
 
+      console.log('🔍 [ACTIONS TAB] Sending to DCA chat API with address:', address);
+      console.log('🔍 [ACTIONS TAB] Address length:', address?.length);
+      console.log('🔍 [ACTIONS TAB] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
+
       // Call our DCA chat API endpoint
       const response = await fetch("/api/dca-chat", {
         method: "POST",
@@ -1022,9 +1038,13 @@ export function ActionsTab() {
               // ✅ Just call the function with connector and walletClient
               ethersSigner = await getEthersSigner(walletClient, connector);
 
+              const signerAddress = await ethersSigner.getAddress();
+              console.log('🔍 [ACTIONS TAB] Final signer address before TriggerX job:', signerAddress);
+              console.log('🔍 [ACTIONS TAB] Final signer address length:', signerAddress?.length);
+              console.log('🔍 [ACTIONS TAB] Final signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(signerAddress || ''));
               console.log(
                 "✅ Signer obtained successfully:",
-                await ethersSigner.getAddress()
+                signerAddress
               );
               console.log("Signer value:", ethersSigner);
 

@@ -59,6 +59,9 @@ export async function POST(request: NextRequest) {
     const { message, userAddress, conversationHistory, confirmationId, action, isPlanCreationRequest, fid } = ChatRequestSchema.parse(body);
 
     console.log('[DCA Chat API] Received:', { message, userAddress, confirmationId, action, isPlanCreationRequest });
+    console.log('🔍 [DCA CHAT API] Received userAddress:', userAddress);
+    console.log('🔍 [DCA CHAT API] Address length:', userAddress?.length);
+    console.log('🔍 [DCA CHAT API] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(userAddress || ''));
 
     const dollarIntent = detectDollarIntent(message || "");
 
@@ -238,6 +241,9 @@ async function handleConfirmationAction(
       planSessionManager.clearSession(userAddress);
       
       // Create instruction for VibeKit agent
+      console.log('🔍 [DCA CHAT API CONFIRMATION] userAddress before VibeKit:', userAddress);
+      console.log('🔍 [DCA CHAT API CONFIRMATION] Address length:', userAddress?.length);
+      console.log('🔍 [DCA CHAT API CONFIRMATION] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(userAddress || ''));
       const createInstruction = `Create DCA plan: Invest ${planData.amount} ${planData.fromToken} into ${planData.toToken} every ${planData.interval} for ${planData.duration} with ${planData.slippage || 2}% slippage`;
       const vibekitResponse = await sendToVibeKitAgent(createInstruction, userAddress, [], fid);
       
@@ -431,6 +437,9 @@ async function sendToVibeKitAgent(
   try {
     console.log('[VibeKit Agent] Sending instruction:', message);
     console.log('[VibeKit Agent] User address:', userAddress);
+    console.log('🔍 [SEND TO VIBEKIT] userAddress before sending:', userAddress);
+    console.log('🔍 [SEND TO VIBEKIT] Address length:', userAddress?.length);
+    console.log('🔍 [SEND TO VIBEKIT] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(userAddress || ''));
     
     // Generate unique request ID to avoid conflicts
     const requestId = Date.now() + Math.floor(Math.random() * 1000);
@@ -456,6 +465,8 @@ async function sendToVibeKitAgent(
       }
     };
     
+    console.log('🔍 [SEND TO VIBEKIT] Request body arguments:', requestBody.params.arguments);
+    console.log('🔍 [SEND TO VIBEKIT] userAddress in request body:', requestBody.params.arguments.userAddress);
     
     // Send to DCA skill via MCP tool call format using the session ID
     const response = await fetch(`${DCA_BACKEND_URL}/messages?sessionId=${sessionId}`, {
