@@ -11,9 +11,7 @@ import {
 } from "react-icons/hi2";
 import { HiOutlineChartBar } from "react-icons/hi";
 import { PiStrategyBold } from "react-icons/pi";
-import { FaCircleUser } from "react-icons/fa6";
 import { LiaDonateSolid } from "react-icons/lia";
-import { IoCopySharp } from "react-icons/io5";
 import {
   HiOutlineWallet,
   HiOutlineDocumentChartBar,
@@ -61,6 +59,14 @@ import sdk, {
   type Context,
 } from "@farcaster/miniapp-sdk";
 import { useFooterVisibility } from "../FooterVisibilityContext";
+import { parseEther } from "ethers";
+
+// Simple in-memory cache for platform quick stats (shared across renders)
+let quickStatsCache: {
+  totalExecutions: number;
+  totalValueSwapped: number;
+  fetchedAt: number;
+} | null = null;
 
 // Legacy interface for compatibility - will be replaced with DCAPlan
 /**
@@ -363,6 +369,7 @@ export function HomeTab() {
     }
 
     const amountNumber = Number(topupAmount);
+    // const amountInWei = parseEther(topupAmount || "0"); 
     if (!topupAmount || isNaN(amountNumber) || amountNumber <= 0) {
       setTopupStatus("Enter a valid TG amount greater than 0.");
       return;
@@ -379,7 +386,9 @@ export function HomeTab() {
         wagmiWalletClient.transport &&
         (wagmiWalletClient.transport as any).request
       ) {
-        const provider = new BrowserProvider(wagmiWalletClient.transport as any);
+        const provider = new BrowserProvider(
+          wagmiWalletClient.transport as any
+        );
         const addr = wagmiWalletClient.account?.address;
         signer = addr
           ? await provider.getSigner(addr)
@@ -691,22 +700,46 @@ export function HomeTab() {
     return () => setFooterVisible(true);
   }, [showOnboarding, setFooterVisible]);
 
-  // Fetch quick stats (executions & volume) periodically
+  // Fetch quick stats (executions & volume) periodically with 5‑minute cache
   useEffect(() => {
     let isCancelled = false;
 
-    const loadQuickStats = async () => {
+    const loadQuickStats = async (opts?: { fromInterval?: boolean }) => {
       try {
-        setIsQuickStatsLoading(true);
+        const now = Date.now();
+
+        // Use cached stats if they are fresher than 2 minutes
+        if (
+          !opts?.fromInterval &&
+          quickStatsCache &&
+          now - quickStatsCache.fetchedAt < 2 * 60 * 1000
+        ) {
+          setTotalExecutions(quickStatsCache.totalExecutions);
+          setTotalValueSwapped(quickStatsCache.totalValueSwapped);
+          setIsQuickStatsLoading(false);
+          return;
+        }
+
+        if (!opts?.fromInterval) {
+          setIsQuickStatsLoading(true);
+        }
+
         const stats = await fetchQuickStats();
         if (isCancelled) return;
 
-        if (stats) {
-          setTotalExecutions(stats.total_job_live_count ?? 0);
-          setTotalValueSwapped(stats.total_value_swapped ?? 0);
-        } else {
-          setTotalExecutions(0);
-          setTotalValueSwapped(0);
+        const nextExecutions = stats?.total_job_live_count ?? 0;
+        const nextVolume = stats?.total_value_swapped ?? 0;
+
+        setTotalExecutions(nextExecutions);
+        setTotalValueSwapped(nextVolume);
+
+        // Only cache if both values are not zero
+        if (nextExecutions !== 0 || nextVolume !== 0) {
+          quickStatsCache = {
+            totalExecutions: nextExecutions,
+            totalValueSwapped: nextVolume,
+            fetchedAt: now,
+          };
         }
       } catch (error) {
         if (!isCancelled) {
@@ -720,8 +753,14 @@ export function HomeTab() {
       }
     };
 
+    // Initial load (will use cache if warm)
     loadQuickStats();
-    const intervalId = setInterval(loadQuickStats, 600_000); // 10 minutes
+
+    // Background refresh every 10 minutes (won't flicker UI)
+    const intervalId = setInterval(
+      () => loadQuickStats({ fromInterval: true }),
+      600_000
+    );
 
     return () => {
       isCancelled = true;
@@ -1818,41 +1857,76 @@ export function HomeTab() {
         )}
       </div>
 
-      <div
-        className={`bg-gradient-to-r from-[#c199e4]/10 to-white/5 rounded-3xl p-4 sm:p-5 border border-[#c199e4]/30 shadow-lg flex flex-col gap-3 mb-2 hover:shadow-xl hover:border-[#c199e4]/50 transition-all duration-500 ${
-          isQuickStatsLoading ? "opacity-60" : "opacity-100"
-        }`}
-      >
-        {/* Header */}
-        <div className="flex items-center gap-2 mb-1">
-          <h2 className="text-base font-bold text-white">Platform Statistics</h2>
-          <span className="text-xs text-white/50">(Across All Users)</span>
-        </div>
-        
-        {/* Stats */}
-        <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-bold text-[#c199e4] leading-tight">
-            {isQuickStatsLoading ? (
-              <span className="inline-block w-16 h-8 bg-white/20 rounded animate-pulse" />
-            ) : (
-              totalExecutions
-            )}
-          </span>
-          <span className="text-sm text-white/70 whitespace-nowrap">
-            Successful executions
-          </span>
-        </div>
-        <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-bold text-emerald-400 leading-tight">
-            {isQuickStatsLoading ? (
-              <span className="inline-block w-24 h-8 bg-white/20 rounded animate-pulse" />
-            ) : (
-              `$${Math.round(totalValueSwapped).toLocaleString()}`
-            )}
-          </span>
-          <span className="text-sm text-white/70 whitespace-nowrap">
-            Total volume swapped
-          </span>
+      <div className="group relative overflow-hidden bg-gradient-to-r from-[#c199e4]/10 to-white/5 rounded-3xl p-6 border border-[#c199e4]/30 shadow-lg flex flex-col gap-4 mb-4 hover:shadow-xl hover:border-[#c199e4]/50 transition-all duration-500">
+        {/* Animated background gradient */}
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-600/5 to-blue-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+        {/* Content container */}
+        <div className="relative z-10 space-y-6">
+          {/* Header */}
+          <div className="flex items-start justify-between">
+            <div className="space-y-0.5">
+              <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                {/* <Activity className="w-5 h-5 text-purple-400" /> */}
+                Platform Statistics
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">Across all users</p>
+            </div>
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Stat 1: Executions */}
+            <div className="group/card rounded-xl bg-gradient-to-br from-white/5 to-transparent border border-slate-700/30 p-4 transition-all duration-300 hover:border-purple-500/40">
+              <div className="flex items-start justify-between mb-3">
+                <span className="text-xs text-slate-400 font-medium">
+                  Executions
+                </span>
+              </div>
+              <div className="space-y-1">
+                {isQuickStatsLoading ? (
+                  <div className="h-8 w-20 bg-slate-700 rounded animate-pulse" />
+                ) : (
+                  <div className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-purple-300">
+                    {totalExecutions.toLocaleString()}
+                  </div>
+                )}
+                <div className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  <span className="text-xs text-slate-400">Successful</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Stat 2: Volume Swapped */}
+            <div className="group/card rounded-xl bg-gradient-to-br from-white/5 to-transparent border border-slate-700/30 p-4 transition-all duration-300  hover:border-emerald-500/40">
+              <div className="flex items-start justify-between mb-3">
+                <span className="text-xs text-slate-400 font-medium">
+                  Volume
+                </span>
+              </div>
+              <div className="space-y-1">
+                {isQuickStatsLoading ? (
+                  <div className="h-8 w-24 bg-slate-700 rounded animate-pulse" />
+                ) : (
+                  <div className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-300">
+                    ${(totalValueSwapped / 1000000).toFixed(1)}
+                  </div>
+                )}
+                <div className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                  <span className="text-xs text-slate-400">Total swapped</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer Info */}
+          <div className="pt-2 border-t border-slate-700/30">
+            <p className="text-xs text-slate-500">
+              Updated <span className="text-slate-400">2 minutes ago</span>
+            </p>
+          </div>
         </div>
       </div>
 
@@ -2398,9 +2472,7 @@ export function HomeTab() {
                 <HiCurrencyDollar className="text-emerald-300 size-6" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-white">
-                  Top up ETH
-                </h3>
+                <h3 className="text-sm font-semibold text-white">Top up ETH</h3>
                 <p className="text-xs text-white/70">
                   Add ETH to run your plans smoothly.
                 </p>
@@ -2435,19 +2507,72 @@ export function HomeTab() {
                     Processing...
                   </>
                 ) : (
-                  <>Submit</>
+                  <>Deposit</>
                 )}
               </button>
             </form>
 
             {topupStatus && (
-              <p className="mt-2 text-xs text-white/80">
-                {topupStatus}
-              </p>
+              <p className="mt-2 text-xs text-white/80">{topupStatus}</p>
             )}
           </div>
         </div>
       </div>
+
+        {/* <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl p-6 border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 hover:shadow-lg">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-gradient-to-br from-emerald-400/30 to-emerald-400/20 rounded-full flex items-center justify-center">
+                <HiCurrencyDollar className="text-emerald-300 size-6" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white">Withdraw ETH</h3>
+                <p className="text-xs text-white/70">
+                  Wirthdraw your ETH.
+                </p>
+              </div>
+            </div>
+
+            <form
+              onSubmit={handleTopupTg}
+              className="mt-3 flex flex-col sm:flex-row gap-3 items-stretch"
+            >
+              <div className="flex-1">
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.0001"
+                    value={topupAmount}
+                    onChange={(e) => setTopupAmount(e.target.value)}
+                    placeholder="Enter ETH amount"
+                    className="w-full rounded-2xl border border-white/25 bg-black/20 px-4 py-2.5 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-[#c199e4]/60 focus:border-[#c199e4]/60"
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={isTopupLoading || !isConnected}
+                className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#c199e4] to-[#b380db] text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all duration-300"
+              >
+                {isTopupLoading ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>Withdraw</>
+                )}
+              </button>
+            </form>
+
+            {topupStatus && (
+              <p className="mt-2 text-xs text-white/80">{topupStatus}</p>
+            )}
+          </div>
+        </div>
+      </div> */}
 
       {/* Plan Details Modal */}
       {showPlanModal && selectedPlan && (
@@ -2489,7 +2614,9 @@ export function HomeTab() {
                             : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
                         }`}
                       >
-                        {selectedPlan.jobStatus || selectedPlan.status || "Unknown"}
+                        {selectedPlan.jobStatus ||
+                          selectedPlan.status ||
+                          "Unknown"}
                       </span>
                     </p>
                   </div>
