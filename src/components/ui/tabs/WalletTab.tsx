@@ -663,6 +663,10 @@ export function WalletTab() {
       const fid = user?.fid;
       // if (!fid) return;
 
+      console.log('🔍 [WALLET TAB] Address from wallet connection:', address);
+      console.log('🔍 [WALLET TAB] Address length:', address?.length);
+      console.log('🔍 [WALLET TAB] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
+
       await storeUser({
         fid: String(fid || "727291"),
         userAddress: address,

@@ -19,6 +19,7 @@ export interface DCAPlanData {
     amountUsd: number;
     tokenPriceUsd: number;
   };
+  _isDollarAmount?: boolean; // Internal flag to indicate if amount is in USD
 }
 
 // Legacy interface for backward compatibility during transition
@@ -120,6 +121,7 @@ export class GPTIntelligenceService {
           currentPlanData
         );
       } else {
+        console.log("No OpenAI API key, falling back to rule-based extraction");
         // Fallback to rule-based extraction
         return this.extractWithRules(userMessage, currentPlanData);
       }
@@ -147,10 +149,17 @@ Available Tokens: ${tokenSymbols.join(", ")} (and more)
 Extract these parameters:
 - fromToken: Source token symbol 
 - toToken: Target token symbol
-- amount: Investment amount per execution
+- amount: Investment amount per execution (IMPORTANT: extract the numeric value only, not currency)
 - interval: Frequency string ("2 minutes", "daily", "weekly", etc.)
 - duration: Duration string ("1 day", "3 weeks", "2 months", etc.)
 - slippage: Optional slippage percentage
+- _isDollarAmount: true if user specified dollar amount (e.g., "$10 of ETH", "0.1 dollar of WETH"), false if token amount (e.g., "0.1 ETH", "10 USDC")
+
+EXAMPLES:
+- "0.1 dollar of WETH" → amount: "0.1", _isDollarAmount: true, fromToken: "WETH"
+- "0.1 WETH" → amount: "0.1", _isDollarAmount: false, fromToken: "WETH"
+- "$5 worth of ETH" → amount: "5", _isDollarAmount: true, fromToken: "ETH"
+- "10 USDC into ETH" → amount: "10", _isDollarAmount: false, fromToken: "USDC"
 
 CRITICAL: Your response must be ONLY valid JSON in this exact format:
 {
@@ -160,7 +169,8 @@ CRITICAL: Your response must be ONLY valid JSON in this exact format:
     "amount": null,
     "interval": null,
     "duration": null,
-    "slippage": null
+    "slippage": null,
+    "_isDollarAmount": null
   },
   "missingFields": [],
   "nextQuestion": "text",
@@ -299,12 +309,27 @@ Extract any new DCA parameters from this message and provide the next question f
     const lowerMessage = message.toLowerCase();
     const extracted: Partial<DCAPlanData> = {};
 
-    // Extract amount
-    const amountMatch = message.match(
-      /(\d+(?:\.\d+)?)\s*(?:usdc|usdt|dai|eth|btc|arb|weth|wbtc|dollars?|\$)/i
+    // Extract amount - improved to handle dollar intent better
+    // First check for dollar patterns ($ or "dollar" word)
+    const dollarAmountMatch = message.match(
+      /(\d+(?:\.\d+)?)\s*(?:dollars?|\$)\s*(?:of|worth\s*of)?\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i
     );
-    if (amountMatch) {
-      extracted.amount = amountMatch[1];
+    
+    if (dollarAmountMatch) {
+      // User wants X dollars worth of token - mark this for USD conversion
+      extracted.amount = dollarAmountMatch[1];
+      (extracted as any)._isDollarAmount = true; // Internal flag for USD conversion
+      console.log('🔍 [GPT Intelligence] Detected dollar amount pattern:', dollarAmountMatch[0], 'Amount:', dollarAmountMatch[1]);
+    } else {
+      // Check for regular token amount pattern
+      const tokenAmountMatch = message.match(
+        /(\d+(?:\.\d+)?)\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i
+      );
+      if (tokenAmountMatch) {
+        extracted.amount = tokenAmountMatch[1];
+        (extracted as any)._isDollarAmount = false;
+        console.log('🔍 [GPT Intelligence] Detected token amount pattern:', tokenAmountMatch[0], 'Amount:', tokenAmountMatch[1]);
+      }
     }
 
     // Extract tokens
@@ -482,8 +507,22 @@ Extract any new DCA parameters from this message and provide the next question f
       return `${address.slice(0, 8)}...${address.slice(-6)}`;
     };
 
+    // Determine if this was originally a dollar amount request
+    const wasOriginallyDollarAmount = planData.usdEstimate && 
+      planData.usdEstimate.amountUsd && 
+      planData.usdEstimate.tokenPriceUsd &&
+      Math.abs((Number(planData.amount) * planData.usdEstimate.tokenPriceUsd) - planData.usdEstimate.amountUsd) > 0.01;
+
+    const investmentLine = wasOriginallyDollarAmount
+      ? `• Investment: $${planData.usdEstimate!.amountUsd.toFixed(2)} worth of ${planData.fromToken} (${planData.amount} ${planData.fromToken})`
+      : `• Investment: ${planData.amount} ${planData.fromToken}${
+          planData.usdEstimate
+            ? ` (~$${planData.usdEstimate.amountUsd.toFixed(2)})`
+            : ""
+        }`;
+
     const usdLine =
-      planData.usdEstimate && isFinite(planData.usdEstimate.amountUsd)
+      planData.usdEstimate && isFinite(planData.usdEstimate.amountUsd) && !wasOriginallyDollarAmount
         ? `• USD equivalent (per execution): ~$${planData.usdEstimate.amountUsd.toFixed(
             2
           )}\n`
@@ -491,11 +530,7 @@ Extract any new DCA parameters from this message and provide the next question f
 
     return (
       `📊 **DCA Plan Summary:**\n` +
-      `• Investment: ${planData.amount} ${planData.fromToken}${
-        planData.usdEstimate
-          ? ` (~$${planData.usdEstimate.amountUsd.toFixed(2)})`
-          : ""
-      }\n` +
+      `${investmentLine}\n` +
       `• Target: ${planData.toToken}\n` +
       `• Duration: ${planData.duration}\n` +
       `• Interval: ${planData.interval}\n` +
@@ -602,51 +637,114 @@ export interface DollarIntentResult {
 
 export function detectDollarIntent(message: string): DollarIntentResult {
   if (!message) return { detected: false };
+  
+  console.log('🔍 [Dollar Intent] Analyzing message:', message);
+  
   const normalized = message.replace(/,/g, "");
+  const lowerMessage = normalized.toLowerCase();
+  
+  // Check for patterns like "X dollar of TOKEN", "$X of TOKEN", "X dollars worth of TOKEN"
+  const dollarOfTokenPattern = /(\d+(?:\.\d+)?)\s*(?:dollars?|\$)\s*(?:of|worth\s*of)\s*(?:usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i;
+  const dollarOfTokenMatch = normalized.match(dollarOfTokenPattern);
+  
+  if (dollarOfTokenMatch) {
+    console.log('🔍 [Dollar Intent] Found "dollar of token" pattern:', dollarOfTokenMatch[0]);
+    return { 
+      detected: true, 
+      usdAmount: parseFloat(dollarOfTokenMatch[1]) 
+    };
+  }
+
+  // Check for simple $ patterns
   const hasDollarSymbol = /\$/.test(normalized);
-  const hasUsdWord = /usd|dollar/.test(normalized.toLowerCase());
+  const hasUsdWord = /usd|dollar/.test(lowerMessage);
   let usdAmount: number | undefined;
 
   if (hasDollarSymbol) {
     const match = normalized.match(/\$\s*(\d+(?:\.\d+)?)/);
     if (match) {
       usdAmount = parseFloat(match[1]);
+      console.log('🔍 [Dollar Intent] Found $ symbol pattern:', match[0]);
     }
   }
 
-  if (usdAmount === undefined) {
+  if (usdAmount === undefined && hasUsdWord) {
     const match = normalized.match(/(\d+(?:\.\d+)?)\s*(usd|dollars?)/i);
     if (match) {
       usdAmount = parseFloat(match[1]);
+      console.log('🔍 [Dollar Intent] Found USD word pattern:', match[0]);
     }
   }
 
-  return { detected: hasDollarSymbol || hasUsdWord, usdAmount };
+  const result = { detected: hasDollarSymbol || hasUsdWord, usdAmount };
+  console.log('🔍 [Dollar Intent] Final result:', result);
+  return result;
 }
 
 export async function applyUsdIntelligence(
   planData: DCAPlanData,
   usdInputAmount?: number
 ): Promise<void> {
+  console.log('🔍 [USD Intelligence] Input:', { planData, usdInputAmount });
+  
   const priceInfo = await fetchTokenUsdPrice(planData.fromToken);
-  if (!priceInfo) return;
+  if (!priceInfo) {
+    console.log('🔍 [USD Intelligence] No price info found for token:', planData.fromToken);
+    return;
+  }
 
-  if (usdInputAmount && usdInputAmount > 0) {
-    const tokenAmount = usdInputAmount / priceInfo.priceUsd;
+  console.log('🔍 [USD Intelligence] Price info:', priceInfo);
+
+  // Check if the amount is specified in dollars (either from detectDollarIntent or internal flag)
+  const isDollarAmount = planData._isDollarAmount || (usdInputAmount && usdInputAmount > 0);
+  const dollarAmount = usdInputAmount || (isDollarAmount ? Number(planData.amount) : 0);
+
+  console.log('🔍 [USD Intelligence] Analysis:', { 
+    isDollarAmount, 
+    dollarAmount, 
+    _isDollarAmount: planData._isDollarAmount,
+    originalAmount: planData.amount 
+  });
+
+  if (isDollarAmount && dollarAmount > 0) {
+    // Convert USD amount to token amount
+    const tokenAmount = dollarAmount / priceInfo.priceUsd;
     const formattedTokenAmount = Number(tokenAmount.toFixed(8)).toString();
+    
+    console.log('🔍 [USD Intelligence] Converting USD to token:', {
+      dollarAmount,
+      tokenPrice: priceInfo.priceUsd,
+      calculatedTokenAmount: tokenAmount,
+      formattedTokenAmount
+    });
+    
     planData.amount = formattedTokenAmount;
     planData.usdEstimate = {
-      amountUsd: usdInputAmount,
+      amountUsd: dollarAmount,
       tokenPriceUsd: priceInfo.priceUsd,
     };
+    // Clean up internal flag
+    delete planData._isDollarAmount;
   } else {
+    // Amount is in token units, calculate USD equivalent
     const tokenAmount = Number(planData.amount);
     if (!isFinite(tokenAmount) || tokenAmount <= 0) return;
+    
+    console.log('🔍 [USD Intelligence] Calculating USD equivalent for token amount:', {
+      tokenAmount,
+      tokenPrice: priceInfo.priceUsd,
+      usdEquivalent: tokenAmount * priceInfo.priceUsd
+    });
+    
     planData.usdEstimate = {
       amountUsd: tokenAmount * priceInfo.priceUsd,
       tokenPriceUsd: priceInfo.priceUsd,
     };
+    // Clean up internal flag
+    delete planData._isDollarAmount;
   }
+  
+  console.log('🔍 [USD Intelligence] Final planData:', planData);
 }
 
 /**
