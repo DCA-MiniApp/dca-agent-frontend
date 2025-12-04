@@ -17,6 +17,7 @@ import {
   IoLockClosed,
   IoArrowDown,
   IoFilter,
+  IoCheckmarkDone,
 } from "react-icons/io5";
 import { fetchPlatformStatsForMonitor, type JobMonitorData, type JobMonitorUser } from "~/lib/api";
 
@@ -134,7 +135,7 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
   // Filter and sort users based on search query and sort options
   const filteredUsers = useMemo(() => {
     if (!data?.users) return [];
-    
+
     // First, filter by search query
     let filtered = data.users;
     if (searchQuery.trim()) {
@@ -412,7 +413,7 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
         </div>
 
         {/* Key Metrics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-6 gap-3">
           {/* Total Users */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -447,6 +448,26 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
             </div>
             <div className="text-sm text-gray-400">Completed Job</div>
           </motion.div>
+
+
+          {/* Succesful task count */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-gray-800/50 backdrop-blur-lg rounded-xl p-5 border border-gray-700/50 hover:border-cyan-500/50 transition-all"
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-cyan-500/20 rounded-lg flex items-center justify-center border border-cyan-500/30">
+                <IoCheckmarkDone className="w-6 h-6 text-cyan-400" />
+              </div>
+            </div>
+            <div className="text-3xl font-bold text-white mb-1">
+              {data.total_successful_task}
+            </div>
+            <div className="text-sm text-gray-400">Succesful Task</div>
+          </motion.div>
+
 
           {/* Processing */}
           <motion.div
@@ -596,95 +617,95 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                     const addressCopyKey = `${user.Address}-${user.jobid}`;
 
                     return (
-                    <tr
-                      key={user.jobid}
-                      className="border-b border-gray-700/30 hover:bg-gray-700/20 transition-colors cursor-pointer"
-                      onClick={() => setSelectedUser(user)}
-                    >
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-white font-mono">
-                            {truncateAddressShort(user.Address)}
+                      <tr
+                        key={user.jobid}
+                        className="border-b border-gray-700/30 hover:bg-gray-700/20 transition-colors cursor-pointer"
+                        onClick={() => setSelectedUser(user)}
+                      >
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-white font-mono">
+                              {truncateAddressShort(user.Address)}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCopyAddress(user.Address, addressCopyKey);
+                              }}
+                              className="text-gray-400 hover:text-white transition-colors"
+                            >
+                              {copiedAddressKey === addressCopyKey ? (
+                                <span className="text-green-400 text-xs">Copied!</span>
+                              ) : (
+                                <IoCopyOutline className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-sm text-white font-medium">
+                            {user.fromToken || "N/A"}
                           </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-sm text-white font-medium">
+                            {user.toToken || "N/A"}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-sm text-white font-medium">
+                            {user.amount || "N/A"}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-white font-semibold">
+                              #{String(user.jobid).slice(0, 7)}...{String(user.jobid).slice(-5)}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCopyJobId(String(user.jobid));
+                              }}
+                              className="text-gray-400 hover:text-white transition-colors"
+                              title="Copy Job ID"
+                            >
+                              {copiedJobId === String(user.jobid) ? (
+                                <span className="text-green-400 text-xs">Copied!</span>
+                              ) : (
+                                <IoCopyOutline className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleCopyAddress(user.Address, addressCopyKey);
+                              setSelectedUser(user);
                             }}
-                            className="text-gray-400 hover:text-white transition-colors"
+                            className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 text-purple-300 rounded-full text-sm font-medium border border-purple-500/30 hover:bg-purple-500/30 transition-all"
                           >
-                            {copiedAddressKey === addressCopyKey ? (
-                              <span className="text-green-400 text-xs">Copied!</span>
-                            ) : (
-                              <IoCopyOutline className="w-4 h-4" />
-                            )}
+                            {user.tasks_id.length} tasks
+                            <span className="text-xs">&gt;</span>
                           </button>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className="text-sm text-white font-medium">
-                          {user.fromToken || "N/A"}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className="text-sm text-white font-medium">
-                          {user.toToken || "N/A"}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className="text-sm text-white font-medium">
-                          {user.amount || "N/A"}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-white font-semibold">
-                            #{String(user.jobid).slice(0, 7)}...{String(user.jobid).slice(-5)}
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-sm text-white">
+                            {typeof user.Cost_of_TG === 'string'
+                              ? user.Cost_of_TG
+                              : `$${Number(user.Cost_of_TG).toFixed(6)}`}
                           </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCopyJobId(String(user.jobid));
-                            }}
-                            className="text-gray-400 hover:text-white transition-colors"
-                            title="Copy Job ID"
-                          >
-                            {copiedJobId === String(user.jobid) ? (
-                              <span className="text-green-400 text-xs">Copied!</span>
-                            ) : (
-                              <IoCopyOutline className="w-4 h-4" />
-                            )}
-                          </button>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedUser(user);
-                          }}
-                          className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 text-purple-300 rounded-full text-sm font-medium border border-purple-500/30 hover:bg-purple-500/30 transition-all"
-                        >
-                          {user.tasks_id.length} tasks
-                          <span className="text-xs">&gt;</span>
-                        </button>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className="text-sm text-white">
-                          {typeof user.Cost_of_TG === 'string' 
-                            ? user.Cost_of_TG 
-                            : `$${Number(user.Cost_of_TG).toFixed(6)}`}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className="text-sm text-green-400 font-semibold">
-                          ${user.total_swapped.toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </span>
-                      </td>
-                    </tr>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-sm text-green-400 font-semibold">
+                            ${user.total_swapped.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                        </td>
+                      </tr>
                     );
                   })
                 )}
@@ -712,11 +733,10 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                     <button
                       key={page}
                       onClick={() => setCurrentPage(page)}
-                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                        currentPage === page
-                          ? "bg-blue-500 text-white"
-                          : "bg-gray-700/50 text-gray-300 hover:bg-gray-700"
-                      }`}
+                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${currentPage === page
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-700/50 text-gray-300 hover:bg-gray-700"
+                        }`}
                     >
                       {page}
                     </button>
@@ -857,8 +877,8 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                     <div className="flex justify-between">
                       <span className="text-gray-400">Cost (TG):</span>
                       <span className="text-white font-medium">
-                        {typeof selectedUser.Cost_of_TG === 'string' 
-                          ? selectedUser.Cost_of_TG 
+                        {typeof selectedUser.Cost_of_TG === 'string'
+                          ? selectedUser.Cost_of_TG
                           : `$${Number(selectedUser.Cost_of_TG).toFixed(6)}`}
                       </span>
                     </div>
@@ -900,13 +920,12 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-purple-300 font-medium">Task #{task.task_id}</span>
                             <span
-                              className={`text-xs px-2 py-1 rounded-full ${
-                                task.task_status === "completed"
-                                  ? "bg-green-500/20 text-green-300 border border-green-500/30"
-                                  : task.task_status === "failed"
+                              className={`text-xs px-2 py-1 rounded-full ${task.task_status === "completed"
+                                ? "bg-green-500/20 text-green-300 border border-green-500/30"
+                                : task.task_status === "failed"
                                   ? "bg-red-500/20 text-red-300 border border-red-500/30"
                                   : "bg-yellow-500/20 text-yellow-300 border border-yellow-500/30"
-                              }`}
+                                }`}
                             >
                               {task.task_status}
                             </span>

@@ -5,7 +5,7 @@
  * DCA plans with job details and IPFS metadata.
  */
 
-import { TriggerXClient, createJob, JobType, ArgType, type TimeBasedJobInput, type CreateJobInput, deleteJob,checkTgBalance,topupTg as triggerxTopupTg } from 'sdk-triggerx';
+import { TriggerXClient, createJob, JobType, ArgType, type TimeBasedJobInput, deleteJob, checkEthBalance, depositEth, withdrawEth } from 'sdk-triggerx';
 import { BrowserProvider } from 'ethers';
 import {
   SWAP_EXECUTOR_ABI,
@@ -175,13 +175,13 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
     // console.log('⚡ Creating TriggerX job...');
     const apiKey = process.env.NEXT_PUBLIC_TRIGGERX_API_KEY || '';
     // console.log('🔑 API Key exists:', !!apiKey, 'Length:', apiKey.length);
-    
+
     const client = new TriggerXClient(apiKey);
     // console.log("📡 TriggerX Client:", client);
     console.log("📝 Job Input (full):", JSON.stringify(jobInput, null, 2));
     console.log("🔗 IPFS URL being passed:", jobInput.dynamicArgumentsScriptUrl);
     // console.log("✍️ Signer:", signer);
-    
+
     let result;
     try {
       console.log('📤 Calling createJob...');
@@ -230,7 +230,27 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
 
   } catch (error) {
     console.error('[TriggerX] Failed to create job:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    // Check if this is a balance error with details
+    let errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    if (error && typeof error === 'object') {
+      const errorObj = error as any;
+
+      // Check for BALANCE_ERROR specifically
+      if (errorObj.errorCode === 'BALANCE_ERROR' || errorObj.errorType === 'BALANCE_ERROR' || errorObj.error === 'Failed to deposit ETH balance') {
+        const details = errorObj.details || {};
+        const ethAmount = details.ethAmount;
+
+        if (ethAmount) {
+          // Convert bigint to ETH (assuming wei)
+          const ethAmountInEth = (Number(ethAmount) / 1e18).toFixed(6);
+          errorMessage = `INSUFFICIENT_BALANCE:${ethAmountInEth}`;
+        } else {
+          errorMessage = 'INSUFFICIENT_BALANCE:unknown';
+        }
+      }
+    }
 
     return {
       success: false,
@@ -365,9 +385,9 @@ export function createDCAJobInput(params: {
     dynamicArgumentsScriptUrl: scriptIpfsUrl,
     autotopupTG: DCA_JOB_CONFIG.autotopupTG, // true
     isImua: false, // Add missing isImua field
-    walletMode:'regular', // Add missing walletMode field
+    walletMode: 'regular', // Add missing walletMode field
     safeAddress: '0x27e801a2233D322eB72861F073f9B1F72B103b01', // Add missing safeAddress field
-    language:'go',
+    language: 'go',
   };
 }
 
@@ -419,7 +439,7 @@ export async function minimalTriggerXExample() {
     abi: '[...]',
     arguments: ['plan-id'],
     autotopupTG: true,
-    safeAddress:'0x27e801a2233D322eB72861F073f9B1F72B103b01'
+    safeAddress: '0x27e801a2233D322eB72861F073f9B1F72B103b01'
   };
 
   // 2. Create client and job
@@ -469,24 +489,24 @@ export async function deleteTriggerXJobForPlan(jobId: string, signer: any, chain
 
         // Intercept sendTransaction to catch user rejections
         if (prop === 'sendTransaction') {
-          return async function(...args: any[]) {
+          return async function (...args: any[]) {
             try {
               const result = await (original as (...args: any[]) => any).apply(target, args);
               return result;
             } catch (error: any) {
               const msg = (error?.message || '').toString().toLowerCase();
               const code = error?.code || error?.error?.code;
-              
+
               // Check if this is a user rejection
-              const isUserRejection = 
-                code === 'ACTION_REJECTED' || 
-                code === 4001 || 
+              const isUserRejection =
+                code === 'ACTION_REJECTED' ||
+                code === 4001 ||
                 code === 'USER_REJECTED' ||
                 /rejected/i.test(msg) ||
                 /user.*cancel/i.test(msg) ||
                 /user.*denied/i.test(msg) ||
                 /cancelled/i.test(msg);
-              
+
               if (isUserRejection) {
                 // Throw a specific error that we can catch
                 const rejectionError: any = new Error('user_rejected');
@@ -511,28 +531,28 @@ export async function deleteTriggerXJobForPlan(jobId: string, signer: any, chain
     try {
       const result = await deleteJob(client, jobId, wrappedSigner, chainId);
       console.log('deleteJob result:', result);
-      
+
       // Check if result is an object with success property (like createJob)
       if (result && typeof result === 'object') {
         const resultAny = result as any;
-        
+
         // If result has success: false, it might indicate user rejection
         if (result.success === false) {
           const errorMsg = (result.error || resultAny.message || '').toString().toLowerCase();
-          const isUserRejection = 
+          const isUserRejection =
             /rejected/i.test(errorMsg) ||
             /user.*cancel/i.test(errorMsg) ||
             /user.*denied/i.test(errorMsg) ||
             /cancelled/i.test(errorMsg) ||
             errorMsg.includes('rejected') ||
             errorMsg.includes('user cancelled');
-          
+
           if (isUserRejection) {
             return { success: false, error: 'user_rejected' };
           }
           return { success: false, error: errorMsg || 'delete_failed' };
         }
-        
+
         // If result has success: true, check if there's any indication of rejection
         if (result.success === true) {
           // Check if transaction hash exists - if user rejected, there might be no hash
@@ -545,27 +565,27 @@ export async function deleteTriggerXJobForPlan(jobId: string, signer: any, chain
           return { success: true };
         }
       }
-      
+
       // If result doesn't have expected structure, assume success
       // console.log('✅ TriggerX job deleted successfully:', jobId, signer, chainId);
       return { success: true };
     } catch (apiError: any) {
       console.error('❌ Error deleting job via SDK:', apiError);
-      
+
       // Check if this is a user rejection from the wrapped signer
       if (apiError?.isUserRejection || apiError?.message === 'user_rejected') {
         console.log('ℹ️ User rejected the transaction');
         return { success: false, error: 'user_rejected' };
       }
-      
+
       const msg = (apiError?.message || '').toString().toLowerCase();
       const code = apiError?.code || apiError?.error?.code || apiError?.info?.error?.code;
       console.log('Error code:', code);
-      
+
       // Enhanced user rejection detection - check multiple patterns
-      const isUserRejection = 
-        code === 'ACTION_REJECTED' || 
-        code === 4001 || 
+      const isUserRejection =
+        code === 'ACTION_REJECTED' ||
+        code === 4001 ||
         code === 'USER_REJECTED' ||
         /rejected/i.test(msg) ||
         /user.*cancel/i.test(msg) ||
@@ -575,7 +595,7 @@ export async function deleteTriggerXJobForPlan(jobId: string, signer: any, chain
         msg.includes('user cancelled');
 
       console.log('Is user rejection:', isUserRejection);
-      
+
       // Propagate user rejection distinctly so UI does NOT update backend
       if (isUserRejection) {
         return { success: false, error: 'user_rejected' };
@@ -612,27 +632,17 @@ export async function checkPlanJobStatus(planId: string) {
   }
 }
 
-export async function checkTgBalanceForUser(signer: any, chainId: string = '42161') {
-  const balance = await checkTgBalance(signer, chainId);
+export async function checkTgBalanceForUser(userAddress: string, chainId: string = '42161') {
+  const balance = await checkEthBalance(userAddress, chainId);
   return balance;
 }
 
-/**
- * Top up TG for a user using TriggerX SDK.
- *
- * This is a thin wrapper around the SDK so the rest of the app
- * only imports from our internal api layer.
- */
-export async function topupTg(
-  tgAmount: number,
-  signer: any
-): Promise<{
-  success: boolean;
-  data?: any;
-  error?: string;
-  errorCode?: string;
-  errorType?: string;
-  details?: any;
-}> {
-  return triggerxTopupTg(tgAmount, signer);
+export async function depositTgBalanceForUser(ethAmount: bigint, signer: any) {
+  const depositResult = await depositEth(ethAmount, signer);
+  return depositResult;
+}
+
+export async function withdrawTgBalanceForUser(ethAmount: bigint, signer: any) {
+  const withdrawResult = await withdrawEth(signer, ethAmount);
+  return withdrawResult;
 }

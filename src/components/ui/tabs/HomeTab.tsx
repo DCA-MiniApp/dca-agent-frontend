@@ -49,7 +49,8 @@ import {
 import {
   deleteTriggerXJobForPlan,
   checkTgBalanceForUser,
-  topupTg,
+  depositTgBalanceForUser,
+  withdrawTgBalanceForUser,
 } from "../../../lib/triggerXIntegration";
 import sdk, {
   AddMiniApp,
@@ -310,56 +311,34 @@ export function HomeTab() {
   }, [notificationDetails]);
 
   useEffect(() => {
-    let cancelled = false;
+    // let cancelled = false;
 
     const fetchTgBalance = async () => {
-      if (!isConnected || !wagmiWalletClient) return;
+      if (!isConnected || !address) return;
 
       try {
-        const { BrowserProvider } = await import("ethers");
-        let signer: any = null;
+        const balance = await checkTgBalanceForUser(address);
+        console.log("TG Balance fetched:", balance);
+        // if (!cancelled) {
+        //   setTgBalance(Number(balance.data?.ethBalance ?? 0));
+        // }
+        setTgBalance(balance.data ? Number(balance.data.ethBalance) : 0);
 
-        if (
-          wagmiWalletClient.transport &&
-          (wagmiWalletClient.transport as any).request
-        ) {
-          const provider = new BrowserProvider(
-            wagmiWalletClient.transport as any
-          );
-          const addr = wagmiWalletClient.account?.address;
-          signer = addr
-            ? await provider.getSigner(addr)
-            : await provider.getSigner();
-        } else if (typeof window !== "undefined" && (window as any).ethereum) {
-          const provider = new BrowserProvider((window as any).ethereum);
-          try {
-            const accounts = await provider.send("eth_accounts", []);
-            if (!accounts || accounts.length === 0) {
-              await provider.send("eth_requestAccounts", []);
-            }
-          } catch {
-            // ignore account fetch errors
-          }
-          signer = await provider.getSigner();
-        }
-
-        if (!cancelled && signer) {
-          const balance = await checkTgBalanceForUser(signer);
-          setTgBalance(Number(balance.data?.tgBalance ?? 0));
-        }
+        
       } catch (error) {
-        if (!cancelled) {
-          setTgBalance(0);
-        }
+        setTgBalance(null);
+        // if (!cancelled) {
+        //   setTgBalance(0);
+        // }
       }
     };
 
     fetchTgBalance();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [isConnected, wagmiWalletClient]);
+    // return () => {
+    //   cancelled = true;
+    // };
+  }, [isConnected, address]);
 
   const handleTopupTg = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -369,9 +348,9 @@ export function HomeTab() {
     }
 
     const amountNumber = Number(topupAmount);
-    // const amountInWei = parseEther(topupAmount || "0"); 
+    const amountInWei = parseEther(topupAmount || "0");
     if (!topupAmount || isNaN(amountNumber) || amountNumber <= 0) {
-      setTopupStatus("Enter a valid TG amount greater than 0.");
+      setTopupStatus("Enter a valid ETH amount greater than 0.");
       return;
     }
 
@@ -412,15 +391,16 @@ export function HomeTab() {
         return;
       }
 
-      const result = await topupTg(amountNumber, signer);
+      const result = await depositTgBalanceForUser(amountInWei, signer);
 
       if (result.success) {
-        setTopupStatus("Top-up of TG successfully completed.");
+        setTopupStatus("Top-up of ETH successfully completed.");
         setTopupAmount("");
 
         try {
-          const balance = await checkTgBalanceForUser(signer);
-          setTgBalance(Number(balance.data?.tgBalance ?? 0));
+          if (!address) return;
+          const balance = await checkTgBalanceForUser(address);
+          setTgBalance(Number(balance.data?.ethBalance ?? 0));
         } catch {
           // ignore balance refresh errors
         }
@@ -437,6 +417,86 @@ export function HomeTab() {
       );
     } finally {
       setIsTopupLoading(false);
+    }
+  };
+
+  const handleWithdrawTg = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!isConnected || !wagmiWalletClient) {
+      setWithdrawStatus("Please connect your wallet on Arbitrum first.");
+      return;
+    }
+
+    const amountNumber = Number(withdrawAmount);
+    const amountInWei = parseEther(withdrawAmount || "0");
+    if (!withdrawAmount || isNaN(amountNumber) || amountNumber <= 0) {
+      setWithdrawStatus("Enter a valid ETH amount greater than 0.");
+      return;
+    }
+
+    setIsWithdrawLoading(true);
+    setWithdrawStatus(null);
+
+    try {
+      const { BrowserProvider } = await import("ethers");
+      let signer: any = null;
+
+      if (
+        wagmiWalletClient.transport &&
+        (wagmiWalletClient.transport as any).request
+      ) {
+        const provider = new BrowserProvider(
+          wagmiWalletClient.transport as any
+        );
+        const addr = wagmiWalletClient.account?.address;
+        signer = addr
+          ? await provider.getSigner(addr)
+          : await provider.getSigner();
+      } else if (typeof window !== "undefined" && (window as any).ethereum) {
+        const provider = new BrowserProvider((window as any).ethereum);
+        try {
+          const accounts = await provider.send("eth_accounts", []);
+          if (!accounts || accounts.length === 0) {
+            await provider.send("eth_requestAccounts", []);
+          }
+        } catch {
+          // ignore account fetch errors
+        }
+        signer = await provider.getSigner();
+      }
+
+      if (!signer) {
+        setWithdrawStatus("Could not obtain wallet signer. Please reconnect.");
+        setIsWithdrawLoading(false);
+        return;
+      }
+
+      const result = await withdrawTgBalanceForUser(amountInWei, signer);
+
+      if (result.success) {
+        setWithdrawStatus("Withdrawal of ETH successfully completed.");
+        setWithdrawAmount("");
+
+        try {
+          if (!address) return;
+          const balance = await checkTgBalanceForUser(address);
+          setTgBalance(Number(balance.data?.ethBalance ?? 0));
+        } catch {
+          // ignore balance refresh errors
+        }
+      } else {
+        setWithdrawStatus(
+          result.error || "Withdrawal failed. Please try again in a moment."
+        );
+      }
+    } catch (error: any) {
+      setWithdrawStatus(
+        error?.message
+          ? `Withdrawal failed: ${error.message}`
+          : "Withdrawal failed due to an unexpected error."
+      );
+    } finally {
+      setIsWithdrawLoading(false);
     }
   };
 
@@ -688,6 +748,10 @@ export function HomeTab() {
   const [totalValueSwapped, setTotalValueSwapped] = useState(0);
   const [isQuickStatsLoading, setIsQuickStatsLoading] = useState(true);
   const [topupAmount, setTopupAmount] = useState("");
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [isWithdrawLoading, setIsWithdrawLoading] = useState(false);
+  const [withdrawStatus, setWithdrawStatus] = useState<string | null>(null);
+
   const [isTopupLoading, setIsTopupLoading] = useState(false);
   const [topupStatus, setTopupStatus] = useState<string | null>(null);
 
@@ -1161,93 +1225,7 @@ export function HomeTab() {
 
   return (
     <div className="flex flex-col h-full py-3 px-2 pb-20 space-y-6 overflow-y-auto">
-      {/* Connect Wallet Modal */}
-      {showConnectWalletModal && !isConnected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-3 py-6">
-          <div
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-            onClick={() => setShowConnectWalletModal(false)}
-          />
-          <div className="relative z-10 w-full max-w-[300px] mx-auto bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 max-h-[68vh] overflow-y-auto">
-            <div className="p-3.5 pb-4 space-y-4">
-              {/* Header */}
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-3 flex-1">
-                  <div className="w-10 h-10 bg-gradient-to-br from-[#c199e4]/30 to-[#c199e4]/20 rounded-2xl flex items-center justify-center border border-[#c199e4]/40">
-                    <HiOutlineWallet className="w-5 h-5 text-[#c199e4]" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-white mb-0.5 leading-tight">
-                      Connect Your Wallet
-                    </h3>
-                    <p className="text-[11px] text-white/70 leading-snug">
-                      {hasFarcasterContext
-                        ? "Connect your wallet to start investing"
-                        : "Get started by connecting your wallet"}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowConnectWalletModal(false)}
-                  className="text-white/70 hover:text-white transition-colors duration-200 p-1 hover:bg-white/10 rounded-lg"
-                >
-                  <HiOutlineXMark className="h-3.5 w-3.5" />
-                </button>
-              </div>
-
-              {/* Info Section */}
-              <div className="bg-white/5 rounded-xl p-3 border border-white/10 space-y-2">
-                {[
-                  {
-                    step: "1",
-                    title: "Choose wallet type",
-                    desc: hasFarcasterContext
-                      ? "Connect Farcaster custody wallet or any EOA"
-                      : "Connect MetaMask, Coinbase Wallet, or other EOA",
-                  },
-                  {
-                    step: "2",
-                    title: "Switch to Arbitrum",
-                    desc: "Ensure the wallet is on Arbitrum mainnet to use DCA Agent",
-                  },
-                  {
-                    step: "3",
-                    title: "Create DCA plans",
-                    desc: "After connecting, automate your investments in a few taps",
-                  },
-                ].map(({ step, title, desc }) => (
-                  <div className="flex items-start gap-2" key={step}>
-                    <div className="w-5 h-5 bg-[#c199e4]/25 rounded-full flex items-center justify-center text-[11px] font-bold text-[#c199e4]">
-                      {step}
-                    </div>
-                    <div className="text-[11px] text-white/70 space-y-0.5">
-                      <p className="text-xs font-semibold text-white leading-tight">
-                        {title}
-                      </p>
-                      <p className="leading-snug">{desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="space-y-2.5">
-                <button
-                  onClick={() => {
-                    setShowConnectWalletModal(false);
-                    setActiveTab("wallet" as any);
-                  }}
-                  className="w-full bg-gradient-to-r from-[#c199e4]/40 to-[#b380db]/40 hover:from-[#c199e4]/55 hover:to-[#b380db]/55 text-white font-medium py-1 px-2 rounded-md transition-all duration-200 border border-[#c199e4]/40 hover:border-[#c199e4]/60 flex items-center justify-center gap-2 text-sm"
-                >
-                  <HiOutlineWallet className="w-4 h-4" />
-                  <span>Connect Wallet</span>
-                  <HiOutlineArrowNarrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Connect Wallet Modal */}    
 
       {/* Onboarding Modal */}
       {showOnboarding && (
@@ -2428,12 +2406,12 @@ export function HomeTab() {
               <p className="text-4xl font-bold text-white group-hover:text-[#c199e4] transition-colors duration-300">
                 {walletBalanceDisplay}
               </p>
-              {/* <div className="flex flex-wrap items-center gap-2 text-sm text-white/70">
-                <span>Total TG balance:</span>
+              <div className="flex flex-wrap items-center gap-2 text-sm text-white/70">
+                <span>Total Deposit balance:</span>
                 <span className="font-semibold text-white">
                   {tgBalance === null
-                    ? "0.0000 TG"
-                    : `${Number(tgBalance).toFixed(4)} TG`}
+                    ? "0.0000 ETH"
+                    : `${Number(tgBalance).toFixed(9)} ETH`}
                 </span>
                 <div
                   onMouseEnter={() => setShowTgTooltip(true)}
@@ -2445,12 +2423,12 @@ export function HomeTab() {
                     <div className="absolute z-[10] left-1/2 -translate-x-1/2 top-full mt-2 w-64 rounded-lg bg-[#c199e4] text-xs text-white/90 px-2 py-2 shadow-2xl border border-green-400/20 pointer-events-none">
                       <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#c199e4] border-l border-t border-green-400/20 rotate-45" />
                       <div className="text-left w-full relative z-10">
-                        TG balance fuels TriggerX to execute your plan.
+                        Deposit use by TriggerX to execute your plan.
                       </div>
                     </div>
                   )}
                 </div>
-              </div> */}
+              </div>
             </div>
           </div>
           <div className="flex flex-col items-end">
@@ -2487,8 +2465,6 @@ export function HomeTab() {
                 <div className="relative">
                   <input
                     type="number"
-                    min="0"
-                    step="0.0001"
                     value={topupAmount}
                     onChange={(e) => setTopupAmount(e.target.value)}
                     placeholder="Enter ETH amount"
@@ -2519,7 +2495,7 @@ export function HomeTab() {
         </div>
       </div>
 
-        {/* <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl p-6 border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 hover:shadow-lg">
+      <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl p-6 border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 hover:shadow-lg">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
@@ -2527,25 +2503,23 @@ export function HomeTab() {
                 <HiCurrencyDollar className="text-emerald-300 size-6" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-white">Withdraw ETH</h3>
-                <p className="text-xs text-white/70">
-                  Wirthdraw your ETH.
-                </p>
+                <h3 className="text-sm font-semibold text-white">
+                  Withdraw ETH
+                </h3>
+                <p className="text-xs text-white/70">Wirthdraw your ETH.</p>
               </div>
             </div>
 
             <form
-              onSubmit={handleTopupTg}
+              onSubmit={handleWithdrawTg}
               className="mt-3 flex flex-col sm:flex-row gap-3 items-stretch"
             >
               <div className="flex-1">
                 <div className="relative">
                   <input
                     type="number"
-                    min="0"
-                    step="0.0001"
-                    value={topupAmount}
-                    onChange={(e) => setTopupAmount(e.target.value)}
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
                     placeholder="Enter ETH amount"
                     className="w-full rounded-2xl border border-white/25 bg-black/20 px-4 py-2.5 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-[#c199e4]/60 focus:border-[#c199e4]/60"
                   />
@@ -2572,7 +2546,7 @@ export function HomeTab() {
             )}
           </div>
         </div>
-      </div> */}
+      </div>
 
       {/* Plan Details Modal */}
       {showPlanModal && selectedPlan && (

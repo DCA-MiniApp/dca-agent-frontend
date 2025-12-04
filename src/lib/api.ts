@@ -108,6 +108,7 @@ export interface JobMonitorData {
   total_job_failed: number;
   total_job_processing: number;
   total_value_swapped: number;
+  total_successful_task:number;
   users: JobMonitorUser[];
   last_update: string;
 }
