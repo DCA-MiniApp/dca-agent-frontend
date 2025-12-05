@@ -10,12 +10,10 @@ export interface DCAPlan {
   fromToken: string;
   toToken: string;
   amount: string;
-  intervalMinutes: number;
-  durationWeeks: number;
-  status: 'ACTIVE' | 'PAUSED' | 'completed' | 'CANCELLED'|'pending'|'processing';
-  nextExecution: string | null;
-  executionCount: number;
+  intervalSeconds: number;
+  durationSeconds: number;
   totalExecutions: number;
+  status: 'ACTIVE' | 'PAUSED' | 'completed' | 'CANCELLED'|'pending'|'processing';
   slippage: string;
   createdAt: string;
   updatedAt: string;
@@ -23,6 +21,11 @@ export interface DCAPlan {
   shareTokens?: string;
   jobStatus?: string;
   successCount: number;
+  // Deprecated fields (for backward compatibility during transition)
+  intervalMinutes?: number;
+  durationWeeks?: number;
+  nextExecution?: string | null;
+  executionCount?: number;
 }
 
 export interface ExecutionHistory {
@@ -342,27 +345,29 @@ export async function updatePlanJobId(userAddress: string, jobId: string): Promi
  * Calculate total invested amount for a user
  */
 export function calculateTotalInvested(plans: DCAPlan[]): number {
-  // console.log("Line number 167 plans:", plans)
   return plans.reduce((total, plan) => {
-    // console.log("Amount plan:",plan.amount);
     const amount = parseFloat(plan.amount);
-    // console.log("Line number 169 amoutn:",amount)
-    // console.log("Total:",total+(amount*plan.executionCount));
-    return total + (amount * plan.executionCount);
+    // Use successCount (from TriggerX API) instead of executionCount
+    // Fall back to executionCount for backward compatibility during transition
+    const executedCount = plan.successCount || plan.executionCount || 0;
+    return total + (amount * executedCount);
   }, 0);
 }
 
 /**
- * Format interval minutes to human readable string
+ * Format interval seconds to human readable string
  */
-export function formatInterval(intervalMinutes: number): string {
-  if (intervalMinutes < 60) {
-    return `${intervalMinutes}m`;
-  } else if (intervalMinutes < 1440) {
-    const hours = Math.floor(intervalMinutes / 60);
+export function formatInterval(intervalSeconds: number): string {
+  if (intervalSeconds < 60) {
+    return `${intervalSeconds}s`;
+  } else if (intervalSeconds < 3600) {
+    const minutes = Math.floor(intervalSeconds / 60);
+    return `${minutes}m`;
+  } else if (intervalSeconds < 86400) {
+    const hours = Math.floor(intervalSeconds / 3600);
     return `${hours}h`;
   } else {
-    const days = Math.floor(intervalMinutes / 1440);
+    const days = Math.floor(intervalSeconds / 86400);
     if (days === 1) return 'Daily';
     if (days === 7) return 'Weekly';
     return `${days}d`;
@@ -370,29 +375,49 @@ export function formatInterval(intervalMinutes: number): string {
 }
 
 /**
- * Format duration weeks to human readable string
- * Converts weeks to the most appropriate unit (hours, days, weeks, months, years)
+ * Format interval minutes to human readable string (backward compatibility)
+ * @deprecated Use formatInterval with seconds instead
+ */
+export function formatIntervalMinutes(intervalMinutes: number): string {
+  return formatInterval(intervalMinutes * 60);
+}
+
+/**
+ * Format duration seconds to human readable string
+ * Converts seconds to the most appropriate unit (minutes, hours, days, weeks, months, years)
  * 
- * @param durationWeeks - Duration in weeks (e.g., 0.006 weeks = ~1 hour)
+ * @param durationSeconds - Duration in seconds (e.g., 3600 = 1 hour)
  * @returns Human-readable duration string (e.g., "1 hour", "3 days", "2 weeks", "6 months", "2 years")
  */
-export function formatDuration(durationWeeks: number): string {
-  // Convert weeks to hours for easier calculation
-  const totalHours = durationWeeks * 168; // 1 week = 168 hours
-  const totalDays = durationWeeks * 7; // 1 week = 7 days
-  const totalMonths = durationWeeks / 4.33; // Average month ≈ 4.33 weeks
-  const totalYears = durationWeeks / 52; // 1 year ≈ 52 weeks
+export function formatDuration(durationSeconds: number): string {
+  const totalMinutes = durationSeconds / 60;
+  const totalHours = durationSeconds / 3600;
+  const totalDays = durationSeconds / 86400;
+  const totalWeeks = durationSeconds / 604800; // 7 * 24 * 60 * 60
+  const totalMonths = durationSeconds / 2629746; // Average month ≈ 30.44 days
+  const totalYears = durationSeconds / 31556952; // Average year ≈ 365.25 days
 
-  // Handle hours (< 1 day = 24 hours)
-  if (totalHours < 24) {
-    const hours = Math.round(totalHours * 10) / 10; // Round to 1 decimal
-    if (hours < 1) {
-      const minutes = Math.round(totalHours * 60);
-      if (minutes < 1) {
-        return 'Less than 1 minute';
+  // Handle minutes (< 1 hour = 3600 seconds)
+  if (durationSeconds < 3600) {
+    const minutes = Math.round(totalMinutes * 10) / 10; // Round to 1 decimal
+    if (minutes < 1) {
+      const seconds = Math.round(durationSeconds);
+      if (seconds < 1) {
+        return 'Less than 1 second';
       }
-      return minutes === 1 ? '1 minute' : `${minutes} minutes`;
+      return seconds === 1 ? '1 second' : `${seconds} seconds`;
     }
+    // Round to whole number if close to whole number
+    const roundedMinutes = Math.round(minutes);
+    if (Math.abs(minutes - roundedMinutes) < 0.1) {
+      return roundedMinutes === 1 ? '1 minute' : `${roundedMinutes} minutes`;
+    }
+    return `${minutes} minutes`;
+  }
+
+  // Handle hours (< 1 day = 86400 seconds)
+  if (durationSeconds < 86400) {
+    const hours = Math.round(totalHours * 10) / 10; // Round to 1 decimal
     // Round to whole number if close to whole number
     const roundedHours = Math.round(hours);
     if (Math.abs(hours - roundedHours) < 0.1) {
@@ -401,8 +426,8 @@ export function formatDuration(durationWeeks: number): string {
     return `${hours} hours`;
   }
 
-  // Handle days (< 1 week = 7 days)
-  if (totalDays < 7) {
+  // Handle days (< 1 week = 604800 seconds)
+  if (durationSeconds < 604800) {
     const days = Math.round(totalDays * 10) / 10; // Round to 1 decimal
     // Round to whole number if close to whole number
     const roundedDays = Math.round(days);
@@ -412,9 +437,9 @@ export function formatDuration(durationWeeks: number): string {
     return `${days} days`;
   }
 
-  // Handle weeks (< 1 month ≈ 4.33 weeks)
-  if (durationWeeks < 4.33) {
-    const weeks = Math.round(durationWeeks * 10) / 10; // Round to 1 decimal
+  // Handle weeks (< 1 month ≈ 2629746 seconds)
+  if (durationSeconds < 2629746) {
+    const weeks = Math.round(totalWeeks * 10) / 10; // Round to 1 decimal
     // Round to whole number if close to whole number
     const roundedWeeks = Math.round(weeks);
     if (Math.abs(weeks - roundedWeeks) < 0.1) {
@@ -423,10 +448,10 @@ export function formatDuration(durationWeeks: number): string {
     return `${weeks} weeks`;
   }
 
-  // Handle months (< 1 year ≈ 52 weeks)
-  if (durationWeeks < 52) {
+  // Handle months (< 1 year ≈ 31556952 seconds)
+  if (durationSeconds < 31556952) {
     const months = Math.round(totalMonths * 10) / 10; // Round to 1 decimal
-    const remainingWeeks = Math.round((durationWeeks % 4.33) * 10) / 10;
+    const remainingWeeks = Math.round((durationSeconds % 2629746) / 604800 * 10) / 10;
     
     let result = months === 1 ? '1 month' : `${months} months`;
     
@@ -438,9 +463,9 @@ export function formatDuration(durationWeeks: number): string {
     return result;
   }
 
-  // Handle years (>= 52 weeks)
+  // Handle years (>= 31556952 seconds)
   const years = Math.floor(totalYears);
-  const remainingMonths = Math.round((durationWeeks % 52) / 4.33);
+  const remainingMonths = Math.round((durationSeconds % 31556952) / 2629746);
   
   let result = years === 1 ? '1 year' : `${years} years`;
   
@@ -450,6 +475,14 @@ export function formatDuration(durationWeeks: number): string {
   }
   
   return result;
+}
+
+/**
+ * Format duration weeks to human readable string (backward compatibility)
+ * @deprecated Use formatDuration with seconds instead
+ */
+export function formatDurationWeeks(durationWeeks: number): string {
+  return formatDuration(durationWeeks * 604800); // Convert weeks to seconds
 }
 
 /**
@@ -508,4 +541,18 @@ export async function fetchQuickStats(): Promise<QuickStats | null> {
     console.error("Error fetching quick stats:", error);
     return null;
   }
+}
+
+/**
+ * Convert seconds to minutes for backward compatibility
+ */
+export function convertSecondsToMinutes(seconds: number): number {
+  return Math.round(seconds / 60);
+}
+
+/**
+ * Convert seconds to weeks for backward compatibility  
+ */
+export function convertSecondsToWeeks(seconds: number): number {
+  return seconds / 604800; // 7 * 24 * 60 * 60
 }

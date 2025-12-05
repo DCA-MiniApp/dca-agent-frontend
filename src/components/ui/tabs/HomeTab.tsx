@@ -2166,7 +2166,8 @@ export function HomeTab() {
                       </p>
                       <p className="text-2xl font-bold text-white group-hover/item:text-[#c199e4] transition-colors duration-300">
                         {formatInterval(
-                          userPlans[currentPlanIndex].intervalMinutes
+                          userPlans[currentPlanIndex].intervalSeconds || 
+                          (userPlans[currentPlanIndex].intervalMinutes ? userPlans[currentPlanIndex].intervalMinutes * 60 : 0)
                         )}
                       </p>
                     </div>
@@ -2652,7 +2653,8 @@ export function HomeTab() {
                     Interval
                   </p>
                   <p className="text-sm font-bold text-white">
-                    {formatInterval(selectedPlan.intervalMinutes)}
+                    {formatInterval(selectedPlan.intervalSeconds || 
+                      (selectedPlan.intervalMinutes ? selectedPlan.intervalMinutes * 60 : 0))}
                   </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
@@ -2660,7 +2662,8 @@ export function HomeTab() {
                     Duration
                   </p>
                   <p className="text-sm font-bold text-white">
-                    {formatDuration(selectedPlan.durationWeeks)}
+                    {formatDuration(selectedPlan.durationSeconds || 
+                      (selectedPlan.durationWeeks ? selectedPlan.durationWeeks * 604800 : 0))}
                   </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
