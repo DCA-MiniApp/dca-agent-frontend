@@ -130,11 +130,16 @@ export async function POST(request: NextRequest) {
         console.log('[Plan Creation] Plan data complete, showing confirmation');
         
         const completePlanData = extractionResult.planData as DCAPlanData;
-        const confirmationId = generateConfirmationId(completePlanData);
+        
+        // IMPORTANT: Apply USD conversion FIRST before generating confirmation ID
+        // This ensures the confirmationId contains the converted token amount, not the dollar amount
         await applyUsdIntelligence(
           completePlanData,
           dollarIntent.usdAmount
         );
+        
+        // Now generate confirmation ID with the converted amount
+        const confirmationId = generateConfirmationId(completePlanData);
         planSessionManager.updateSessionPlanData(session.id, completePlanData);
         const confirmationMessage =
           gptIntelligence.generatePlanSummary(completePlanData);
