@@ -198,7 +198,13 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
     }
 
     if (!result.success || !result.data) {
-      throw new Error(result.error || 'TriggerX job creation failed');
+      // Preserve the full result object as error so we can access errorType, errorCode, and details
+      const error: any = new Error(result.error || 'TriggerX job creation failed');
+      error.errorType = result.errorType;
+      error.errorCode = result.errorCode;
+      error.details = result.details;
+      error.error = result.error;
+      throw error;
     }
 
     // Normalize jobId to a single string (backend expects string, not array)
@@ -230,6 +236,11 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
 
   } catch (error) {
     console.error('[TriggerX] Failed to create job:', error);
+    console.error('[TriggerX] Error type:', typeof error);
+    console.error('[TriggerX] Error errorType:', (error as any)?.errorType);
+    console.error('[TriggerX] Error errorCode:', (error as any)?.errorCode);
+    console.error('[TriggerX] Error error field:', (error as any)?.error);
+    console.error('[TriggerX] Error details:', (error as any)?.details);
 
     // Check if this is a balance error with details
     let errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -239,16 +250,24 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
 
       // Check for BALANCE_ERROR specifically
       if (errorObj.errorCode === 'BALANCE_ERROR' || errorObj.errorType === 'BALANCE_ERROR' || errorObj.error === 'Failed to deposit ETH balance') {
+        console.log('[TriggerX] ✅ Detected BALANCE_ERROR, extracting ethAmount...');
         const details = errorObj.details || {};
         const ethAmount = details.ethAmount;
+
+        console.log('[TriggerX] ethAmount from details:', ethAmount);
 
         if (ethAmount) {
           // Convert bigint to ETH (assuming wei)
           const ethAmountInEth = (Number(ethAmount) / 1e18).toFixed(6);
+          console.log('[TriggerX] Converted to ETH:', ethAmountInEth);
           errorMessage = `INSUFFICIENT_BALANCE:${ethAmountInEth}`;
         } else {
           errorMessage = 'INSUFFICIENT_BALANCE:unknown';
         }
+
+        console.log('[TriggerX] Final error message:', errorMessage);
+      } else {
+        console.log('[TriggerX] Not a balance error, using original message');
       }
     }
 

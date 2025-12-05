@@ -323,8 +323,6 @@ export function HomeTab() {
         //   setTgBalance(Number(balance.data?.ethBalance ?? 0));
         // }
         setTgBalance(balance.data ? Number(balance.data.ethBalance) : 0);
-
-        
       } catch (error) {
         setTgBalance(null);
         // if (!cancelled) {
@@ -764,26 +762,11 @@ export function HomeTab() {
     return () => setFooterVisible(true);
   }, [showOnboarding, setFooterVisible]);
 
-  // Fetch quick stats (executions & volume) periodically with 5‑minute cache
   useEffect(() => {
     let isCancelled = false;
 
     const loadQuickStats = async (opts?: { fromInterval?: boolean }) => {
       try {
-        const now = Date.now();
-
-        // Use cached stats if they are fresher than 2 minutes
-        if (
-          !opts?.fromInterval &&
-          quickStatsCache &&
-          now - quickStatsCache.fetchedAt < 2 * 60 * 1000
-        ) {
-          setTotalExecutions(quickStatsCache.totalExecutions);
-          setTotalValueSwapped(quickStatsCache.totalValueSwapped);
-          setIsQuickStatsLoading(false);
-          return;
-        }
-
         if (!opts?.fromInterval) {
           setIsQuickStatsLoading(true);
         }
@@ -796,15 +779,6 @@ export function HomeTab() {
 
         setTotalExecutions(nextExecutions);
         setTotalValueSwapped(nextVolume);
-
-        // Only cache if both values are not zero
-        if (nextExecutions !== 0 || nextVolume !== 0) {
-          quickStatsCache = {
-            totalExecutions: nextExecutions,
-            totalValueSwapped: nextVolume,
-            fetchedAt: now,
-          };
-        }
       } catch (error) {
         if (!isCancelled) {
           setTotalExecutions(0);
@@ -817,10 +791,10 @@ export function HomeTab() {
       }
     };
 
-    // Initial load (will use cache if warm)
+    // Initial load
     loadQuickStats();
 
-    // Background refresh every 10 minutes (won't flicker UI)
+    // Background refresh every 10 minutes
     const intervalId = setInterval(
       () => loadQuickStats({ fromInterval: true }),
       600_000
@@ -1225,7 +1199,7 @@ export function HomeTab() {
 
   return (
     <div className="flex flex-col h-full py-3 px-2 pb-20 space-y-6 overflow-y-auto">
-      {/* Connect Wallet Modal */}    
+      {/* Connect Wallet Modal */}
 
       {/* Onboarding Modal */}
       {showOnboarding && (
@@ -2530,7 +2504,7 @@ export function HomeTab() {
                 disabled={isTopupLoading || !isConnected}
                 className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#c199e4] to-[#b380db] text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all duration-300"
               >
-                {isTopupLoading ? (
+                {isWithdrawLoading ? (
                   <>
                     <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     Processing...
@@ -2541,8 +2515,8 @@ export function HomeTab() {
               </button>
             </form>
 
-            {topupStatus && (
-              <p className="mt-2 text-xs text-white/80">{topupStatus}</p>
+            {withdrawStatus && (
+              <p className="mt-2 text-xs text-white/80">{withdrawStatus}</p>
             )}
           </div>
         </div>

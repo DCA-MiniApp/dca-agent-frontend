@@ -29,7 +29,8 @@ import {
   MANUAL_DISCONNECT_EVENT,
   MANUAL_DISCONNECT_FLAG,
 } from "../../providers/WagmiProvider";
-import { BrowserProvider, JsonRpcSigner } from "ethers";
+import { BrowserProvider, JsonRpcSigner, parseEther } from "ethers";
+import { depositTgBalanceForUser, checkTgBalanceForUser } from "../../../lib/triggerXIntegration";
 
 // Chat message interface
 interface ChatMessage {
@@ -47,6 +48,10 @@ interface ChatMessage {
   isCreatingPlan?: boolean;
   // Optional share content to enable a "Share now" button
   shareText?: string;
+  // Deposit UI fields
+  requiresDeposit?: boolean;
+  depositAmount?: string;
+  messageIdForDeposit?: string;
 }
 
 type StepStatus = "pending" | "active" | "complete";
@@ -385,8 +390,8 @@ export function ActionsTab() {
       id: "1",
       role: "assistant",
       content: `👋 **Hello!** I'm your DCA investment assistant.\n\n🎯 Create automated strategies\n📊 Track portfolio performance\n⚙️ Manage your plans\n\n Please ensure your DCA plan interval is set to a minimum of 5 minutes. Make sure your plan follows this requirement for optimal automation.\n\n${isWalletConnected
-          ? `Wallet connected (${formatAddress(address || "")}) - ready to go!`
-          : "Connect wallet to access all features."
+        ? `Wallet connected (${formatAddress(address || "")}) - ready to go!`
+        : "Connect wallet to access all features."
         }\n\n**Quick start:** "Create a DCA plan with 0.1 USDC into WETH weekly for 1 month"`,
       timestamp: new Date(),
     },
@@ -427,6 +432,11 @@ export function ActionsTab() {
   const [showScrollToLatest, setShowScrollToLatest] = useState(false);
   const messagesPinnedRef = useRef(true);
   const [showCreatePlanTokens, setShowCreatePlanTokens] = useState(false);
+
+  // Deposit state
+  const [depositAmounts, setDepositAmounts] = useState<Record<string, string>>({});
+  const [depositStatuses, setDepositStatuses] = useState<Record<string, string>>({});
+  const [isDepositLoading, setIsDepositLoading] = useState<Record<string, boolean>>({});
 
   // Contract interactions for token approval
   const {
@@ -809,6 +819,96 @@ export function ActionsTab() {
     }
   }, [inputMessage, isLoading, address, messages]);
 
+  // --- Deposit Handler ---
+  const handleDeposit = useCallback(
+    async (messageId: string, amount: string) => {
+      if (!walletClient || !address || !connector) {
+        setDepositStatuses((prev) => ({
+          ...prev,
+          [messageId]: "Please connect your wallet first.",
+        }));
+        return;
+      }
+
+      const amountNumber = Number(amount);
+      if (!amount || isNaN(amountNumber) || amountNumber <= 0) {
+        setDepositStatuses((prev) => ({
+          ...prev,
+          [messageId]: "Enter a valid ETH amount greater than 0.",
+        }));
+        return;
+      }
+
+      setIsDepositLoading((prev) => ({ ...prev, [messageId]: true }));
+      setDepositStatuses((prev) => ({ ...prev, [messageId]: "" }));
+
+      try {
+        
+         const { BrowserProvider } = await import("ethers");
+      let signer: any = null;
+
+      if (
+        walletClient.transport &&
+        (walletClient.transport as any).request
+      ) {
+        const provider = new BrowserProvider(
+          walletClient.transport as any
+        );
+        const addr = walletClient.account?.address;
+        signer = addr
+          ? await provider.getSigner(addr)
+          : await provider.getSigner();
+      } else if (typeof window !== "undefined" && (window as any).ethereum) {
+        const provider = new BrowserProvider((window as any).ethereum);
+        try {
+          const accounts = await provider.send("eth_accounts", []);
+          if (!accounts || accounts.length === 0) {
+            await provider.send("eth_requestAccounts", []);
+          }
+        } catch {
+          // ignore account fetch errors
+        }
+        signer = await provider.getSigner();
+      }
+
+        const amountInWei = parseEther(amount);
+        const result = await depositTgBalanceForUser(amountInWei, signer);
+
+        if (result.success) {
+          setDepositStatuses((prev) => ({
+            ...prev,
+            [messageId]: `✅ Successfully deposited ${amount} ETH! You can now retry creating your plan.`,
+          }));
+          setDepositAmounts((prev) => ({ ...prev, [messageId]: "" }));
+
+          // Refresh TG balance
+          try {
+            const balance = await checkTgBalanceForUser(address);
+            console.log("Updated TG balance:", balance);
+          } catch (err) {
+            console.warn("Could not refresh TG balance:", err);
+          }
+        } else {
+          setDepositStatuses((prev) => ({
+            ...prev,
+            [messageId]:
+              result.error || "Deposit failed. Please try again in a moment.",
+          }));
+        }
+      } catch (error: any) {
+        setDepositStatuses((prev) => ({
+          ...prev,
+          [messageId]: error?.message
+            ? `Deposit failed: ${error.message}`
+            : "Deposit failed due to an unexpected error.",
+        }));
+      } finally {
+        setIsDepositLoading((prev) => ({ ...prev, [messageId]: false }));
+      }
+    },
+    [walletClient, address, connector]
+  );
+
   // --- Chat Action Handlers ---
   const handleChatAction = useCallback(
     (action: string, data?: any, messageId?: string) => {
@@ -1181,24 +1281,40 @@ export function ActionsTab() {
                 );
 
                 // Check if this is a balance error
+                console.log('[ActionsTab] Checking error format:', triggerXResult.error);
+                console.log('[ActionsTab] Is INSUFFICIENT_BALANCE?', triggerXResult.error?.startsWith('INSUFFICIENT_BALANCE:'));
+
                 let errorContent = `⚠️ **Plan Created but Automation Failed**\n\nYour DCA plan was created successfully, but we couldn't set up automation:\n${triggerXResult.error}\n\nPlease try setting up automation again!`;
+                let requiresDeposit = false;
+                let depositAmount = '';
 
                 if (triggerXResult.error && triggerXResult.error.startsWith('INSUFFICIENT_BALANCE:')) {
                   const ethAmount = triggerXResult.error.split(':')[1];
+                  console.log('[ActionsTab] Extracted ETH amount:', ethAmount);
 
                   if (ethAmount && ethAmount !== 'unknown') {
-                    errorContent = `⚠️ **Plan Created but Automation Failed**\n\n✅ Your DCA plan was created successfully!\n\n❌ However, automation setup failed because you don't have enough funds in your TriggerX balance.\n\n💰 **Required Deposit:** ${ethAmount} ETH\n\n**Next Steps:**\n1. Deposit at least ${ethAmount} ETH to your TriggerX balance\n2. Try setting up automation again\n\nPlease ensure you have sufficient ETH deposited to run this automated job.`;
+                    console.log('[ActionsTab] Displaying deposit message with amount:', ethAmount);
+                    errorContent = `⚠️ **Plan Created but Automation Failed**\n\n✅ Your DCA plan was created successfully!\n\n❌ However, automation setup failed because you don't have enough funds in your TriggerX balance.\n\n💰 **Required Deposit:** ${ethAmount} ETH\n\n**Quick Deposit:**\nDeposit ETH to your TriggerX balance below, then retry creating your plan.`;
+                    requiresDeposit = true;
+                    depositAmount = ethAmount;
                   } else {
-                    errorContent = `⚠️ **Plan Created but Automation Failed**\n\n✅ Your DCA plan was created successfully!\n\n❌ However, automation setup failed due to insufficient TriggerX balance.\n\n**Next Steps:**\n1. Check your TriggerX balance\n2. Deposit sufficient ETH\n3. Try setting up automation again`;
+                    console.log('[ActionsTab] Amount unknown, showing generic balance message');
+                    errorContent = `⚠️ **Plan Created but Automation Failed**\n\n✅ Your DCA plan was created successfully!\n\n❌ However, automation setup failed due to insufficient TriggerX balance.\n\n**Quick Deposit:**\nDeposit ETH to your TriggerX balance below, then retry creating your plan.`;
+                    requiresDeposit = true;
+                    depositAmount = '';
                   }
                 }
 
                 // Add error message about automation failure
+                const automationErrorMessageId = createMessageId("assistant");
                 const automationErrorMessage: ChatMessage = {
-                  id: createMessageId("assistant"),
+                  id: automationErrorMessageId,
                   role: "assistant",
                   content: errorContent,
                   timestamp: new Date(),
+                  requiresDeposit,
+                  depositAmount,
+                  messageIdForDeposit: automationErrorMessageId,
                 };
                 setMessages((prev) => [
                   ...prev.filter((msg) => !msg.isCreatingPlan),
@@ -1214,8 +1330,8 @@ export function ActionsTab() {
               id: createMessageId("assistant"),
               role: "assistant",
               content: `⚠️ **Plan Created but Automation Setup Failed**\n\nYour DCA plan was created successfully, but we encountered an error setting up automation:\n${triggerXError instanceof Error
-                  ? triggerXError.message
-                  : "Unknown error"
+                ? triggerXError.message
+                : "Unknown error"
                 }\n\nYou can manually execute swaps for now.`,
               timestamp: new Date(),
             };
@@ -1775,8 +1891,8 @@ export function ActionsTab() {
               {/* Avatar Icon */}
               <div
                 className={`flex-shrink-0 size-6 rounded-full flex items-center justify-center ${message.role === "user"
-                    ? "bg-gradient-to-br from-[#c199e4] to-[#b380db]"
-                    : "bg-gradient-to-br from-white/20 to-white/10 border border-white/30"
+                  ? "bg-gradient-to-br from-[#c199e4] to-[#b380db]"
+                  : "bg-gradient-to-br from-white/20 to-white/10 border border-white/30"
                   }`}
               >
                 {message.role === "user" ? (
@@ -1789,8 +1905,8 @@ export function ActionsTab() {
               {/* Message Content */}
               <div
                 className={`rounded-2xl px-3 py-3 ${message.role === "user"
-                    ? "max-w-[75%] bg-gradient-to-br from-[#c199e4] to-[#b380db] text-white shadow-lg"
-                    : "max-w-[85%] bg-gradient-to-br from-white/15 to-white/10 backdrop-blur-sm text-white border border-white/20"
+                  ? "max-w-[75%] bg-gradient-to-br from-[#c199e4] to-[#b380db] text-white shadow-lg"
+                  : "max-w-[85%] bg-gradient-to-br from-white/15 to-white/10 backdrop-blur-sm text-white border border-white/20"
                   }`}
               >
                 <div className="text-sm leading-relaxed break-words overflow-wrap-anywhere">
@@ -1886,8 +2002,8 @@ export function ActionsTab() {
                                 <div className="flex-1">
                                   <div
                                     className={`text-sm font-semibold ${status === "pending"
-                                        ? "text-white/70"
-                                        : "text-white"
+                                      ? "text-white/70"
+                                      : "text-white"
                                       }`}
                                   >
                                     {step.label}
@@ -2047,6 +2163,68 @@ export function ActionsTab() {
                       </div>
                     </div>
                   )}
+
+                {/* Deposit UI */}
+                {message.requiresDeposit && message.messageIdForDeposit && (
+                  <div className="mt-3 pt-3 border-t border-white/20">
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          placeholder={message.depositAmount || "Amount in ETH"}
+                          value={depositAmounts[message.messageIdForDeposit] || message.depositAmount || ''}
+                          onChange={(e) => setDepositAmounts(prev => ({
+                            ...prev,
+                            [message.messageIdForDeposit!]: e.target.value
+                          }))}
+                          disabled={isDepositLoading[message.messageIdForDeposit]}
+                          className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#c199e4] disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                        <button
+                          onClick={() => handleDeposit(
+                            message.messageIdForDeposit!,
+                            depositAmounts[message.messageIdForDeposit!] || message.depositAmount || ''
+                          )}
+                          disabled={isDepositLoading[message.messageIdForDeposit]}
+                          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#c199e4] to-[#b380db] hover:from-[#b380db] hover:to-[#a56fcf] disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-all duration-300 shadow-lg"
+                        >
+                          {isDepositLoading[message.messageIdForDeposit] ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              Depositing...
+                            </>
+                          ) : (
+                            <>
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
+                              </svg>
+                              Deposit
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      {depositStatuses[message.messageIdForDeposit] && (
+                        <div className={`text-xs px-3 py-2 rounded-lg ${depositStatuses[message.messageIdForDeposit].startsWith('✅')
+                            ? 'bg-green-500/20 text-green-200 border border-green-500/30'
+                            : 'bg-red-500/20 text-red-200 border border-red-500/30'
+                          }`}>
+                          {depositStatuses[message.messageIdForDeposit]}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
 
                 <div
                   className={`text-xs mt-1 ${message.role === "user" ? "text-white/80" : "text-white/60"

@@ -172,7 +172,7 @@ export async function fetchUserDCAPlans(userAddress: string): Promise<DCAPlan[]>
         plan.jobStatus = plan?.jobData?.data?.jobData?.status || plan?.jobData?.data?.status || null;
         const taskData = plan?.jobData?.data?.taskData;
         if (Array.isArray(taskData)) {
-          plan.successCount = taskData.filter((t: any) => t.task_status === 'completed').length;
+          plan.successCount = taskData.filter((t: any) => t.task_status === 'completed').length; //here we also need to cache for 2 minutes
         }
       });
       // console.log("result.data in fetchUserDCAPlans", result.data);
@@ -482,7 +482,22 @@ export async function fetchPlatformStatsForMonitor(): Promise<JobMonitorData | n
   }
 }
 
+let quickStatsCache: {
+  data: QuickStats | null;
+  fetchedAt: number;
+} | null = null;
+
 export async function fetchQuickStats(): Promise<QuickStats | null> {
+  const now = Date.now();
+
+  // Use cached stats if they are fresher than 2 minutes
+  if (
+    quickStatsCache &&
+    now - quickStatsCache.fetchedAt < 2 * 60 * 1000
+  ) {
+    return quickStatsCache.data;
+  }
+
   try {
     const response = await fetch(`${API_BASE_URL}/api/dca/platform-stats`, {
       method: "GET",
@@ -499,6 +514,16 @@ export async function fetchQuickStats(): Promise<QuickStats | null> {
 
     const result: ApiResponse<QuickStats> = await response.json();
     if (result.success && result.data) {
+      // Only cache if at least one value is non-zero
+      if (
+        (result.data.total_job_live_count ?? 0) !== 0 ||
+        (result.data.total_value_swapped ?? 0) !== 0
+      ) {
+        quickStatsCache = {
+          data: result.data,
+          fetchedAt: now,
+        };
+      }
       return result.data;
     } else {
       console.error("Failed to fetch quick stats:", result.message);
