@@ -62,13 +62,6 @@ import sdk, {
 import { useFooterVisibility } from "../FooterVisibilityContext";
 import { parseEther } from "ethers";
 
-// Simple in-memory cache for platform quick stats (shared across renders)
-let quickStatsCache: {
-  totalExecutions: number;
-  totalValueSwapped: number;
-  fetchedAt: number;
-} | null = null;
-
 // Legacy interface for compatibility - will be replaced with DCAPlan
 /**
  * HomeTab component displays the main landing content for the mini app.
@@ -221,9 +214,9 @@ export function HomeTab() {
 
   // Dynamic data state
   const [userPlans, setUserPlans] = useState<DCAPlan[]>([]);
-  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(
-    null
-  );
+  // const [platformStats, setPlatformStats] = useState<PlatformStats | null>(
+  //   null
+  // );
   const [isLoading, setIsLoading] = useState(true);
   const [totalInvested, setTotalInvested] = useState(0);
   const [portfolioUsd, setPortfolioUsd] = useState<number | null>(null);
@@ -323,8 +316,6 @@ export function HomeTab() {
         //   setTgBalance(Number(balance.data?.ethBalance ?? 0));
         // }
         setTgBalance(balance.data ? Number(balance.data.ethBalance) : 0);
-
-        
       } catch (error) {
         setTgBalance(null);
         // if (!cancelled) {
@@ -764,31 +755,17 @@ export function HomeTab() {
     return () => setFooterVisible(true);
   }, [showOnboarding, setFooterVisible]);
 
-  // Fetch quick stats (executions & volume) periodically with 5‑minute cache
   useEffect(() => {
     let isCancelled = false;
 
     const loadQuickStats = async (opts?: { fromInterval?: boolean }) => {
       try {
-        const now = Date.now();
-
-        // Use cached stats if they are fresher than 2 minutes
-        if (
-          !opts?.fromInterval &&
-          quickStatsCache &&
-          now - quickStatsCache.fetchedAt < 2 * 60 * 1000
-        ) {
-          setTotalExecutions(quickStatsCache.totalExecutions);
-          setTotalValueSwapped(quickStatsCache.totalValueSwapped);
-          setIsQuickStatsLoading(false);
-          return;
-        }
-
         if (!opts?.fromInterval) {
           setIsQuickStatsLoading(true);
         }
 
         const stats = await fetchQuickStats();
+        // console.log("Quick stats fetched:", stats);
         if (isCancelled) return;
 
         const nextExecutions = stats?.total_job_live_count ?? 0;
@@ -796,15 +773,6 @@ export function HomeTab() {
 
         setTotalExecutions(nextExecutions);
         setTotalValueSwapped(nextVolume);
-
-        // Only cache if both values are not zero
-        if (nextExecutions !== 0 || nextVolume !== 0) {
-          quickStatsCache = {
-            totalExecutions: nextExecutions,
-            totalValueSwapped: nextVolume,
-            fetchedAt: now,
-          };
-        }
       } catch (error) {
         if (!isCancelled) {
           setTotalExecutions(0);
@@ -817,10 +785,10 @@ export function HomeTab() {
       }
     };
 
-    // Initial load (will use cache if warm)
+    // Initial load
     loadQuickStats();
 
-    // Background refresh every 10 minutes (won't flicker UI)
+    // Background refresh every 10 minutes
     const intervalId = setInterval(
       () => loadQuickStats({ fromInterval: true }),
       600_000
@@ -868,13 +836,13 @@ export function HomeTab() {
 
     setIsLoading(true);
     try {
-      const [plans, stats] = await Promise.all([
+      const [plans] = await Promise.all([
         fetchUserDCAPlans(address),
-        fetchPlatformStats(),
+        // fetchPlatformStats(),
       ]);
 
       setUserPlans(plans);
-      setPlatformStats(stats);
+      // setPlatformStats(stats);
       const totalInvested = calculateTotalInvested(plans);
       setTotalInvested(calculateTotalInvested(plans));
       // Compute USD value across plans using CoinGecko
@@ -1225,7 +1193,7 @@ export function HomeTab() {
 
   return (
     <div className="flex flex-col h-full py-3 px-2 pb-20 space-y-6 overflow-y-auto">
-      {/* Connect Wallet Modal */}    
+      {/* Connect Wallet Modal */}
 
       {/* Onboarding Modal */}
       {showOnboarding && (
@@ -1888,7 +1856,7 @@ export function HomeTab() {
                   <div className="h-8 w-24 bg-slate-700 rounded animate-pulse" />
                 ) : (
                   <div className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-300">
-                    ${(totalValueSwapped / 1000000).toFixed(1)}
+                    ${(totalValueSwapped).toFixed(2)}
                   </div>
                 )}
                 <div className="flex items-center gap-1.5">
@@ -2531,7 +2499,7 @@ export function HomeTab() {
                 disabled={isTopupLoading || !isConnected}
                 className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#c199e4] to-[#b380db] text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all duration-300"
               >
-                {isTopupLoading ? (
+                {isWithdrawLoading ? (
                   <>
                     <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     Processing...
@@ -2542,8 +2510,8 @@ export function HomeTab() {
               </button>
             </form>
 
-            {topupStatus && (
-              <p className="mt-2 text-xs text-white/80">{topupStatus}</p>
+            {withdrawStatus && (
+              <p className="mt-2 text-xs text-white/80">{withdrawStatus}</p>
             )}
           </div>
         </div>

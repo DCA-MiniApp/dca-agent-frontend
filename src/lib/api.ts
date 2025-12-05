@@ -122,6 +122,9 @@ export interface QuickStats {
   last_update: string;
 }
 
+let quickStatsCache: { data: QuickStats; fetchedAt: number } | null = null;
+
+
 
 export interface StoreUserPayload {
   fid: string;
@@ -516,6 +519,16 @@ export async function fetchPlatformStatsForMonitor(): Promise<JobMonitorData | n
 }
 
 export async function fetchQuickStats(): Promise<QuickStats | null> {
+  const now = Date.now();
+
+  // Use cached stats if they are fresher than 2 minutes
+  if (
+    quickStatsCache &&
+    now - quickStatsCache.fetchedAt < 2 * 60 * 1000
+  ) {
+    return quickStatsCache.data;
+  }
+
   try {
     const response = await fetch(`${API_BASE_URL}/api/dca/platform-stats`, {
       method: "GET",
@@ -532,6 +545,10 @@ export async function fetchQuickStats(): Promise<QuickStats | null> {
 
     const result: ApiResponse<QuickStats> = await response.json();
     if (result.success && result.data) {
+      quickStatsCache = {
+        data: result.data,
+        fetchedAt: now,
+      };
       return result.data;
     } else {
       console.error("Failed to fetch quick stats:", result.message);
@@ -542,7 +559,6 @@ export async function fetchQuickStats(): Promise<QuickStats | null> {
     return null;
   }
 }
-
 /**
  * Convert seconds to minutes for backward compatibility
  */
