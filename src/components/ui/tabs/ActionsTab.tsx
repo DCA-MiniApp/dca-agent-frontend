@@ -1233,8 +1233,13 @@ export function ActionsTab() {
                 fromToken: result.data.agentResponse.fromToken,
                 toToken: result.data.agentResponse.toToken,
                 amount: result.data.agentResponse.amount,
-                intervalMinutes: result.data.agentResponse.intervalMinutes,
-                durationWeeks: result.data.agentResponse.durationWeeks,
+                // Convert seconds back to minutes/weeks for TriggerX compatibility
+                intervalMinutes: result.data.agentResponse.intervalSeconds 
+                  ? Math.round(result.data.agentResponse.intervalSeconds / 60)
+                  : result.data.agentResponse.intervalMinutes,
+                durationWeeks: result.data.agentResponse.durationSeconds
+                  ? result.data.agentResponse.durationSeconds / 604800
+                  : result.data.agentResponse.durationWeeks,
                 slippage: result.data.agentResponse.slippage,
                 signer: ethersSigner,
                 fid: context?.user?.fid || 727291,

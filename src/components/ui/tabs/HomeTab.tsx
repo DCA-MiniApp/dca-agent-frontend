@@ -62,13 +62,6 @@ import sdk, {
 import { useFooterVisibility } from "../FooterVisibilityContext";
 import { parseEther } from "ethers";
 
-// Simple in-memory cache for platform quick stats (shared across renders)
-let quickStatsCache: {
-  totalExecutions: number;
-  totalValueSwapped: number;
-  fetchedAt: number;
-} | null = null;
-
 // Legacy interface for compatibility - will be replaced with DCAPlan
 /**
  * HomeTab component displays the main landing content for the mini app.
@@ -221,9 +214,9 @@ export function HomeTab() {
 
   // Dynamic data state
   const [userPlans, setUserPlans] = useState<DCAPlan[]>([]);
-  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(
-    null
-  );
+  // const [platformStats, setPlatformStats] = useState<PlatformStats | null>(
+  //   null
+  // );
   const [isLoading, setIsLoading] = useState(true);
   const [totalInvested, setTotalInvested] = useState(0);
   const [portfolioUsd, setPortfolioUsd] = useState<number | null>(null);
@@ -772,6 +765,7 @@ export function HomeTab() {
         }
 
         const stats = await fetchQuickStats();
+        // console.log("Quick stats fetched:", stats);
         if (isCancelled) return;
 
         const nextExecutions = stats?.total_job_live_count ?? 0;
@@ -842,13 +836,13 @@ export function HomeTab() {
 
     setIsLoading(true);
     try {
-      const [plans, stats] = await Promise.all([
+      const [plans] = await Promise.all([
         fetchUserDCAPlans(address),
-        fetchPlatformStats(),
+        // fetchPlatformStats(),
       ]);
 
       setUserPlans(plans);
-      setPlatformStats(stats);
+      // setPlatformStats(stats);
       const totalInvested = calculateTotalInvested(plans);
       setTotalInvested(calculateTotalInvested(plans));
       // Compute USD value across plans using CoinGecko
@@ -1862,7 +1856,7 @@ export function HomeTab() {
                   <div className="h-8 w-24 bg-slate-700 rounded animate-pulse" />
                 ) : (
                   <div className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-300">
-                    ${(totalValueSwapped / 1000000).toFixed(1)}
+                    ${(totalValueSwapped).toFixed(2)}
                   </div>
                 )}
                 <div className="flex items-center gap-1.5">
@@ -2140,7 +2134,8 @@ export function HomeTab() {
                       </p>
                       <p className="text-2xl font-bold text-white group-hover/item:text-[#c199e4] transition-colors duration-300">
                         {formatInterval(
-                          userPlans[currentPlanIndex].intervalMinutes
+                          userPlans[currentPlanIndex].intervalSeconds || 
+                          (userPlans[currentPlanIndex].intervalMinutes ? userPlans[currentPlanIndex].intervalMinutes * 60 : 0)
                         )}
                       </p>
                     </div>
@@ -2626,7 +2621,8 @@ export function HomeTab() {
                     Interval
                   </p>
                   <p className="text-sm font-bold text-white">
-                    {formatInterval(selectedPlan.intervalMinutes)}
+                    {formatInterval(selectedPlan.intervalSeconds || 
+                      (selectedPlan.intervalMinutes ? selectedPlan.intervalMinutes * 60 : 0))}
                   </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
@@ -2634,7 +2630,8 @@ export function HomeTab() {
                     Duration
                   </p>
                   <p className="text-sm font-bold text-white">
-                    {formatDuration(selectedPlan.durationWeeks)}
+                    {formatDuration(selectedPlan.durationSeconds || 
+                      (selectedPlan.durationWeeks ? selectedPlan.durationWeeks * 604800 : 0))}
                   </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
