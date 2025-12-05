@@ -384,11 +384,10 @@ export function ActionsTab() {
     {
       id: "1",
       role: "assistant",
-      content: `👋 **Hello!** I'm your DCA investment assistant.\n\n🎯 Create automated strategies\n📊 Track portfolio performance\n⚙️ Manage your plans\n\n Please ensure your DCA plan interval is set to a minimum of 1 hour. Make sure your plan follows this requirement for optimal automation.\n\n${
-        isWalletConnected
+      content: `👋 **Hello!** I'm your DCA investment assistant.\n\n🎯 Create automated strategies\n📊 Track portfolio performance\n⚙️ Manage your plans\n\n Please ensure your DCA plan interval is set to a minimum of 5 minutes. Make sure your plan follows this requirement for optimal automation.\n\n${isWalletConnected
           ? `Wallet connected (${formatAddress(address || "")}) - ready to go!`
           : "Connect wallet to access all features."
-      }\n\n**Quick start:** "Create a DCA plan with 0.1 USDC into WETH weekly for 1 month"`,
+        }\n\n**Quick start:** "Create a DCA plan with 0.1 USDC into WETH weekly for 1 month"`,
       timestamp: new Date(),
     },
   ]);
@@ -768,10 +767,10 @@ export function ActionsTab() {
           // If this is a plan confirmation response, mark it for DCA Chat API response:
           ...(isPlanConfirmationResponse && result.data
             ? {
-                requiresConfirmation: true,
-                confirmationId: `approve-${result.data.confirmationId}`,
-                confirmationData: result.data.planData,
-              }
+              requiresConfirmation: true,
+              confirmationId: `approve-${result.data.confirmationId}`,
+              confirmationData: result.data.planData,
+            }
             : {}),
         };
 
@@ -796,8 +795,8 @@ export function ActionsTab() {
 
       // Fallback to local response generation on error
       const fallbackResponse = generateAssistantResponse(currentInput);
-        const assistantMessage: ChatMessage = {
-          id: createMessageId("assistant"),
+      const assistantMessage: ChatMessage = {
+        id: createMessageId("assistant"),
         role: "assistant",
         content: `⚠️ I'm having trouble connecting to the DCA backend right now. Here's a basic response:\n\n${fallbackResponse}`,
         timestamp: new Date(),
@@ -981,12 +980,12 @@ export function ActionsTab() {
         setPlanSimulation((prev) =>
           prev
             ? {
-                ...prev,
-                progress: rawProgress,
-                etaMs,
-                activeStepIndex: activeIndex,
-                stepStatuses: statuses,
-              }
+              ...prev,
+              progress: rawProgress,
+              etaMs,
+              activeStepIndex: activeIndex,
+              stepStatuses: statuses,
+            }
             : prev
         );
       }, 900);
@@ -994,12 +993,12 @@ export function ActionsTab() {
       setPlanSimulation((prev) =>
         prev
           ? {
-              ...prev,
-              progress: 1,
-              etaMs: 0,
-              activeStepIndex: PLAN_SIMULATION_STEPS.length - 1,
-              stepStatuses: PLAN_SIMULATION_STEPS.map(() => "complete"),
-            }
+            ...prev,
+            progress: 1,
+            etaMs: 0,
+            activeStepIndex: PLAN_SIMULATION_STEPS.length - 1,
+            stepStatuses: PLAN_SIMULATION_STEPS.map(() => "complete"),
+          }
           : prev
       );
       finalizeTimeout = setTimeout(() => setPlanSimulation(null), 600);
@@ -1159,9 +1158,9 @@ export function ActionsTab() {
                     "Set it. Forget it. Grow it. 🌿",
                     APP_URL
                   ]
-                  // Filter out any empty lines and trim whitespace from each line, then join
-                  .map(line => line.trim())
-                  .filter(line => line.length > 0)
+                    // Filter out any empty lines and trim whitespace from each line, then join
+                    .map(line => line.trim())
+                    .filter(line => line.length > 0)
                 ];
                 const shareText = shareLines.join("\n");
                 const automationMessage: ChatMessage = {
@@ -1181,11 +1180,24 @@ export function ActionsTab() {
                   triggerXResult.error
                 );
 
+                // Check if this is a balance error
+                let errorContent = `⚠️ **Plan Created but Automation Failed**\n\nYour DCA plan was created successfully, but we couldn't set up automation:\n${triggerXResult.error}\n\nPlease try setting up automation again!`;
+
+                if (triggerXResult.error && triggerXResult.error.startsWith('INSUFFICIENT_BALANCE:')) {
+                  const ethAmount = triggerXResult.error.split(':')[1];
+
+                  if (ethAmount && ethAmount !== 'unknown') {
+                    errorContent = `⚠️ **Plan Created but Automation Failed**\n\n✅ Your DCA plan was created successfully!\n\n❌ However, automation setup failed because you don't have enough funds in your TriggerX balance.\n\n💰 **Required Deposit:** ${ethAmount} ETH\n\n**Next Steps:**\n1. Deposit at least ${ethAmount} ETH to your TriggerX balance\n2. Try setting up automation again\n\nPlease ensure you have sufficient ETH deposited to run this automated job.`;
+                  } else {
+                    errorContent = `⚠️ **Plan Created but Automation Failed**\n\n✅ Your DCA plan was created successfully!\n\n❌ However, automation setup failed due to insufficient TriggerX balance.\n\n**Next Steps:**\n1. Check your TriggerX balance\n2. Deposit sufficient ETH\n3. Try setting up automation again`;
+                  }
+                }
+
                 // Add error message about automation failure
                 const automationErrorMessage: ChatMessage = {
                   id: createMessageId("assistant"),
                   role: "assistant",
-                  content: `⚠️ **Plan Created but Automation Failed**\n\nYour DCA plan was created successfully, but we couldn't set up automation:\n${triggerXResult.error}\n\nPlease try setting up automation again!`,
+                  content: errorContent,
                   timestamp: new Date(),
                 };
                 setMessages((prev) => [
@@ -1201,11 +1213,10 @@ export function ActionsTab() {
             const automationErrorMessage: ChatMessage = {
               id: createMessageId("assistant"),
               role: "assistant",
-              content: `⚠️ **Plan Created but Automation Setup Failed**\n\nYour DCA plan was created successfully, but we encountered an error setting up automation:\n${
-                triggerXError instanceof Error
+              content: `⚠️ **Plan Created but Automation Setup Failed**\n\nYour DCA plan was created successfully, but we encountered an error setting up automation:\n${triggerXError instanceof Error
                   ? triggerXError.message
                   : "Unknown error"
-              }\n\nYou can manually execute swaps for now.`,
+                }\n\nYou can manually execute swaps for now.`,
               timestamp: new Date(),
             };
             setMessages((prev) => [
@@ -1258,7 +1269,7 @@ export function ActionsTab() {
           role: "assistant",
           content:
             error instanceof Error &&
-            error.message.includes("wallet connection")
+              error.message.includes("wallet connection")
               ? `❌ ${error.message}`
               : "❌ Sorry, I encountered an error while creating your plan. Please try again.",
           timestamp: new Date(),
@@ -1364,8 +1375,8 @@ export function ActionsTab() {
             duration: planData.duration,
           });
 
-        const errMsg: ChatMessage = {
-          id: createMessageId("assistant"),
+          const errMsg: ChatMessage = {
+            id: createMessageId("assistant"),
             role: "assistant",
             content:
               "❌ Invalid plan details for approval. Please review your amount, interval, and duration.",
@@ -1389,11 +1400,9 @@ export function ActionsTab() {
         const approvalMessage: ChatMessage = {
           id: createMessageId("assistant"),
           role: "assistant",
-          content: `🔐 **Requesting Token Approval**\n\nPlease approve spending of ${
-            planData.fromToken
-          } tokens so the contract can execute your plan automatically.\n\n• Amount per execution: ${amountPerExecutionStr} ${
-            planData.fromToken
-          }\n• Executions: ${totalExecutions}\n• Total approval: ${totalAmountWei.toString()} (wei)\n\n*Check your wallet popup...*`,
+          content: `🔐 **Requesting Token Approval**\n\nPlease approve spending of ${planData.fromToken
+            } tokens so the contract can execute your plan automatically.\n\n• Amount per execution: ${amountPerExecutionStr} ${planData.fromToken
+            }\n• Executions: ${totalExecutions}\n• Total approval: ${totalAmountWei.toString()} (wei)\n\n*Check your wallet popup...*`,
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, approvalMessage]);
@@ -1732,19 +1741,19 @@ export function ActionsTab() {
             ) : (
               <div className="w-5 h-5 rounded-full bg-[#c199e4]/20 border border-[#c199e4] flex items-center justify-center">
                 <img
-                src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTvAyrN5PLmvXRRHsJOVxJZN1SRscvJQLL33Q&s"
-                alt="User Avatar"
-                className="w-5 h-5 rounded-full object-cover border border-[#c199e4]"
-                style={{ background: "#fff" }}
-              />
+                  src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTvAyrN5PLmvXRRHsJOVxJZN1SRscvJQLL33Q&s"
+                  alt="User Avatar"
+                  className="w-5 h-5 rounded-full object-cover border border-[#c199e4]"
+                  style={{ background: "#fff" }}
+                />
               </div>
             )}
             {/* {address ? formatAddress(address) : "Not Connected"} */}
             {!isWalletConnected
               ? "Wallet Not Connected"
               : isWalletConnected && !address
-              ? "Connecting..."
-              : formatAddress(address as `0x${string}`)}
+                ? "Connecting..."
+                : formatAddress(address as `0x${string}`)}
           </div>
         </div>
 
@@ -1760,17 +1769,15 @@ export function ActionsTab() {
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`flex items-start gap-1.5 ${
-                message.role === "user" ? "flex-row-reverse" : "flex-row"
-              }`}
+              className={`flex items-start gap-1.5 ${message.role === "user" ? "flex-row-reverse" : "flex-row"
+                }`}
             >
               {/* Avatar Icon */}
               <div
-                className={`flex-shrink-0 size-6 rounded-full flex items-center justify-center ${
-                  message.role === "user"
+                className={`flex-shrink-0 size-6 rounded-full flex items-center justify-center ${message.role === "user"
                     ? "bg-gradient-to-br from-[#c199e4] to-[#b380db]"
                     : "bg-gradient-to-br from-white/20 to-white/10 border border-white/30"
-                }`}
+                  }`}
               >
                 {message.role === "user" ? (
                   <IoPersonCircle className="size-4 text-white" />
@@ -1781,11 +1788,10 @@ export function ActionsTab() {
 
               {/* Message Content */}
               <div
-                className={`rounded-2xl px-3 py-3 ${
-                  message.role === "user"
+                className={`rounded-2xl px-3 py-3 ${message.role === "user"
                     ? "max-w-[75%] bg-gradient-to-br from-[#c199e4] to-[#b380db] text-white shadow-lg"
                     : "max-w-[85%] bg-gradient-to-br from-white/15 to-white/10 backdrop-blur-sm text-white border border-white/20"
-                }`}
+                  }`}
               >
                 <div className="text-sm leading-relaxed break-words overflow-wrap-anywhere">
                   {renderMarkdownText(message.content)}
@@ -1848,8 +1854,8 @@ export function ActionsTab() {
                               status === "complete"
                                 ? "border-emerald-400/50 bg-emerald-400/10 text-emerald-200"
                                 : status === "active"
-                                ? "border-[#c199e4] bg-[#c199e4]/10 text-white"
-                                : "border-white/15 bg-white/5 text-white/50";
+                                  ? "border-[#c199e4] bg-[#c199e4]/10 text-white"
+                                  : "border-white/15 bg-white/5 text-white/50";
 
                             return (
                               <div
@@ -1879,11 +1885,10 @@ export function ActionsTab() {
                                 </span>
                                 <div className="flex-1">
                                   <div
-                                    className={`text-sm font-semibold ${
-                                      status === "pending"
+                                    className={`text-sm font-semibold ${status === "pending"
                                         ? "text-white/70"
                                         : "text-white"
-                                    }`}
+                                      }`}
                                   >
                                     {step.label}
                                   </div>
@@ -2044,9 +2049,8 @@ export function ActionsTab() {
                   )}
 
                 <div
-                  className={`text-xs mt-1 ${
-                    message.role === "user" ? "text-white/80" : "text-white/60"
-                  }`}
+                  className={`text-xs mt-1 ${message.role === "user" ? "text-white/80" : "text-white/60"
+                    }`}
                 >
                   {message.timestamp.toLocaleTimeString([], {
                     hour: "2-digit",
@@ -2111,7 +2115,7 @@ export function ActionsTab() {
         <div
           ref={inputContainerRef}
           className="flex-shrink-0 border-t border-white/20 px-4 py-2 bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-lg"
-          // style={{ paddingBottom: Math.max(12, 12 + safeBottom) }}
+        // style={{ paddingBottom: Math.max(12, 12 + safeBottom) }}
         >
           {/* Quick Action Buttons */}
           <div className="flex flex-wrap gap-2 mb-2">
@@ -2202,38 +2206,38 @@ export function ActionsTab() {
 
           <div className="flex items-center space-x-3">
             <div className="flex-1 relative">
-            <textarea
+              <textarea
                 ref={quickStartInputRef}
                 value={inputMessage}
-              onChange={(e) => {
-                setInputMessage(e.target.value);
-                adjustInputHeight();
-              }}
+                onChange={(e) => {
+                  setInputMessage(e.target.value);
+                  adjustInputHeight();
+                }}
                 onKeyDown={(e) => {
                   const canSend =
-                isWalletConnected &&
+                    isWalletConnected &&
                     !isLoading &&
                     !isApprovalLoading &&
                     !isApprovePending &&
                     !isApprovalConfirming &&
                     !isPlanCreationLoading &&
                     inputMessage.trim().length > 0;
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  if (canSend) handleSendMessage();
-                }
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (canSend) handleSendMessage();
+                  }
                 }}
                 onFocus={handleInputFocus}
                 placeholder={
                   isInPlanCreationFlow
                     ? "Review the plan details above and click 'Review Plan Details' to proceed..."
                     : isConnected
-                    ? "Ask me anything about DCA investing..."
-                    : "Connect wallet first, then ask about DCA strategies"
+                      ? "Ask me anything about DCA investing..."
+                      : "Connect wallet first, then ask about DCA strategies"
                 }
-              className="w-full px-4 py-2 border border-white/30 rounded-2xl bg-white/10 backdrop-blur-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-[#c199e4]/50 focus:border-[#c199e4]/50 transition-all duration-300 resize-none leading-relaxed"
-              rows={1}
-              style={{ minHeight: 44, maxHeight: 180, overflowY: "auto" }}
+                className="w-full px-4 py-2 border border-white/30 rounded-2xl bg-white/10 backdrop-blur-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-[#c199e4]/50 focus:border-[#c199e4]/50 transition-all duration-300 resize-none leading-relaxed"
+                rows={1}
+                style={{ minHeight: 44, maxHeight: 180, overflowY: "auto" }}
               />
             </div>
             <button
