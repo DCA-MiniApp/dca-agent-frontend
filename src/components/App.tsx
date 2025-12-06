@@ -280,7 +280,7 @@ export default function App(
 
         {/* Footer - Fixed at bottom with increased height for attribution */}
         <div
-          className={`fixed bottom-0 left-0 right-0 h-53 z-40 transition-opacity duration-300 ${
+          className={`fixed bottom-0 left-0 right-0 h-56 z-40 transition-opacity duration-300 ${
             isFooterVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
           }`}
         >

@@ -1,22 +1,18 @@
 "use client";
 
-import { useCallback, useMemo, useState, useEffect, use } from "react";
+import { useCallback, useState, useEffect } from "react";
 import {
   useAccount,
-  useSendTransaction,
-  useSignTypedData,
-  useWaitForTransactionReceipt,
   useConnect,
   useDisconnect,
   useSwitchChain,
   useChainId,
   type Connector,
 } from "wagmi";
-import { mainnet, arbitrum } from "wagmi/chains";
+import { arbitrum } from "wagmi/chains";
 import { Button } from "../Button";
-import { truncateAddress } from "../../../lib/truncateAddress";
 import { renderError } from "../../../lib/errorUtils";
-import { USE_WALLET, APP_NAME } from "../../../lib/constants";
+import { USE_WALLET } from "../../../lib/constants";
 import { useMiniApp } from "@neynar/react";
 import { storeUser } from "../../../lib/api";
 import { sdk } from "@farcaster/miniapp-sdk";
@@ -24,6 +20,11 @@ import {
   MANUAL_DISCONNECT_EVENT,
   MANUAL_DISCONNECT_FLAG,
 } from "../../providers/WagmiProvider";
+import { TriggerXWithdrawCard } from "../tabs/HomeTab/components/TriggerXWithdrawCard";
+import { WalletBalanceCard } from "../tabs/HomeTab/components/WalletBalanceCard";
+import { useTriggerX } from "../tabs/HomeTab/hooks/useTriggerX";
+import { useWalletClient } from "wagmi";
+import { calculateWalletTotalUsdValue, fetchArbitrumUsdPrices, getArbitrumAddressBySymbol } from "../../../lib/utils";
 
 function updateManualDisconnectFlag(value: boolean) {
   if (typeof window === "undefined") return;
@@ -54,6 +55,7 @@ interface WalletStatusProps {
   fid?: number;
   isConnected: boolean;
 }
+
 interface UserInfo {
   fid: number;
   username?: string;
@@ -72,71 +74,13 @@ function WalletStatus({
   fid,
   isConnected,
 }: WalletStatusProps) {
-  const getChainName = (chainId?: number) => {
-    switch (chainId) {
-      case mainnet.id:
-        return "Ethereum";
-      case arbitrum.id:
-        return "Arbitrum";
-      default:
-        return "Unknown";
-    }
-  };
-
-  const [user, setUser] = useState<UserInfo | null>(null);
-  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
-
-  const getChainColor = (chainId?: number) => {
-    switch (chainId) {
-      case mainnet.id:
-        return "bg-gray-500";
-      case arbitrum.id:
-        return "bg-indigo-500";
-      default:
-        return "bg-gray-400";
-    }
-  };
+  const getChainColor = () => "bg-indigo-500"; // Always Arbitrum
 
   const handleCopyAddress = () => {
     if (address) {
       navigator.clipboard.writeText(address);
     }
   };
-
-  useEffect(() => {
-    // Wait for SDK to initialize / ready if needed
-    const init = async () => {
-      try {
-        // Optionally, ensure SDK is ready (hide splash etc.)
-        await sdk.actions.ready();
-      } catch (err) {
-        console.error("Failed to ready SDK:", err);
-      }
-
-      const context = await sdk.context;
-      const ctxUser = context?.user;
-      // const ctxUser = (await sdk.context).user;
-      if (ctxUser && typeof ctxUser.fid === "number") {
-        setUser({
-          fid: ctxUser.fid,
-          username: ctxUser.username,
-          displayName: ctxUser.displayName,
-          pfpUrl: ctxUser.pfpUrl,
-        });
-        if (sdk && !isSDKLoaded) {
-          setIsSDKLoaded(true);
-          // load();
-          return () => {
-            sdk.removeAllListeners();
-          };
-        }
-      } else {
-        console.warn("User info missing in sdk.context.user");
-      }
-    };
-
-    init();
-  }, []);
 
   return (
     <div className="space-y-6 mb-6">
@@ -166,17 +110,11 @@ function WalletStatus({
           </span>
         </div>
 
-        {/* Chain badge */}
+        {/* Chain badge - Always Arbitrum */}
         {chainId && (
           <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-br from-white/20 to-white/5 border border-white/30">
-            <span
-              className={`inline-block w-2 h-2 rounded-full ${getChainColor(
-                chainId
-              )}`}
-            />
-            <span className="text-xs text-white/90 font-medium">
-              {getChainName(chainId)}
-            </span>
+            <span className={`inline-block w-2 h-2 rounded-full ${getChainColor()}`} />
+            <span className="text-xs text-white/90 font-medium">Arbitrum</span>
           </div>
         )}
 
@@ -238,6 +176,7 @@ interface ConnectionControlsProps {
   connect: (args: { connector: Connector }) => void;
   connectors: readonly Connector[];
   disconnect: () => void;
+  onSwitchToArbitrum: () => void;
 }
 
 /**
@@ -249,6 +188,7 @@ function ConnectionControls({
   connect,
   connectors,
   disconnect,
+  onSwitchToArbitrum,
 }: ConnectionControlsProps) {
   const { haptics } = useMiniApp();
 
@@ -325,7 +265,7 @@ function ConnectionControls({
             />
           </svg>
         </div>
-        Connect your wallet
+        Connect to Arbitrum
       </h4>
       <div className="space-y-3">
         {context?.user?.fid ? (
@@ -333,7 +273,7 @@ function ConnectionControls({
             <Button
               type="button"
               className={primaryButtonClasses}
-              onClick={() => {
+              onClick={async () => {
                 triggerHaptic();
                 const farcasterConnector = connectors.find(
                   (c) => c.id === "farcaster"
@@ -341,8 +281,8 @@ function ConnectionControls({
                 if (farcasterConnector) {
               updateManualDisconnectFlag(false);
                   connect({ connector: farcasterConnector });
-                  // Note: Chain will be switched to Arbitrum after connection if needed
-                  // via the WalletControls component
+                  // Auto-switch to Arbitrum immediately after connection
+                  setTimeout(() => onSwitchToArbitrum(), 500);
                 }
               }}
             >
@@ -355,8 +295,8 @@ function ConnectionControls({
                 triggerHaptic();
             updateManualDisconnectFlag(false);
                 connect({ connector: connectors[2] });
-                // Note: Chain will be switched to Arbitrum after connection if needed
-                // via the WalletControls component
+                // Auto-switch to Arbitrum immediately after connection
+                setTimeout(() => onSwitchToArbitrum(), 500);
               }}
             >
               Connect MetaMask
@@ -371,8 +311,8 @@ function ConnectionControls({
                 triggerHaptic();
             updateManualDisconnectFlag(false);
                 connect({ connector: connectors[1] });
-                // Note: Chain will be switched to Arbitrum after connection if needed
-                // via the WalletControls component
+                // Auto-switch to Arbitrum immediately after connection
+                setTimeout(() => onSwitchToArbitrum(), 500);
               }}
             >
               Connect Coinbase Wallet
@@ -384,8 +324,8 @@ function ConnectionControls({
                 triggerHaptic();
             updateManualDisconnectFlag(false);
                 connect({ connector: connectors[2] });
-                // Note: Chain will be switched to Arbitrum after connection if needed
-                // via the WalletControls component
+                // Auto-switch to Arbitrum immediately after connection
+                setTimeout(() => onSwitchToArbitrum(), 500);
               }}
             >
               Connect MetaMask
@@ -509,7 +449,7 @@ function WalletControls({
       </div>
 
       {/* Wallet Info */}
-      <div className="p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500">
+      {/* <div className="p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500">
         <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
           <div className="w-8 h-8 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-xl flex items-center justify-center border border-[#c199e4]/30">
             <svg
@@ -544,43 +484,45 @@ function WalletControls({
             interface.
           </div>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 }
 
 export function WalletTab() {
-  // --- State ---
-  const [evmContractTransactionHash, setEvmContractTransactionHash] = useState<
-    string | null
-  >(null);
-
   // --- Hooks ---
-  // const { context } = useMiniApp();
-  const {
-    address,
-    isConnected,
-    connector,
-    chainId: accountChainId,
-  } = useAccount();
-  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
+  const { address, isConnected, connector, chainId: accountChainId } = useAccount();
   const [user, setUser] = useState<UserInfo | null>(null);
   const chainId = useChainId();
   const effectiveChainId = accountChainId ?? chainId;
+  
+  // Get wallet client for TriggerX integration
+  const { data: wagmiWalletClient } = useWalletClient();
+
+  // TriggerX hooks for withdraw functionality
+  const {
+    tgBalance,
+    withdrawAmount,
+    isWithdrawLoading,
+    withdrawStatus,
+    setWithdrawAmount,
+    handleWithdrawTg,
+  } = useTriggerX(isConnected, address, wagmiWalletClient);
+
+  // Wallet balance state
+  const [walletTotalUsd, setWalletTotalUsd] = useState<number | null>(null);
+  const [isWalletValueLoading, setIsWalletValueLoading] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [showTgTooltip, setShowTgTooltip] = useState(false);
+  const [ethPrice, setEthPrice] = useState<number | null>(null);
 
   useEffect(() => {
-    // Wait for SDK to initialize / ready if needed
     const init = async () => {
       try {
-        // Optionally, ensure SDK is ready (hide splash etc.)
         await sdk.actions.ready();
-      } catch (err) {
-        console.error("Failed to ready SDK:", err);
-      }
-
       const context = await sdk.context;
       const ctxUser = context?.user;
-      // const ctxUser = (await sdk.context).user;
+        
       if (ctxUser && typeof ctxUser.fid === "number") {
         setUser({
           fid: ctxUser.fid,
@@ -588,15 +530,9 @@ export function WalletTab() {
           displayName: ctxUser.displayName,
           pfpUrl: ctxUser.pfpUrl,
         });
-        if (sdk && !isSDKLoaded) {
-          setIsSDKLoaded(true);
-          // load();
-          return () => {
-            sdk.removeAllListeners();
-          };
         }
-      } else {
-        console.warn("User info missing in sdk.context.user");
+      } catch (err) {
+        console.error("Failed to initialize SDK:", err);
       }
     };
 
@@ -604,30 +540,8 @@ export function WalletTab() {
   }, []);
 
   // --- Wagmi Hooks ---
-  const {
-    sendTransaction,
-    error: evmTransactionError,
-    isError: isEvmTransactionError,
-    isPending: isEvmTransactionPending,
-  } = useSendTransaction();
-
-  const {
-    isLoading: isEvmTransactionConfirming,
-    isSuccess: isEvmTransactionConfirmed,
-  } = useWaitForTransactionReceipt({
-    hash: evmContractTransactionHash as `0x${string}`,
-  });
-
-  const {
-    signTypedData,
-    error: evmSignTypedDataError,
-    isError: isEvmSignTypedDataError,
-    isPending: isEvmSignTypedDataPending,
-  } = useSignTypedData();
-
   const { disconnect } = useDisconnect();
   const { connect, connectors } = useConnect();
-
   const {
     switchChain,
     switchChainAsync,
@@ -637,35 +551,25 @@ export function WalletTab() {
   } = useSwitchChain();
 
   // --- Computed Values ---
-  // Detect wallet type based on active connector
-  // console.log("connector", connector?.id);
   const isFarcasterWallet = connector?.id === "farcaster";
-  const isCustodyWallet = isFarcasterWallet; // Farcaster Frame connector is always custody wallet
-
-  // Debug logging
-  console.log("Wallet Debug Info:", {
-    isConnected,
-    connectorId: connector?.id,
-    connectorName: connector?.name,
-    isFarcasterWallet,
-    isCustodyWallet,
-    // context: !!context,
-    fid: user?.fid,
-    chainIdFromAccount: accountChainId,
-    chainIdFromHook: chainId,
-    effectiveChainId,
-  });
+  const isCustodyWallet = isFarcasterWallet;
+  
+  // Wallet balance display
+  const walletBalanceDisplay =
+    walletTotalUsd !== null
+      ? `$${walletTotalUsd.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}`
+      : isWalletValueLoading
+      ? "..."
+      : "$0.00";
 
   // Store user on first connect
   useEffect(() => {
     const run = async () => {
       if (!isConnected || !address) return;
       const fid = user?.fid;
-      // if (!fid) return;
-
-      console.log('🔍 [WALLET TAB] Address from wallet connection:', address);
-      console.log('🔍 [WALLET TAB] Address length:', address?.length);
-      console.log('🔍 [WALLET TAB] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
 
       await storeUser({
         fid: String(fid || "727291"),
@@ -679,25 +583,74 @@ export function WalletTab() {
     run();
   }, [isConnected, address, user?.fid]);
 
-  // Auto-switch to Arbitrum after connection if on wrong chain
+  // Fetch wallet total USD value
   useEffect(() => {
-    if (
-      isConnected &&
-      effectiveChainId &&
-      effectiveChainId !== arbitrum.id &&
-      !isChainSwitchPending
-    ) {
-      // Only auto-switch if not already switching and not on Arbitrum
-      console.log(
-        `Auto-switching from chain ${effectiveChainId} to Arbitrum (${arbitrum.id})`
-      );
-      handleSwitchToArbitrum().catch((error) => {
-        console.warn("Auto-switch to Arbitrum failed:", error);
-        // Don't show error to user - they can manually switch via UI
-      });
+    if (!address) {
+      setWalletTotalUsd(null);
+      setIsWalletValueLoading(false);
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConnected, effectiveChainId, isChainSwitchPending]);
+
+    let cancelled = false;
+    setIsWalletValueLoading(true);
+
+    const loadWalletValue = async () => {
+      try {
+        const totalUsd = await calculateWalletTotalUsdValue(address);
+        if (!cancelled) {
+          setWalletTotalUsd(totalUsd);
+        }
+      } catch (error) {
+        console.error("Error loading wallet value:", error);
+        if (!cancelled) {
+          setWalletTotalUsd(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsWalletValueLoading(false);
+        }
+      }
+    };
+
+    loadWalletValue();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [address]);
+
+  // Fetch ETH price for TriggerX balance conversion
+  useEffect(() => {
+    const fetchEthPrice = async () => {
+      try {
+        // Get WETH address for Arbitrum
+        const wethAddress = getArbitrumAddressBySymbol('WETH');
+        console.log('WETH Address:', wethAddress);
+        
+        if (wethAddress) {
+          const prices = await fetchArbitrumUsdPrices([wethAddress]);
+          console.log('Fetched prices:', prices);
+          
+          const price = prices[wethAddress.toLowerCase()];
+          console.log('ETH Price:', price);
+          
+          if (price) {
+            setEthPrice(price);
+            console.log('ETH price set to:', price);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching ETH price:", error);
+      }
+    };
+
+    fetchEthPrice();
+    
+    // Refresh ETH price every 5 minutes
+    const interval = setInterval(fetchEthPrice, 5 * 60 * 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // --- Handlers ---
   const handleSwitchToArbitrum = useCallback(async () => {
@@ -753,6 +706,17 @@ export function WalletTab() {
     }
   }, [switchChain, switchChainAsync]);
 
+  // Auto-switch to Arbitrum after connection - ALWAYS enforce Arbitrum
+  useEffect(() => {
+    if (isConnected && effectiveChainId && effectiveChainId !== arbitrum.id && !isChainSwitchPending) {
+      console.log(`Auto-switching from chain ${effectiveChainId} to Arbitrum (${arbitrum.id})`);
+      // Immediate switch for better UX
+      handleSwitchToArbitrum().catch((error) => {
+        console.warn("Auto-switch to Arbitrum failed:", error);
+      });
+    }
+  }, [isConnected, effectiveChainId, isChainSwitchPending, handleSwitchToArbitrum]);
+
   // --- Early Return ---
   if (!USE_WALLET) {
     return null;
@@ -782,7 +746,7 @@ export function WalletTab() {
           <div>
             <h2 className="text-xl font-bold text-white">Wallet Management</h2>
             <p className="text-sm text-white/70">
-              Connect and manage your crypto wallet
+              Connect and manage your Arbitrum wallet
             </p>
           </div>
         </div>
@@ -805,6 +769,7 @@ export function WalletTab() {
         connect={connect}
         connectors={connectors}
         disconnect={disconnect}
+        onSwitchToArbitrum={handleSwitchToArbitrum}
       />
 
       {/* Wallet Controls (only when connected) */}
@@ -819,6 +784,33 @@ export function WalletTab() {
         isFarcasterWallet={isFarcasterWallet}
         isCustodyWallet={isCustodyWallet}
       />
+
+      {/* Total Wallet Value (only when connected) */}
+      {isConnected && (
+        <WalletBalanceCard
+          walletBalanceDisplay={walletBalanceDisplay}
+          tgBalance={tgBalance}
+          showTooltip={showTooltip}
+          showTgTooltip={showTgTooltip}
+          setShowTooltip={setShowTooltip}
+          setShowTgTooltip={setShowTgTooltip}
+          ethPrice={ethPrice}
+        />
+      )}
+
+      {/* Withdraw ETH Section (only when connected and on Arbitrum) */}
+      {isConnected && effectiveChainId === arbitrum.id && (
+        <div className="mt-6">
+          <TriggerXWithdrawCard
+            withdrawAmount={withdrawAmount}
+            setWithdrawAmount={setWithdrawAmount}
+            handleWithdrawTg={handleWithdrawTg}
+            isWithdrawLoading={isWithdrawLoading}
+            isConnected={isConnected}
+            withdrawStatus={withdrawStatus}
+          />
+        </div>
+      )}
     </div>
     // </div>
   );

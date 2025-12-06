@@ -14,9 +14,9 @@ interface FooterProps {
   isAnimating: boolean;
 }
 
-export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWallet = false }) => {
+export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWallet = false, isAnimating }) => {
   const router = useRouter();
-  const [isAnimating, setIsAnimating] = useState(false);
+  const [isChatAnimating, setIsChatAnimating] = useState(false);
   const { haptics } = useMiniApp();
   
   const triggerHaptic = useCallback(() => {
@@ -30,13 +30,13 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
     }
   }, [haptics]);
   const handleChatClick = () => {
-    if (isAnimating) return;
-    setIsAnimating(true);
+    if (isAnimating || isChatAnimating) return;
+    setIsChatAnimating(true);
     
     // After animation delay, navigate to chat
     setTimeout(() => {
       router.push('/chat');
-      setIsAnimating(false);
+      setIsChatAnimating(false);
     }, 1200); // Same duration as other tab animations
   };
   const getTabPosition = (tab: Tab) => {
@@ -74,10 +74,12 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
         {/* Home Tab - Top */}
         <button
           onClick={() => {
+            if (isAnimating) return;
             triggerHaptic();
             setActiveTab(Tab.Home);
           }}
-          className="absolute text-white text-[11px] font-medium hover:text-white/80 transition-all duration-200"
+          className="absolute text-white text-[11px] font-medium hover:text-white/80 transition-all duration-200 disabled:opacity-50"
+          disabled={isAnimating}
           style={getTabPosition(Tab.Home)}
         >
           HOME
@@ -98,10 +100,12 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
         {/* Context Tab - Bottom */}
         <button
           onClick={() => {
+            if (isAnimating) return;
             triggerHaptic();
             setActiveTab(Tab.Context);
           }}
-          className="absolute text-white text-[11px] font-medium hover:text-white/80 transition-all duration-200"
+          className="absolute text-white text-[11px] font-medium hover:text-white/80 transition-all duration-200 disabled:opacity-50"
+          disabled={isAnimating}
           style={getTabPosition(Tab.Context)}
         >
           HISTORY
@@ -111,10 +115,12 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
         {showWallet && (
           <button
             onClick={() => {
+              if (isAnimating) return;
               triggerHaptic();
               setActiveTab(Tab.Wallet);
             }}
-            className="absolute text-white text-[11px] font-medium hover:text-white/80 transition-all duration-200"
+            className="absolute text-white text-[11px] font-medium hover:text-white/80 transition-all duration-200 disabled:opacity-50"
+            disabled={isAnimating}
             style={getTabPosition(Tab.Wallet)}
           >
             WALLET
@@ -135,7 +141,7 @@ export const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, showWal
       
       {/* Chat Animation Overlay */}
       <AnimatePresence>
-        {isAnimating && (
+        {isChatAnimating && (
           <motion.div
             className="fixed inset-0 z-100 flex items-center justify-center pointer-events-none backdrop-blur-2xl"
             initial={{ opacity: 0 }}

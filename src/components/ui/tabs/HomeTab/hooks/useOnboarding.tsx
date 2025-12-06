@@ -2,7 +2,12 @@ import { useState, useEffect } from "react";
 import { HiOutlineWallet, HiOutlineDocumentChartBar, HiOutlineCheckCircle, HiOutlineDevicePhoneMobile } from "react-icons/hi2";
 
 export function useOnboarding() {
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    // Check localStorage immediately during initialization to prevent flash
+    if (typeof window === "undefined") return false;
+    const completed = window.localStorage.getItem("dca_onboarding_completed");
+    return !completed;
+  });
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -46,13 +51,6 @@ export function useOnboarding() {
     },
   ]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const completed = window.localStorage.getItem("dca_onboarding_completed");
-    if (!completed) {
-      setShowOnboarding(true);
-    }
-  }, []);
 
   const completeOnboarding = () => {
     if (typeof window !== "undefined") {

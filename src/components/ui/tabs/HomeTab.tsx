@@ -14,7 +14,6 @@ import {
 } from "../../../lib/api";
 import {
   computePlansInvestedUsd,
-  calculateWalletTotalUsdValue,
 } from "../../../lib/utils";
 import { useFooterVisibility } from "../FooterVisibilityContext";
 import tokenMapData from "../../../tokenMap_arbitrum.json";
@@ -33,9 +32,7 @@ import {
   PlatformStatsCard,
   QuickStartCard,
   PortfolioCard,
-  WalletBalanceCard,
   TriggerXTopUpCard,
-  TriggerXWithdrawCard,
   PlansSlider,
   PlanDetailsModal,
   TokenSearchModal,
@@ -63,17 +60,11 @@ export function HomeTab() {
 
   // TriggerX balance management
   const {
-    tgBalance,
     topupAmount,
-    withdrawAmount,
     isTopupLoading,
-    isWithdrawLoading,
     topupStatus,
-    withdrawStatus,
     setTopupAmount,
-    setWithdrawAmount,
     handleTopupTg,
-    handleWithdrawTg,
   } = useTriggerX(isConnected, address, wagmiWalletClient);
 
   // State management
@@ -81,13 +72,8 @@ export function HomeTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [totalInvested, setTotalInvested] = useState(0);
   const [portfolioUsd, setPortfolioUsd] = useState<number | null>(null);
-  const [walletTotalUsd, setWalletTotalUsd] = useState<number | null>(null);
-  const [isWalletValueLoading, setIsWalletValueLoading] = useState(false);
-
   // UI state
-  const [showTooltip, setShowTooltip] = useState(false);
   const [showWrongNetworkTooltip, setShowWrongNetworkTooltip] = useState(false);
-  const [showTgTooltip, setShowTgTooltip] = useState(false);
   const [showTokenSearch, setShowTokenSearch] = useState(false);
   const [tokenSearchQuery, setTokenSearchQuery] = useState("");
   const [tokenSearchResults, setTokenSearchResults] = useState<
@@ -245,41 +231,6 @@ export function HomeTab() {
     fetchUserData();
   }, [fetchUserData]);
 
-  // Fetch wallet total USD value
-  useEffect(() => {
-    if (!address) {
-      setWalletTotalUsd(null);
-      setIsWalletValueLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setIsWalletValueLoading(true);
-
-    const loadWalletValue = async () => {
-      try {
-        const totalUsd = await calculateWalletTotalUsdValue(address);
-        if (!cancelled) {
-          setWalletTotalUsd(totalUsd);
-        }
-      } catch (error) {
-        console.error("Error loading wallet value:", error);
-        if (!cancelled) {
-          setWalletTotalUsd(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsWalletValueLoading(false);
-        }
-      }
-    };
-
-    loadWalletValue();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [address]);
 
   // Quick stats loading
   useEffect(() => {
@@ -330,10 +281,7 @@ export function HomeTab() {
     return () => setFooterVisible(true);
   }, [showPlanModal, setFooterVisible]);
 
-  useEffect(() => {
-    setFooterVisible(!showOnboarding);
-    return () => setFooterVisible(true);
-  }, [showOnboarding, setFooterVisible]);
+ 
 
   // Handle keyboard navigation for plan slider
   useEffect(() => {
@@ -357,15 +305,6 @@ export function HomeTab() {
   const userGreeting = `Welcome back, ${
     context?.user?.username ?? "John Doe"
   } 👋`;
-  const walletBalanceDisplay =
-    walletTotalUsd !== null
-      ? `$${walletTotalUsd.toLocaleString(undefined, {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}`
-      : isWalletValueLoading
-      ? "..."
-      : "$0.00";
 
   const activePlans = userPlans.filter((plan) => plan.status === "ACTIVE");
   const runningPlans = userPlans.filter(
@@ -444,16 +383,6 @@ export function HomeTab() {
         context={context}
       />
 
-      {/* Wallet Total Value */}
-      <WalletBalanceCard
-        walletBalanceDisplay={walletBalanceDisplay}
-        tgBalance={tgBalance}
-        showTooltip={showTooltip}
-        showTgTooltip={showTgTooltip}
-        setShowTooltip={setShowTooltip}
-        setShowTgTooltip={setShowTgTooltip}
-      />
-
       {/* TG Top-Up Card */}
       <TriggerXTopUpCard
         topupAmount={topupAmount}
@@ -464,15 +393,6 @@ export function HomeTab() {
         topupStatus={topupStatus}
       />
 
-      {/* TG Withdraw Card */}
-      <TriggerXWithdrawCard
-        withdrawAmount={withdrawAmount}
-        setWithdrawAmount={setWithdrawAmount}
-        handleWithdrawTg={handleWithdrawTg}
-        isWithdrawLoading={isWithdrawLoading}
-        isConnected={isConnected}
-        withdrawStatus={withdrawStatus}
-      />
 
       {/* Plan Details Modal */}
       <PlanDetailsModal
