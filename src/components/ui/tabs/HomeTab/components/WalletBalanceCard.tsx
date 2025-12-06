@@ -29,13 +29,13 @@ export function WalletBalanceCard({
       })
     : null;
 
-  // Debug logging
-  console.log('WalletBalanceCard Debug:', {
-    tgBalance,
-    ethPrice,
-    tgBalanceUsd,
-    calculation: tgBalance && ethPrice ? tgBalance * ethPrice : null
-  });
+  // // Debug logging
+  // console.log('WalletBalanceCard Debug:', {
+  //   tgBalance,
+  //   ethPrice,
+  //   tgBalanceUsd,
+  //   calculation: tgBalance && ethPrice ? tgBalance * ethPrice : null
+  // });
 
   // Format TriggerX balance display - always show 6 decimal places
   const formatTgBalance = () => {
@@ -98,12 +98,12 @@ export function WalletBalanceCard({
             <p className="text-3xl font-bold text-white group-hover:text-blue-400 transition-colors duration-300">
               {walletBalanceDisplay}
             </p>
-            <div className="flex items-center gap-2">
+            {/* <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
               <span className="text-xs text-white/60 uppercase tracking-wide font-medium">
                 Live Balance
               </span>
-            </div>
+            </div> */}
           </div>
         </motion.div>
 

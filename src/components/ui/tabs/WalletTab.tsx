@@ -101,9 +101,8 @@ function WalletStatus({
         {/* Connection Status Badge */}
         <div className="mt-3 mr-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 border border-[#c199e4]/30">
           <span
-            className={`inline-block w-2 h-2 rounded-full ${
-              isConnected ? "bg-green-400" : "bg-white/60"
-            }`}
+            className={`inline-block w-2 h-2 rounded-full ${isConnected ? "bg-green-400" : "bg-white/60"
+              }`}
           />
           <span className="text-xs text-white/90 font-medium">
             {isConnected ? "Connected" : "Not Connected"}
@@ -279,7 +278,7 @@ function ConnectionControls({
                   (c) => c.id === "farcaster"
                 );
                 if (farcasterConnector) {
-              updateManualDisconnectFlag(false);
+                  updateManualDisconnectFlag(false);
                   connect({ connector: farcasterConnector });
                   // Auto-switch to Arbitrum immediately after connection
                   setTimeout(() => onSwitchToArbitrum(), 500);
@@ -293,7 +292,7 @@ function ConnectionControls({
               className={secondaryButtonClasses}
               onClick={() => {
                 triggerHaptic();
-            updateManualDisconnectFlag(false);
+                updateManualDisconnectFlag(false);
                 connect({ connector: connectors[2] });
                 // Auto-switch to Arbitrum immediately after connection
                 setTimeout(() => onSwitchToArbitrum(), 500);
@@ -309,7 +308,7 @@ function ConnectionControls({
               className={primaryButtonClasses}
               onClick={() => {
                 triggerHaptic();
-            updateManualDisconnectFlag(false);
+                updateManualDisconnectFlag(false);
                 connect({ connector: connectors[1] });
                 // Auto-switch to Arbitrum immediately after connection
                 setTimeout(() => onSwitchToArbitrum(), 500);
@@ -322,7 +321,7 @@ function ConnectionControls({
               className={secondaryButtonClasses}
               onClick={() => {
                 triggerHaptic();
-            updateManualDisconnectFlag(false);
+                updateManualDisconnectFlag(false);
                 connect({ connector: connectors[2] });
                 // Auto-switch to Arbitrum immediately after connection
                 setTimeout(() => onSwitchToArbitrum(), 500);
@@ -376,11 +375,10 @@ function WalletControls({
     <div className="space-y-6">
       {/* Network Status */}
       <div
-        className={`p-6 backdrop-blur-lg rounded-3xl border transition-all duration-500 text-sm ${
-          isOnArbitrum
-            ? "bg-gradient-to-br from-green-400/20 to-green-400/10 border-green-400/30 hover:border-green-400/50"
-            : "bg-gradient-to-br from-red-400/20 to-red-400/10 border-red-400/30 hover:border-red-400/50"
-        }`}
+        className={`p-6 backdrop-blur-lg rounded-3xl border transition-all duration-500 text-sm mb-7 ${isOnArbitrum
+          ? "bg-gradient-to-br from-green-400/20 to-green-400/10 border-green-400/30 hover:border-green-400/50"
+          : "bg-gradient-to-br from-red-400/20 to-red-400/10 border-red-400/30 hover:border-red-400/50"
+          }`}
       >
         {isOnArbitrum ? (
           <div className="flex items-start gap-3">
@@ -495,7 +493,7 @@ export function WalletTab() {
   const [user, setUser] = useState<UserInfo | null>(null);
   const chainId = useChainId();
   const effectiveChainId = accountChainId ?? chainId;
-  
+
   // Get wallet client for TriggerX integration
   const { data: wagmiWalletClient } = useWalletClient();
 
@@ -520,16 +518,16 @@ export function WalletTab() {
     const init = async () => {
       try {
         await sdk.actions.ready();
-      const context = await sdk.context;
-      const ctxUser = context?.user;
-        
-      if (ctxUser && typeof ctxUser.fid === "number") {
-        setUser({
-          fid: ctxUser.fid,
-          username: ctxUser.username,
-          displayName: ctxUser.displayName,
-          pfpUrl: ctxUser.pfpUrl,
-        });
+        const context = await sdk.context;
+        const ctxUser = context?.user;
+
+        if (ctxUser && typeof ctxUser.fid === "number") {
+          setUser({
+            fid: ctxUser.fid,
+            username: ctxUser.username,
+            displayName: ctxUser.displayName,
+            pfpUrl: ctxUser.pfpUrl,
+          });
         }
       } catch (err) {
         console.error("Failed to initialize SDK:", err);
@@ -553,17 +551,14 @@ export function WalletTab() {
   // --- Computed Values ---
   const isFarcasterWallet = connector?.id === "farcaster";
   const isCustodyWallet = isFarcasterWallet;
-  
+
   // Wallet balance display
   const walletBalanceDisplay =
     walletTotalUsd !== null
-      ? `$${walletTotalUsd.toLocaleString(undefined, {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}`
+      ? `$${walletTotalUsd.toFixed(2)}`
       : isWalletValueLoading
-      ? "..."
-      : "$0.00";
+        ? "..."
+        : "$0.00";
 
   // Store user on first connect
   useEffect(() => {
@@ -626,14 +621,14 @@ export function WalletTab() {
         // Get WETH address for Arbitrum
         const wethAddress = getArbitrumAddressBySymbol('WETH');
         console.log('WETH Address:', wethAddress);
-        
+
         if (wethAddress) {
           const prices = await fetchArbitrumUsdPrices([wethAddress]);
           console.log('Fetched prices:', prices);
-          
+
           const price = prices[wethAddress.toLowerCase()];
           console.log('ETH Price:', price);
-          
+
           if (price) {
             setEthPrice(price);
             console.log('ETH price set to:', price);
@@ -645,10 +640,10 @@ export function WalletTab() {
     };
 
     fetchEthPrice();
-    
+
     // Refresh ETH price every 5 minutes
     const interval = setInterval(fetchEthPrice, 5 * 60 * 1000);
-    
+
     return () => clearInterval(interval);
   }, []);
 
