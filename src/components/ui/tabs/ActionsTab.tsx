@@ -1507,40 +1507,6 @@ export function ActionsTab() {
           return;
         }
 
-        // Compute total executions
-        const totalExecutions = Math.max(
-          1,
-          Math.floor(durationMinutes / intervalMinutes)
-        );
-        // console.log("totalExecutions", totalExecutions);
-        // Compute approval amount
-        const amountWeiPerExec = parseUnits(amountPerExecutionStr, decimals);
-        const totalAmountWei = amountWeiPerExec * BigInt(totalExecutions);
-        // console.log("totalAmountWei", totalAmountWei);
-        // Show approval request message
-        const approvalMessage: ChatMessage = {
-          id: createMessageId("assistant"),
-          role: "assistant",
-          content: `🔐 **Requesting Token Approval**\n\nPlease approve spending of ${planData.fromToken
-            } tokens so the contract can execute your plan automatically.\n\n• Amount per execution: ${amountPerExecutionStr} ${planData.fromToken
-            }\n• Executions: ${totalExecutions}\n• Total approval: ${totalAmountWei.toString()} (wei)\n\n*Check your wallet popup...*`,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, approvalMessage]);
-
-        setConfirmationStep("approval");
-        setApprovalStatus("approving");
-        setPendingConfirmationId(confirmationId);
-        setIsApprovalLoading(true);
-
-        // console.log("[Approval] Starting token approval process:", {
-        //   token: tokenInfo.symbol,
-        //   amountPerExecution: amountPerExecutionStr,
-        //   totalExecutions,
-        //   decimals,
-        //   totalAmountWei: totalAmountWei.toString(),
-        // });
-
         // Ensure we're on Arbitrum before proceeding
         if (chainId !== arbitrum.id) {
           const errorMessage: ChatMessage = {
@@ -1555,15 +1521,98 @@ export function ActionsTab() {
           return;
         }
 
-        // Trigger wallet approval popup with dynamic total amount
-        // Note: Explicitly pass chainId to help wagmi avoid connector.getChainId() issues
-        writeContract({
-          address: tokenInfo.address as `0x${string}`,
-          abi: ERC20_ABI,
-          functionName: "approve",
-          args: [EXECUTOR_ADDRESS as `0x${string}`, totalAmountWei],
-          chainId: arbitrum.id,
-        });
+        // Compute total executions
+        const totalExecutions = Math.max(
+          1,
+          Math.floor(durationMinutes / intervalMinutes)
+        );
+        
+        // Compute required approval amount for this job
+        const amountWeiPerExec = parseUnits(amountPerExecutionStr, decimals);
+        const requiredAmountWei = amountWeiPerExec * BigInt(totalExecutions);
+
+        // Show initial approval request message
+        const initialMessage: ChatMessage = {
+          id: createMessageId("assistant"),
+          role: "assistant",
+          content: `🔐 **Checking Current Allowance**\n\nChecking existing token allowance and calculating total approval needed...\n\n• Amount per execution: ${amountPerExecutionStr} ${planData.fromToken}\n• Executions: ${totalExecutions}\n• Required for this job: ${requiredAmountWei.toString()} (wei)\n\n*Please wait...*`,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, initialMessage]);
+
+        setConfirmationStep("approval");
+        setApprovalStatus("approving");
+        setPendingConfirmationId(confirmationId);
+        setIsApprovalLoading(true);
+
+        // Fetch current allowance
+        try {
+          const allowanceResponse = await fetch('/api/check-allowance', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              tokenAddress: tokenInfo.address,
+              ownerAddress: address,
+              spenderAddress: EXECUTOR_ADDRESS,
+            }),
+          });
+
+          let currentAllowance = BigInt(0);
+          if (allowanceResponse.ok) {
+            const allowanceData = await allowanceResponse.json();
+            currentAllowance = BigInt(allowanceData.allowance || '0');
+          } else {
+            console.warn('Failed to fetch allowance, proceeding with 0');
+          }
+
+          // Calculate total approval amount (current allowance + required amount)
+          const totalApprovalAmount = currentAllowance + requiredAmountWei;
+
+          console.log("[Approval] Allowance calculation:", {
+            currentAllowance: currentAllowance.toString(),
+            requiredAmount: requiredAmountWei.toString(),
+            totalApproval: totalApprovalAmount.toString(),
+          });
+
+          // Update approval message with allowance info
+          const updatedApprovalMessage: ChatMessage = {
+            id: createMessageId("assistant"),
+            role: "assistant",
+            content: `🔐 **Requesting Token Approval**\n\nPlease approve spending of ${planData.fromToken} tokens so the contract can execute your plan automatically.\n\n• Amount per execution: ${amountPerExecutionStr} ${planData.fromToken}\n• Executions: ${totalExecutions}\n• Current allowance for previous executions: ${currentAllowance.toString()} (wei)\n• Required for this job: ${requiredAmountWei.toString()} (wei)\n• Total approval: ${totalApprovalAmount.toString()} (wei)\n\n*Check your wallet popup...*`,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev.slice(0, -1), updatedApprovalMessage]);
+
+          // Trigger wallet approval popup with total amount (current allowance + required)
+          writeContract({
+            address: tokenInfo.address as `0x${string}`,
+            abi: ERC20_ABI,
+            functionName: "approve",
+            args: [EXECUTOR_ADDRESS as `0x${string}`, totalApprovalAmount],
+            chainId: arbitrum.id,
+          });
+        } catch (allowanceError) {
+          console.error("Error fetching allowance:", allowanceError);
+          
+          // Fallback: proceed with just the required amount if allowance check fails
+          const fallbackMessage: ChatMessage = {
+            id: createMessageId("assistant"),
+            role: "assistant",
+            content: `🔐 **Requesting Token Approval**\n\nUnable to check current allowance, proceeding with required amount.\n\n• Amount per execution: ${amountPerExecutionStr} ${planData.fromToken}\n• Executions: ${totalExecutions}\n• Approval amount: ${requiredAmountWei.toString()} (wei)\n\n*Check your wallet popup...*`,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev.slice(0, -1), fallbackMessage]);
+
+          writeContract({
+            address: tokenInfo.address as `0x${string}`,
+            abi: ERC20_ABI,
+            functionName: "approve",
+            args: [EXECUTOR_ADDRESS as `0x${string}`, requiredAmountWei],
+            chainId: arbitrum.id,
+          });
+        }
       } catch (error) {
         console.error("Error starting approval process:", error);
 
@@ -1578,7 +1627,7 @@ export function ActionsTab() {
         setApprovalStatus("idle");
       }
     },
-    [writeContract, chainId]
+    [writeContract, chainId, address]
   );
 
   // Handle the approve confirmation (after summary)

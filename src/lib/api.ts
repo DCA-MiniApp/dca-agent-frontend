@@ -3,6 +3,52 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ||'https://dca-backend.udonswap.org'; // Default to production URL
 console.log("API_BASE_URL", API_BASE_URL);
 
+export interface TaskData {
+  task_id: number;
+  task_number: number;
+  task_opx_cost: number;
+  execution_timestamp: string;
+  execution_tx_hash: string;
+  task_performer_id: number;
+  task_attester_ids: number[];
+  task_status: string;
+  task_error: string;
+  is_accepted: boolean;
+  tx_url: string;
+  converted_arguments: string[];
+}
+
+export interface JobData {
+  job_id: string;
+  job_title: string;
+  task_definition_id: number;
+  user_id: number;
+  link_job_id: string | null;
+  chain_status: number;
+  custom: boolean;
+  time_frame: number;
+  recurring: boolean;
+  status: string;
+  job_cost_prediction: number;
+  job_cost_actual: number;
+  task_ids: number[];
+  created_at: string;
+  updated_at: string;
+  last_executed_at: string;
+  timezone: string;
+  is_imua: boolean;
+  created_chain_id: string;
+  safe_address: string;
+}
+
+export interface JobDataResponse {
+  success: boolean;
+  data: {
+    jobData: JobData;
+    taskData: TaskData[];
+  };
+}
+
 export interface DCAPlan {
   id: string;
   jobId: string;
@@ -17,11 +63,14 @@ export interface DCAPlan {
   slippage: string;
   createdAt: string;
   updatedAt: string;
+  ipfsLink?: string;
+  jobData?: JobDataResponse;
+  successCount: number;
+  jobDataStatus?: string;
+  jobStatus?: string;
+  // Deprecated fields (for backward compatibility during transition)
   vaultAddress?: string;
   shareTokens?: string;
-  jobStatus?: string;
-  successCount: number;
-  // Deprecated fields (for backward compatibility during transition)
   intervalMinutes?: number;
   durationWeeks?: number;
   nextExecution?: string | null;
@@ -80,12 +129,12 @@ export interface TaskData {
   execution_timestamp: string;
   execution_tx_hash: string;
   task_performer_id: number;
-  task_attester_ids: number[] | null;
+  task_attester_ids: number[];
   task_status: string;
   task_error: string;
   is_accepted: boolean;
   tx_url: string;
-  converted_arguments: any;
+  converted_arguments: string[];
 }
 
 export interface JobMonitorUser {

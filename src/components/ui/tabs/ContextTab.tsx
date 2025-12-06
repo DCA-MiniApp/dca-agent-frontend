@@ -122,28 +122,33 @@ export function ContextTab() {
 
   // Convert ExecutionHistory to TransactionRow format
   const transactions: TransactionRow[] = useMemo(() => {
-    return executionHistory.map((item) => {
-      const executedAt = new Date(item.executionTimestamp);
-      return {
-        id: `${item.jobId}-${item.taskId}`,
-        jobId: item.jobId,
-        taskId: item.taskId,
-        fromToken: item.fromToken,
-        toToken: item.toToken,
-        amount: item.amount,
-        dateISO: executedAt.toISOString().slice(0, 10),
-        executedAtISO: item.executionTimestamp,
-        status: item.taskStatus,
-        txHash: item.executionTxHash || null,
-        txUrl: item.txUrl || null,
-        slippage: item.slippage || null,
-        gasFee: item.gasFee || null,
-        tgCostETH: item.tgCostETH || null,
-        inputAmount: item.inputAmount || null,
-        outputAmount: item.outputAmount || null,
-        exchangeRate: item.exchangeRate || null,
-      };
-    });
+    return executionHistory
+      .map((item) => {
+        const executedAt = new Date(item.executionTimestamp);
+        return {
+          id: `${item.jobId}-${item.taskId}`,
+          jobId: item.jobId,
+          taskId: item.taskId,
+          fromToken: item.fromToken,
+          toToken: item.toToken,
+          amount: item.amount,
+          dateISO: executedAt.toISOString().slice(0, 10),
+          executedAtISO: item.executionTimestamp,
+          status: item.taskStatus,
+          txHash: item.executionTxHash || null,
+          txUrl: item.txUrl || null,
+          slippage: item.slippage || null,
+          gasFee: item.gasFee || null,
+          tgCostETH: item.tgCostETH || null,
+          inputAmount: item.inputAmount || null,
+          outputAmount: item.outputAmount || null,
+          exchangeRate: item.exchangeRate || null,
+        };
+      })
+      .sort((a, b) => {
+        // Sort by execution time in descending order (most recent first)
+        return new Date(b.executedAtISO).getTime() - new Date(a.executedAtISO).getTime();
+      });
   }, [executionHistory]);
 
   // Filters
@@ -309,7 +314,7 @@ export function ContextTab() {
       )}
 
       {/* Task ID Search (always visible) */}
-      {!selectedTx && transactions.length > 0 && (
+      {/* {!selectedTx && transactions.length > 0 && (
         <div className="mb-4">
           <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl p-4 border border-white/20">
             <label className="text-sm text-[#c199e4]/90 mb-2 font-medium block">
@@ -327,7 +332,7 @@ export function ContextTab() {
             />
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Filters (collapsible) */}
       {showFilters && !selectedTx && (
@@ -681,7 +686,7 @@ export function ContextTab() {
 
               {/* Transaction Details Grid */}
               <div className="grid grid-cols-2 gap-2.5">
-                <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
+                {/* <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
                   <p className="text-xs text-gray-400 mb-1 font-medium">
                     Job ID (TriggerX)
                   </p>
@@ -697,7 +702,7 @@ export function ContextTab() {
                   <p className="text-sm font-bold text-white font-mono">
                     {selectedTx.taskId ? `${selectedTx.taskId}` : "N/A"}
                   </p>
-                </div>
+                </div> */}
                 <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20 col-span-2">
                   <p className="text-xs text-gray-400 mb-1 font-medium">
                     Transaction Hash

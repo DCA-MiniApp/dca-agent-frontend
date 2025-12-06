@@ -571,8 +571,7 @@ export function HomeTab() {
 
       sdk.on("miniAppAdded", ({ notificationDetails }) => {
         setLastEvent(
-          `miniAppAdded${
-            !!notificationDetails ? ", notifications enabled" : ""
+          `miniAppAdded${!!notificationDetails ? ", notifications enabled" : ""
           }`
         );
         setAdded(true);
@@ -935,6 +934,26 @@ export function HomeTab() {
     }
   }, []);
 
+  const getShortTimezone = () => {
+    const longTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  
+    const map = {
+      "Asia/Kolkata": "IST",
+      "Asia/Calcutta": "IST",
+      "America/New_York": "EST",
+      "America/Los_Angeles": "PST",
+      "America/Chicago": "CST",
+      "America/Denver": "MST",
+      "Europe/London": "GMT",
+      "Europe/Paris": "CET",
+      "Asia/Dubai": "GST",
+      "Asia/Tokyo": "JST",
+      "Australia/Sydney": "AEST"
+    } as Record<string, string>;
+  
+    return map[longTZ] ?? longTZ;
+  };
+
   const completeOnboarding = () => {
     if (typeof window !== "undefined") {
       window.localStorage.setItem("dca_onboarding_completed", "true");
@@ -1060,7 +1079,7 @@ export function HomeTab() {
               if (!accounts || accounts.length === 0) {
                 await provider.send("eth_requestAccounts", []);
               }
-            } catch {}
+            } catch { }
             signer = await provider.getSigner();
           } else {
             console.warn(
@@ -1132,6 +1151,13 @@ export function HomeTab() {
 
   const openPlanModal = (plan: DCAPlan) => {
     setSelectedPlan(plan);
+    console.log("=== SELECTED PLAN DETAILS ===");
+    console.log("Full plan object:", plan);
+    console.log("Job Status:", plan.jobStatus);
+    console.log("Success Count:", plan.successCount);
+    console.log("Total Executions:", plan.totalExecutions);
+
+    console.log("========================");
     setShowPlanModal(true);
   };
 
@@ -1173,18 +1199,17 @@ export function HomeTab() {
     return () => window.removeEventListener("keydown", handleKeyPress);
   }, []);
 
-  const userGreeting = `Welcome back, ${
-    context?.user?.username ?? "John Doe"
-  } 👋`;
+  const userGreeting = `Welcome back, ${context?.user?.username ?? "John Doe"
+    } 👋`;
   const walletBalanceDisplay =
     walletTotalUsd !== null
       ? `$${walletTotalUsd.toLocaleString(undefined, {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}`
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`
       : isWalletValueLoading
-      ? "..."
-      : "$0.00";
+        ? "..."
+        : "$0.00";
 
   const step = onboardingSteps[currentStepIndex];
 
@@ -1602,13 +1627,12 @@ export function HomeTab() {
                       {s.icon}
                     </div>
                     <div
-                      className={`text-sm font-bold transition-colors duration-300 mb-1 ${
-                        idx === currentStepIndex
-                          ? "text-[#c199e4]"
-                          : idx < currentStepIndex
+                      className={`text-sm font-bold transition-colors duration-300 mb-1 ${idx === currentStepIndex
+                        ? "text-[#c199e4]"
+                        : idx < currentStepIndex
                           ? "text-green-400"
                           : "text-white group-hover:text-gray-200"
-                      }`}
+                        }`}
                     >
                       {s.title}
                     </div>
@@ -1714,9 +1738,8 @@ export function HomeTab() {
                 {address.slice(0, 6)}...{address.slice(-4)}
               </code>
               <button
-                className={`inline-flex items-center px-1.5 py-0.5 rounded transition ${
-                  copied ? "bg-green-400/20" : "hover:bg-white/20"
-                }`}
+                className={`inline-flex items-center px-1.5 py-0.5 rounded transition ${copied ? "bg-green-400/20" : "hover:bg-white/20"
+                  }`}
                 title={copied ? "Copied!" : "Copy address"}
                 onClick={() => {
                   navigator.clipboard.writeText(address);
@@ -1726,9 +1749,8 @@ export function HomeTab() {
                 type="button"
               >
                 <HiOutlineClipboard
-                  className={`w-3.5 h-3.5 transition ${
-                    copied ? "text-green-400" : "text-white/70 hover:text-white"
-                  }`}
+                  className={`w-3.5 h-3.5 transition ${copied ? "text-green-400" : "text-white/70 hover:text-white"
+                    }`}
                 />
               </button>
               <code className="text-xs px-1 rounded-full transition-all duration-300">
@@ -2097,21 +2119,22 @@ export function HomeTab() {
                   </div>
                   <div>
                     <span
-                      className={`text-xs font-bold px-4 py-2 rounded-full transition-all duration-300 ${
-                        userPlans[currentPlanIndex].jobStatus === "completed"
-                          ? "bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30"
-                          : userPlans[currentPlanIndex].jobStatus === "running"
+                      className={`text-xs font-bold px-4 py-2 rounded-full transition-all duration-300 ${userPlans[currentPlanIndex].jobStatus === "completed"
+                        ? "bg-green-400/20 text-green-300 border border-green-400/40 group-hover:bg-green-400/30"
+                        : userPlans[currentPlanIndex].jobStatus === "running"
                           ? "bg-blue-400/20 text-blue-300 border border-blue-400/40 group-hover:bg-blue-400/30"
                           : userPlans[currentPlanIndex].jobStatus === "pending"
-                          ? "bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 group-hover:bg-yellow-400/30"
-                          : userPlans[currentPlanIndex].jobStatus === "deleted"
-                          ? "bg-red-400/20 text-red-300 border border-red-400/40 group-hover:bg-red-400/30"
-                          : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
-                      }`}
+                            ? "bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 group-hover:bg-yellow-400/30"
+                            : userPlans[currentPlanIndex].jobStatus === "deleted"
+                              ? "bg-red-400/20 text-red-300 border border-red-400/40 group-hover:bg-red-400/30"
+                              : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
+                        }`}
                     >
-                      {userPlans[currentPlanIndex].jobStatus ||
+                      {(userPlans[currentPlanIndex].jobStatus ||
                         userPlans[currentPlanIndex].status ||
-                        "Unknown"}
+                        "Unknown") === "pending" ? "Live" : (userPlans[currentPlanIndex].jobStatus ||
+                          userPlans[currentPlanIndex].status ||
+                          "Unknown")}
                     </span>
                   </div>
                 </div>
@@ -2134,7 +2157,7 @@ export function HomeTab() {
                       </p>
                       <p className="text-2xl font-bold text-white group-hover/item:text-[#c199e4] transition-colors duration-300">
                         {formatInterval(
-                          userPlans[currentPlanIndex].intervalSeconds || 
+                          userPlans[currentPlanIndex].intervalSeconds ||
                           (userPlans[currentPlanIndex].intervalMinutes ? userPlans[currentPlanIndex].intervalMinutes * 60 : 0)
                         )}
                       </p>
@@ -2156,9 +2179,9 @@ export function HomeTab() {
                       <p className="text-2xl font-bold text-[#c199e4]">
                         {userPlans[currentPlanIndex].successCount > 0
                           ? (
-                              parseFloat(userPlans[currentPlanIndex].amount) *
-                                userPlans[currentPlanIndex].successCount || 0
-                            ).toFixed(5)
+                            parseFloat(userPlans[currentPlanIndex].amount) *
+                            userPlans[currentPlanIndex].successCount || 0
+                          ).toFixed(5)
                           : "0.00"}
                       </p>
                     </div>
@@ -2166,11 +2189,10 @@ export function HomeTab() {
                       <div
                         className="bg-gradient-to-r from-[#c199e4] to-emerald-400 h-3 rounded-full transition-all duration-700 shadow-sm"
                         style={{
-                          width: `${
-                            (userPlans[currentPlanIndex].successCount /
-                              userPlans[currentPlanIndex].totalExecutions) *
+                          width: `${(userPlans[currentPlanIndex].successCount /
+                            userPlans[currentPlanIndex].totalExecutions) *
                             100
-                          }%`,
+                            }%`,
                         }}
                       />
                     </div>
@@ -2221,11 +2243,10 @@ export function HomeTab() {
               <button
                 key={index}
                 onClick={() => setCurrentPlanIndex(index)}
-                className={`size-1.5 rounded-full transition-all duration-300 ${
-                  index === currentPlanIndex
-                    ? "bg-white shadow-lg scale-125"
-                    : "bg-white/40 hover:bg-white/60"
-                }`}
+                className={`size-1.5 rounded-full transition-all duration-300 ${index === currentPlanIndex
+                  ? "bg-white shadow-lg scale-125"
+                  : "bg-white/40 hover:bg-white/60"
+                  }`}
                 aria-label={`Go to plan ${index + 1}`}
               />
             ))}
@@ -2263,9 +2284,9 @@ export function HomeTab() {
                     {isLoading || portfolioUsd === null || !isConnected
                       ? "$0.00"
                       : `$${portfolioUsd?.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}`}
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}`}
                   </p>
                   <span className="text-sm text-white/60 font-medium">
                     Total Invested
@@ -2545,21 +2566,22 @@ export function HomeTab() {
                     <p className="text-xs text-white/70 flex items-center gap-2">
                       {selectedPlan.fromToken} → {selectedPlan.toToken}
                       <span
-                        className={`text-xs font-bold px-2 py-1 rounded-full ${
-                          selectedPlan.jobStatus === "completed"
-                            ? "bg-green-400/20 text-green-300 border border-green-400/40"
-                            : selectedPlan.jobStatus === "running"
+                        className={`text-xs font-bold px-2 py-1 rounded-full ${selectedPlan.jobStatus === "completed"
+                          ? "bg-green-400/20 text-green-300 border border-green-400/40"
+                          : selectedPlan.jobStatus === "running"
                             ? "bg-blue-400/20 text-blue-300 border border-blue-400/40"
                             : selectedPlan.jobStatus === "pending"
-                            ? "bg-yellow-400/20 text-yellow-300 border border-yellow-400/40"
-                            : selectedPlan.jobStatus === "deleted"
-                            ? "bg-red-400/20 text-red-300 border border-red-400/40"
-                            : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
-                        }`}
+                              ? "bg-yellow-400/20 text-yellow-300 border border-yellow-400/40"
+                              : selectedPlan.jobStatus === "deleted"
+                                ? "bg-red-400/20 text-red-300 border border-red-400/40"
+                                : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
+                          }`}
                       >
-                        {selectedPlan.jobStatus ||
+                        {(selectedPlan.jobStatus ||
                           selectedPlan.status ||
-                          "Unknown"}
+                          "Unknown") === "pending" ? "Live" : (selectedPlan.jobStatus ||
+                            selectedPlan.status ||
+                            "Unknown")}
                       </span>
                     </p>
                   </div>
@@ -2586,7 +2608,7 @@ export function HomeTab() {
 
               {/* Plan Details Grid */}
               <div className="grid grid-cols-2 gap-2.5">
-                <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
+                {/* <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
                   <p className="text-xs text-gray-400 mb-1 font-medium">
                     Job ID (TriggerX)
                   </p>
@@ -2607,13 +2629,13 @@ export function HomeTab() {
                       )}
                     </button>
                   </div>
-                </div>
+                </div> */}
                 <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
                   <p className="text-xs text-gray-400 mb-1 font-medium">
                     Amount
                   </p>
                   <p className="text-sm font-bold text-white">
-                    {parseFloat(selectedPlan.amount).toFixed(5)}
+                    {parseFloat(selectedPlan.amount).toFixed(5)}  {selectedPlan.fromToken}
                   </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
@@ -2621,7 +2643,7 @@ export function HomeTab() {
                     Interval
                   </p>
                   <p className="text-sm font-bold text-white">
-                    {formatInterval(selectedPlan.intervalSeconds || 
+                    {formatInterval(selectedPlan.intervalSeconds ||
                       (selectedPlan.intervalMinutes ? selectedPlan.intervalMinutes * 60 : 0))}
                   </p>
                 </div>
@@ -2630,7 +2652,7 @@ export function HomeTab() {
                     Duration
                   </p>
                   <p className="text-sm font-bold text-white">
-                    {formatDuration(selectedPlan.durationSeconds || 
+                    {formatDuration(selectedPlan.durationSeconds ||
                       (selectedPlan.durationWeeks ? selectedPlan.durationWeeks * 604800 : 0))}
                   </p>
                 </div>
@@ -2642,7 +2664,7 @@ export function HomeTab() {
                     {parseFloat(selectedPlan.slippage).toFixed(2)}%
                   </p>
                 </div>
-                <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
+                <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20 col-span-2">
                   <p className="text-xs text-gray-400 mb-1 font-medium">
                     Progress
                   </p>
@@ -2664,41 +2686,67 @@ export function HomeTab() {
                 </div>
                 <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
                   <p className="text-xs text-gray-400 mb-1 font-medium">
-                    Created
+                    Created ({getShortTimezone()})
                   </p>
                   <p className="text-sm font-bold text-white">
-                    {new Date(selectedPlan.createdAt).toLocaleDateString(
+                    {new Date(selectedPlan.createdAt).toLocaleString(
                       "en-US",
                       {
                         month: "short",
                         day: "numeric",
                         year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        timeZone: "UTC",
                       }
                     )}
                   </p>
                 </div>
                 <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
                   <p className="text-xs text-gray-400 mb-1 font-medium">
-                    Next Execution
+                    Next Execution ({getShortTimezone()})
                   </p>
                   <p className="text-sm font-bold text-white">
-                    {selectedPlan.nextExecution
-                      ? new Date(selectedPlan.nextExecution).toLocaleString(
-                          "en-US",
-                          {
-                            month: "short",
-                            day: "numeric",
-                            hour: "numeric",
-                            minute: "2-digit",
-                          }
-                        )
-                      : "N/A"}
+                    {(() => {
+                      const taskData = selectedPlan.jobData?.data?.taskData;
+                      if (!taskData || !Array.isArray(taskData) || taskData.length === 0 || !selectedPlan.intervalSeconds) return "N/A";
+
+                      // Find the task with the highest task_id (latest task)
+                      const latestTask = taskData.reduce((latest, current) =>
+                        current.task_id > latest.task_id ? current : latest
+                      );
+
+                      if (!latestTask.execution_timestamp) return "N/A";
+
+                      const lastExecutionTime = new Date(latestTask.execution_timestamp);
+                      const nextExecutionTime = new Date(
+                        lastExecutionTime.getTime() + selectedPlan.intervalSeconds * 1000
+                      );
+
+                      // return nextExecutionTime.toLocaleString("en-US", {
+                      //   month: "short",
+                      //   year: "numeric",
+                      //   day: "numeric",
+                      //   hour: "numeric",
+                      //   minute: "2-digit",
+                      //   timeZone: "UTC",
+                      // });
+                      return nextExecutionTime.toLocaleString(undefined, {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12: true
+                      })
+                    })()}
                   </p>
                 </div>
+
               </div>
 
               {/* Progress Bar */}
-              <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
+              {/* <div className="backdrop-blur-lg rounded-xl p-2.5 border border-[#c199e4]/20">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs text-gray-400 font-medium">
                     Execution Progress
@@ -2724,15 +2772,14 @@ export function HomeTab() {
                     }}
                   />
                 </div>
-              </div>
+              </div> */}
 
               {/* Delete Button */}
               <div className="pt-2">
                 <button
                   onClick={() => handleDeletePlan(selectedPlan)}
-                  className={`w-full bg-gradient-to-r from-red-500/20 to-red-500/10 hover:from-red-500/30 hover:to-red-500/20 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-300 text-sm border border-red-500/30 hover:border-red-500/50 ${
-                    isDeleting ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
+                  className={`w-full bg-gradient-to-r from-red-500/20 to-red-500/10 hover:from-red-500/30 hover:to-red-500/20 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-300 text-sm border border-red-500/30 hover:border-red-500/50 ${isDeleting ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
                   disabled={isDeleting}
                 >
                   {isDeleting ? "Deleting..." : "Delete Plan"}
