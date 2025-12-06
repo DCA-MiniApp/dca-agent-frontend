@@ -567,15 +567,58 @@ export async function fetchPlatformStatsForMonitor(): Promise<JobMonitorData | n
   }
 }
 
-export async function fetchQuickStats(): Promise<QuickStats | null> {
+// export async function fetchQuickStats(): Promise<QuickStats | null> {
+//   const now = Date.now();
+
+//   // Use cached stats if they are fresher than 2 minutes
+//   if (
+//     quickStatsCache &&
+//     now - quickStatsCache.fetchedAt < 5 * 60 * 1000
+//   ) {
+//     return quickStatsCache.data;
+//   }
+
+//   try {
+//     const response = await fetch(`${API_BASE_URL}/api/dca/platform-stats`, {
+//       method: "GET",
+//       headers: {
+//         Accept: "application/json",
+//         ishome: "true",
+//       },
+//     });
+
+//     if (!response.ok) {
+//       console.error("Failed to fetch quick stats:", response.status);
+//       return null;
+//     }
+
+//     const result: ApiResponse<QuickStats> = await response.json();
+//     if (result.success && result.data) {
+//       quickStatsCache = {
+//         data: result.data,
+//         fetchedAt: now,
+//       };
+//       return result.data;
+//     } else {
+//       console.error("Failed to fetch quick stats:", result.message);
+//       return null;
+//     }
+//   } catch (error) {
+//     console.error("Error fetching quick stats:", error);
+//     return null;
+//   }
+// }
+
+
+// In api.ts
+export async function fetchQuickStats(): Promise<{ data: QuickStats | null; fromCache: boolean }> {
   const now = Date.now();
 
-  // Use cached stats if they are fresher than 2 minutes
   if (
     quickStatsCache &&
-    now - quickStatsCache.fetchedAt < 2 * 60 * 1000
+    now - quickStatsCache.fetchedAt < 5 * 60 * 1000
   ) {
-    return quickStatsCache.data;
+    return { data: quickStatsCache.data, fromCache: true };
   }
 
   try {
@@ -589,7 +632,7 @@ export async function fetchQuickStats(): Promise<QuickStats | null> {
 
     if (!response.ok) {
       console.error("Failed to fetch quick stats:", response.status);
-      return null;
+      return { data: null, fromCache: false };
     }
 
     const result: ApiResponse<QuickStats> = await response.json();
@@ -598,16 +641,17 @@ export async function fetchQuickStats(): Promise<QuickStats | null> {
         data: result.data,
         fetchedAt: now,
       };
-      return result.data;
+      return { data: result.data, fromCache: false };
     } else {
       console.error("Failed to fetch quick stats:", result.message);
-      return null;
+      return { data: null, fromCache: false };
     }
   } catch (error) {
     console.error("Error fetching quick stats:", error);
-    return null;
+    return { data: null, fromCache: false };
   }
 }
+
 /**
  * Convert seconds to minutes for backward compatibility
  */

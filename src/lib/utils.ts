@@ -184,7 +184,7 @@ export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<numb
           cached &&
           cached.signature === signature &&
           typeof cached.timestamp === "number" &&
-          Date.now() - cached.timestamp < 2 * 60 * 1000
+          Date.now() - cached.timestamp < 5 * 60 * 1000
         ) {
           return cached.value ?? 0;
         }
@@ -241,7 +241,7 @@ export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<numb
     total += per * price * (successCount ?? 0);
     // console.log("total in computePlansInvestedUsd 149:", total);
   }
-  if (cacheKey) {
+  if (cacheKey && total > 0) {
     try {
       window.localStorage.setItem(
         cacheKey,

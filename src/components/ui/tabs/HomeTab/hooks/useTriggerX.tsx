@@ -21,7 +21,7 @@ export function useTriggerX(isConnected: boolean, address?: string, wagmiWalletC
 
       try {
         const balance = await checkTgBalanceForUser(address);
-        console.log("TG Balance fetched:", balance);
+        // console.log("TG Balance fetched:", balance);
         setTgBalance(balance.data ? Number(balance.data.ethBalance) : 0);
       } catch (error) {
         setTgBalance(null);

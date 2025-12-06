@@ -69,7 +69,7 @@ export function PlatformStatsCard({
 
         <div className="pt-2 border-t border-slate-700/30">
           <p className="text-xs text-slate-500">
-            Updated <span className="text-slate-400">2 minutes ago</span>
+            Updated <span className="text-slate-400">5 minutes ago</span>
           </p>
         </div>
       </div>

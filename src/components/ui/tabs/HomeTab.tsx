@@ -12,9 +12,7 @@ import {
   fetchQuickStats,
   type DCAPlan,
 } from "../../../lib/api";
-import {
-  computePlansInvestedUsd,
-} from "../../../lib/utils";
+import { computePlansInvestedUsd } from "../../../lib/utils";
 import { useFooterVisibility } from "../FooterVisibilityContext";
 import tokenMapData from "../../../tokenMap_arbitrum.json";
 
@@ -41,6 +39,14 @@ import {
 // Import utilities
 import { formatContractAddress } from "./HomeTab/utils/helpers";
 
+//Cache for plans to avoid re-computation
+// let plansCache: {
+//   activePlans: DCAPlan[];
+//   runningPlans: DCAPlan[];
+//   fetchedAt: number;
+//   address: string;
+// } | null = null;
+
 /**
  * HomeTab component displays the main landing content for the mini app.
  */
@@ -53,10 +59,7 @@ export function HomeTab() {
 
   // SDK and onboarding hooks
   const { context, isSDKLoaded } = useSDK();
-  const {
-    showOnboarding,
-    setShowOnboarding,
-  } = useOnboarding();
+  const { showOnboarding, setShowOnboarding } = useOnboarding();
 
   // TriggerX balance management
   const {
@@ -92,6 +95,10 @@ export function HomeTab() {
     () => Object.entries(tokenMapData.tokenMap || {}),
     []
   );
+
+  //Memoized/cache plans
+  // const [activePlans, setActivePlans] = useState<DCAPlan[]>([]);
+  // const [runningPlans, setRunningPlans] = useState<DCAPlan[]>([]);
 
   // Plan management hook
   const fetchUserData = useCallback(async () => {
@@ -209,6 +216,37 @@ export function HomeTab() {
     setTokenSearchResults(matches);
   }, [tokenSearchQuery, tokenEntries]);
 
+  // //Active and running plans caching
+  // useEffect(() => {
+  //   const now = Date.now();
+  //   if (
+  //     plansCache &&
+  //     plansCache.address === address &&
+  //     now - plansCache.fetchedAt < 5 * 60 * 1000
+  //   ) {
+  //     setActivePlans(plansCache.activePlans);
+  //     setRunningPlans(plansCache.runningPlans);
+  //   } else {
+  //     const newActivePlans = userPlans.filter(
+  //       (plan) => plan.status === "ACTIVE"
+  //     );
+  //     const newRunningPlans = userPlans.filter(
+  //       (plan) =>
+  //         plan.jobStatus === "processing" || plan.jobStatus === "pending"
+  //     );
+  //     setActivePlans(newActivePlans);
+  //     setRunningPlans(newRunningPlans);
+  //     plansCache = {
+  //       activePlans: newActivePlans,
+  //       runningPlans: newRunningPlans,
+  //       fetchedAt: now,
+  //       address: address || "",
+  //     };
+  //   }
+  // }, [userPlans, address]);
+
+
+
   useEffect(() => {
     if (showTokenSearch) {
       const timeout = setTimeout(
@@ -231,7 +269,6 @@ export function HomeTab() {
     fetchUserData();
   }, [fetchUserData]);
 
-
   // Quick stats loading
   useEffect(() => {
     let isCancelled = false;
@@ -242,14 +279,21 @@ export function HomeTab() {
           setIsQuickStatsLoading(true);
         }
 
-        const stats = await fetchQuickStats();
+        const { data: stats, fromCache } = await fetchQuickStats();
         if (isCancelled) return;
 
-        const nextExecutions = stats?.total_job_live_count ?? 0;
-        const nextVolume = stats?.total_value_swapped ?? 0;
-
-        setTotalExecutions(nextExecutions);
-        setTotalValueSwapped(nextVolume);
+        if (fromCache) {
+          console.log("Using cached quick stats data");
+          setIsQuickStatsLoading(false);
+          setTotalExecutions(stats?.total_job_live_count ?? 0);
+          setTotalValueSwapped(stats?.total_value_swapped ?? 0);        
+        } else {
+          console.log("Fetched fresh quick stats data");
+          const nextExecutions = stats?.total_job_live_count ?? 0;
+          const nextVolume = stats?.total_value_swapped ?? 0;
+          setTotalExecutions(nextExecutions);
+          setTotalValueSwapped(nextVolume);
+        }
       } catch (error) {
         if (!isCancelled) {
           setTotalExecutions(0);
@@ -281,8 +325,6 @@ export function HomeTab() {
     return () => setFooterVisible(true);
   }, [showPlanModal, setFooterVisible]);
 
- 
-
   // Handle keyboard navigation for plan slider
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
@@ -305,6 +347,7 @@ export function HomeTab() {
   const userGreeting = `Welcome back, ${
     context?.user?.username ?? "John Doe"
   } 👋`;
+
 
   const activePlans = userPlans.filter((plan) => plan.status === "ACTIVE");
   const runningPlans = userPlans.filter(
@@ -346,7 +389,9 @@ export function HomeTab() {
         showTokenSearch={showTokenSearch}
         tokenSearchQuery={tokenSearchQuery}
         tokenSearchResults={tokenSearchResults}
-        tokenSearchInputRef={tokenSearchInputRef as React.RefObject<HTMLInputElement>}
+        tokenSearchInputRef={
+          tokenSearchInputRef as React.RefObject<HTMLInputElement>
+        }
         setTokenSearchQuery={setTokenSearchQuery}
         handleTokenSearchSelect={handleTokenSearchSelect}
         closeTokenSearch={closeTokenSearch}
@@ -392,7 +437,6 @@ export function HomeTab() {
         isConnected={isConnected}
         topupStatus={topupStatus}
       />
-
 
       {/* Plan Details Modal */}
       <PlanDetailsModal
