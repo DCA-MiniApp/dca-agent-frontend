@@ -843,33 +843,33 @@ export function ActionsTab() {
       setDepositStatuses((prev) => ({ ...prev, [messageId]: "" }));
 
       try {
-        
-         const { BrowserProvider } = await import("ethers");
-      let signer: any = null;
 
-      if (
-        walletClient.transport &&
-        (walletClient.transport as any).request
-      ) {
-        const provider = new BrowserProvider(
-          walletClient.transport as any
-        );
-        const addr = walletClient.account?.address;
-        signer = addr
-          ? await provider.getSigner(addr)
-          : await provider.getSigner();
-      } else if (typeof window !== "undefined" && (window as any).ethereum) {
-        const provider = new BrowserProvider((window as any).ethereum);
-        try {
-          const accounts = await provider.send("eth_accounts", []);
-          if (!accounts || accounts.length === 0) {
-            await provider.send("eth_requestAccounts", []);
+        const { BrowserProvider } = await import("ethers");
+        let signer: any = null;
+
+        if (
+          walletClient.transport &&
+          (walletClient.transport as any).request
+        ) {
+          const provider = new BrowserProvider(
+            walletClient.transport as any
+          );
+          const addr = walletClient.account?.address;
+          signer = addr
+            ? await provider.getSigner(addr)
+            : await provider.getSigner();
+        } else if (typeof window !== "undefined" && (window as any).ethereum) {
+          const provider = new BrowserProvider((window as any).ethereum);
+          try {
+            const accounts = await provider.send("eth_accounts", []);
+            if (!accounts || accounts.length === 0) {
+              await provider.send("eth_requestAccounts", []);
+            }
+          } catch {
+            // ignore account fetch errors
           }
-        } catch {
-          // ignore account fetch errors
+          signer = await provider.getSigner();
         }
-        signer = await provider.getSigner();
-      }
 
         const amountInWei = parseEther(amount);
         const result = await depositTgBalanceForUser(amountInWei, signer);
@@ -1234,7 +1234,7 @@ export function ActionsTab() {
                 toToken: result.data.agentResponse.toToken,
                 amount: result.data.agentResponse.amount,
                 // Convert seconds back to minutes/weeks for TriggerX compatibility
-                intervalMinutes: result.data.agentResponse.intervalSeconds 
+                intervalMinutes: result.data.agentResponse.intervalSeconds
                   ? Math.round(result.data.agentResponse.intervalSeconds / 60)
                   : result.data.agentResponse.intervalMinutes,
                 durationWeeks: result.data.agentResponse.durationSeconds
@@ -1297,14 +1297,23 @@ export function ActionsTab() {
                   const ethAmount = triggerXResult.error.split(':')[1];
                   console.log('[ActionsTab] Extracted ETH amount:', ethAmount);
 
+                  // Fetch current balance to show to user
+                  let currentBalance = "0";
+                  try {
+                    const balance = await checkTgBalanceForUser(address || "");
+                    currentBalance = balance?balance.data?.ethBalance || "0" : "0";
+                  } catch (e) {
+                    console.error("Failed to fetch balance", e);
+                  }
+
                   if (ethAmount && ethAmount !== 'unknown') {
                     console.log('[ActionsTab] Displaying deposit message with amount:', ethAmount);
-                    errorContent = `⚠️ **Plan Created but Automation Failed**\n\n✅ Your DCA plan was created successfully!\n\n❌ However, automation setup failed because you don't have enough funds in your TriggerX balance.\n\n💰 **Required Deposit:** ${ethAmount} ETH\n\n**Quick Deposit:**\nDeposit ETH to your TriggerX balance below, then retry creating your plan.`;
+                    errorContent = `⚠️ **Automation Setup Failed**\n\nWe couldn't set up automation for your plan due to insufficient balance.\n\n💰 **Current Balance:** ${currentBalance} ETH\n💰 **Required Deposit:** ${ethAmount} ETH\n\n**Quick Deposit:**\nDeposit ETH below to fund your account. This balance will be used to cover transaction and network fees so you can successfully execute your plan. **After depositing, After depositing, please recreate the plan. .**`;
                     requiresDeposit = true;
                     depositAmount = ethAmount;
                   } else {
                     console.log('[ActionsTab] Amount unknown, showing generic balance message');
-                    errorContent = `⚠️ **Plan Created but Automation Failed**\n\n✅ Your DCA plan was created successfully!\n\n❌ However, automation setup failed due to insufficient TriggerX balance.\n\n**Quick Deposit:**\nDeposit ETH to your TriggerX balance below, then retry creating your plan.`;
+                    errorContent = `⚠️ **Automation Setup Failed**\n\nWe couldn't set up automation for your plan due to insufficient balance.\n\n💰 **Current Balance:** ${currentBalance} ETH\n\n**Quick Deposit:**\nDeposit ETH below to fund your account. This balance will be used to cover transaction and network fees so you can successfully execute your plan. **After depositing, After depositing, please recreate the plan. .**`;
                     requiresDeposit = true;
                     depositAmount = '';
                   }
@@ -1526,7 +1535,7 @@ export function ActionsTab() {
           1,
           Math.floor(durationMinutes / intervalMinutes)
         );
-        
+
         // Compute required approval amount for this job
         const amountWeiPerExec = parseUnits(amountPerExecutionStr, decimals);
         const requiredAmountWei = amountWeiPerExec * BigInt(totalExecutions);
@@ -1595,7 +1604,7 @@ export function ActionsTab() {
           });
         } catch (allowanceError) {
           console.error("Error fetching allowance:", allowanceError);
-          
+
           // Fallback: proceed with just the required amount if allowance check fails
           const fallbackMessage: ChatMessage = {
             id: createMessageId("assistant"),
@@ -2222,7 +2231,7 @@ export function ActionsTab() {
                 {message.requiresDeposit && message.messageIdForDeposit && (
                   <div className="mt-3 pt-3 border-t border-white/20">
                     <div className="space-y-2">
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <input
                           type="number"
                           placeholder={message.depositAmount || "Amount in ETH"}
@@ -2232,7 +2241,7 @@ export function ActionsTab() {
                             [message.messageIdForDeposit!]: e.target.value
                           }))}
                           disabled={isDepositLoading[message.messageIdForDeposit]}
-                          className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#c199e4] disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full sm:flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#c199e4] disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                         <button
                           onClick={() => handleDeposit(
@@ -2240,7 +2249,7 @@ export function ActionsTab() {
                             depositAmounts[message.messageIdForDeposit!] || message.depositAmount || ''
                           )}
                           disabled={isDepositLoading[message.messageIdForDeposit]}
-                          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#c199e4] to-[#b380db] hover:from-[#b380db] hover:to-[#a56fcf] disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-all duration-300 shadow-lg"
+                          className="w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#c199e4] to-[#b380db] hover:from-[#b380db] hover:to-[#a56fcf] disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-all duration-300 shadow-lg"
                         >
                           {isDepositLoading[message.messageIdForDeposit] ? (
                             <>
@@ -2269,8 +2278,8 @@ export function ActionsTab() {
                       </div>
                       {depositStatuses[message.messageIdForDeposit] && (
                         <div className={`text-xs px-3 py-2 rounded-lg ${depositStatuses[message.messageIdForDeposit].startsWith('✅')
-                            ? 'bg-green-500/20 text-green-200 border border-green-500/30'
-                            : 'bg-red-500/20 text-red-200 border border-red-500/30'
+                          ? 'bg-green-500/20 text-green-200 border border-green-500/30'
+                          : 'bg-red-500/20 text-red-200 border border-red-500/30'
                           }`}>
                           {depositStatuses[message.messageIdForDeposit]}
                         </div>

@@ -56,7 +56,7 @@ export function PlatformStatsCard({
                 <div className="h-8 w-24 bg-slate-700 rounded animate-pulse" />
               ) : (
                 <div className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-300">
-                  ${totalValueSwapped.toFixed(2)}
+                  ${Math.round(totalValueSwapped).toLocaleString()}
                 </div>
               )}
               <div className="flex items-center gap-1.5">

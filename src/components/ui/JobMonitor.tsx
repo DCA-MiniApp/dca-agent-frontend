@@ -522,8 +522,8 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
             </div>
             <div className="text-sm text-gray-400">
               {data.total_value_swapped.toLocaleString(undefined, {
-                minimumFractionDigits: 5,
-                maximumFractionDigits: 5,
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
               })} USD
             </div>
           </motion.div>
@@ -700,8 +700,8 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                         <td className="py-4 px-4">
                           <span className="text-sm text-green-400 font-semibold">
                             ${user.total_swapped.toLocaleString(undefined, {
-                              minimumFractionDigits: 5,
-                              maximumFractionDigits: 5,
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
                             })}
                           </span>
                         </td>
@@ -886,8 +886,8 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                       <span className="text-gray-400">Total Swapped:</span>
                       <span className="text-green-400 font-semibold">
                         ${selectedUser.total_swapped.toLocaleString(undefined, {
-                          minimumFractionDigits: 5,
-                          maximumFractionDigits: 5,
+                          minimumFractionDigits: 4,
+                          maximumFractionDigits: 4,
                         })}
                       </span>
                     </div>
