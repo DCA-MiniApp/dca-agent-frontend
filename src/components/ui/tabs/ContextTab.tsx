@@ -314,7 +314,7 @@ export function ContextTab() {
       )}
 
       {/* Task ID Search (always visible) */}
-      {/* {!selectedTx && transactions.length > 0 && (
+      {!selectedTx && transactions.length > 0 && (
         <div className="mb-4">
           <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl p-4 border border-white/20">
             <label className="text-sm text-[#c199e4]/90 mb-2 font-medium block">
@@ -332,7 +332,7 @@ export function ContextTab() {
             />
           </div>
         </div>
-      )} */}
+      )}
 
       {/* Filters (collapsible) */}
       {showFilters && !selectedTx && (

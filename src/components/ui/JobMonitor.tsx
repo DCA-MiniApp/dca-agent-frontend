@@ -886,8 +886,8 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                       <span className="text-gray-400">Total Swapped:</span>
                       <span className="text-green-400 font-semibold">
                         ${selectedUser.total_swapped.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
+                          minimumFractionDigits: 4,
+                          maximumFractionDigits: 4,
                         })}
                       </span>
                     </div>

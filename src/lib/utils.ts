@@ -79,12 +79,12 @@ export async function getFarcasterDomainManifest(): Promise<Manifest> {
       webhookUrl: APP_WEBHOOK_URL,
     },
   };
-  
+
   // Add accountAssociation at the top level if available
   if (APP_ACCOUNT_ASSOCIATION) {
     manifest.accountAssociation = APP_ACCOUNT_ASSOCIATION;
   }
-  
+
   return manifest as Manifest;
 }
 
@@ -137,16 +137,16 @@ export async function fetchArbitrumUsdPrices(addresses: string[]): Promise<Recor
   if (addresses.length === 0) return {};
   const unique = Array.from(new Set(addresses.map((a) => a.toLowerCase()).filter((addr) => addr)));
   if (unique.length === 0) return {};
-  
+
   const out: Record<string, number> = {};
-  
+
   // Fetch prices one address at a time
   for (const address of unique) {
     try {
       const url = `https://api.coingecko.com/api/v3/simple/token_price/arbitrum-one?contract_addresses=${encodeURIComponent(address)}&vs_currencies=usd`;
       const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) continue;
-      
+
       const json = await res.json();
       if (json && typeof json === 'object') {
         for (const [addr, data] of Object.entries<any>(json)) {
@@ -155,7 +155,7 @@ export async function fetchArbitrumUsdPrices(addresses: string[]): Promise<Recor
           }
         }
       }
-      
+
       // Add a small delay to avoid rate limiting
       await new Promise(resolve => setTimeout(resolve, 100));
     } catch (error) {
@@ -163,7 +163,7 @@ export async function fetchArbitrumUsdPrices(addresses: string[]): Promise<Recor
       continue;
     }
   }
-  
+
   return out;
 }
 
@@ -184,7 +184,7 @@ export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<numb
           cached &&
           cached.signature === signature &&
           typeof cached.timestamp === "number" &&
-          Date.now() - cached.timestamp < 2 * 60 * 1000 
+          Date.now() - cached.timestamp < 5 * 60 * 1000
         ) {
           return cached.value ?? 0;
         }
@@ -241,7 +241,7 @@ export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<numb
     total += per * price * (successCount ?? 0);
     // console.log("total in computePlansInvestedUsd 149:", total);
   }
-  if (cacheKey) {
+  if (cacheKey && total > 0) {
     try {
       window.localStorage.setItem(
         cacheKey,
@@ -273,7 +273,7 @@ async function fetchDefiLlamaInfo(contractAddress: string): Promise<{ price: num
     if (!json.coins) return { price: 0, decimals: null };
 
     const coinData = json.coins[`arbitrum:${contractAddress.toLowerCase()}`];
-    // console.log("coinData in fetchDefiLlamaPrice:", coinData);
+    console.log("coinData in fetchDefiLlamaPrice:", coinData);
     if (!coinData || typeof coinData.price !== "number") return { price: 0, decimals: null };
 
     return {
@@ -345,8 +345,9 @@ async function getTokenBalances(userAddress: string): Promise<TokenBalance[]> {
     }
 
     const { result } = await res.json();
+    // console.log("Token balances result from Alchemy:", result);
     if (!result || !result.tokenBalances) return [];
-    
+
     // Filter out zero balances and errors
     return result.tokenBalances.filter(
       (tb: TokenBalance) => tb.tokenBalance !== "0x0" && !tb.error
