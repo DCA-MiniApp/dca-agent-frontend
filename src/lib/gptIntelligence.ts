@@ -66,9 +66,23 @@ export class GPTIntelligenceService {
 
   constructor() {
     this.openaiApiKey = process.env.OPENAI_API_KEY || "";
+    
+    // Check for force fallback mode first
+    const forceFallback = process.env.FORCE_FALLBACK_MODE === 'true' || 
+                         process.env.NODE_ENV === 'development' && !this.openaiApiKey;
+    
+    if (forceFallback) {
+      console.warn("[GPT Intelligence] FORCE_FALLBACK_MODE enabled or no API key in development. Using rule-based extraction only.");
+      this.openaiApiKey = "";
+      return;
+    }
+    
     if (!this.openaiApiKey) {
       console.warn(
         "[GPT Intelligence] No OpenAI API key provided. Using fallback extraction."
+      );
+      console.warn(
+        "[GPT Intelligence] To enable GPT intelligence, set OPENAI_API_KEY environment variable."
       );
     } else {
       console.log(
@@ -85,14 +99,9 @@ export class GPTIntelligenceService {
           "[GPT Intelligence] Current key starts with:",
           this.openaiApiKey.substring(0, 10) + "..."
         );
+        console.warn("[GPT Intelligence] Falling back to rule-based extraction due to invalid API key.");
+        this.openaiApiKey = ""; // Force fallback
       }
-    }
-    
-    // Temporary: Force fallback mode due to quota issues
-    // Remove this line once OpenAI quota is resolved
-    if (process.env.FORCE_FALLBACK_MODE === 'true') {
-      console.warn("[GPT Intelligence] FORCE_FALLBACK_MODE enabled. Using rule-based extraction only.");
-      this.openaiApiKey = "";
     }
   }
 
@@ -112,23 +121,41 @@ export class GPTIntelligenceService {
     conversationHistory: Array<{ role: string; content: string }> = [],
     currentPlanData: Partial<DCAPlanData> = {}
   ): Promise<ExtractionResult> {
+    console.log("[GPT Intelligence] Starting extraction for message:", userMessage.substring(0, 100) + "...");
+    console.log("[GPT Intelligence] Has API key:", !!this.openaiApiKey);
+    console.log("[GPT Intelligence] Current plan data:", currentPlanData);
+    
     try {
       // If we have OpenAI API key, use GPT for intelligent extraction
       if (this.openaiApiKey) {
+        console.log("[GPT Intelligence] Attempting GPT extraction...");
         return await this.extractWithGPT(
           userMessage,
           conversationHistory,
           currentPlanData
         );
       } else {
-        console.log("No OpenAI API key, falling back to rule-based extraction");
+        console.log("[GPT Intelligence] No OpenAI API key, using rule-based extraction");
         // Fallback to rule-based extraction
         return this.extractWithRules(userMessage, currentPlanData);
       }
     } catch (error) {
       console.error("[GPT Intelligence] Extraction error:", error);
-      // Fallback to rule-based on error
-      return this.extractWithRules(userMessage, currentPlanData);
+      console.error("[GPT Intelligence] Error type:", error instanceof Error ? error.constructor.name : typeof error);
+      console.error("[GPT Intelligence] Error message:", error instanceof Error ? error.message : String(error));
+      console.warn("[GPT Intelligence] Falling back to rule-based extraction due to error");
+      
+      // Always fallback to rule-based on any error
+      try {
+        const fallbackResult = this.extractWithRules(userMessage, currentPlanData);
+        console.log("[GPT Intelligence] Fallback extraction completed successfully");
+        return fallbackResult;
+      } catch (fallbackError) {
+        console.error("[GPT Intelligence] Fallback extraction also failed:", fallbackError);
+        console.warn("[GPT Intelligence] Using safe extraction as last resort");
+        // Use safe extraction as absolute last resort
+        return this.createSafeExtractionResult(userMessage, currentPlanData);
+      }
     }
   }
 
@@ -185,6 +212,13 @@ User message: "${userMessage}"
 Extract any new DCA parameters from this message and provide the next question for missing information.`;
 
     try {
+      // Add timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+        console.warn("[GPT Intelligence] Request timeout after 30 seconds");
+      }, 30000);
+
       const response = await fetch(this.apiUrl, {
         method: "POST",
         headers: {
@@ -202,11 +236,16 @@ Extract any new DCA parameters from this message and provide the next question f
           max_tokens: 500,
           response_format: { type: "json_object" },
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`[GPT Intelligence] OpenAI API error: ${response.status}`, errorText);
+        
+        let errorMessage = `OpenAI API error: ${response.status}`;
         
         if (response.status === 429) {
           console.error("[GPT Intelligence] Rate limit exceeded. This could be due to:");
@@ -214,9 +253,19 @@ Extract any new DCA parameters from this message and provide the next question f
           console.error("2. Quota exceeded");
           console.error("3. Server overload");
           console.error("Falling back to rule-based extraction.");
+          errorMessage = "Rate limit exceeded - falling back to rule-based extraction";
+        } else if (response.status === 401) {
+          console.error("[GPT Intelligence] Authentication failed - invalid API key");
+          errorMessage = "Invalid API key - falling back to rule-based extraction";
+        } else if (response.status === 403) {
+          console.error("[GPT Intelligence] Forbidden - API key may not have access");
+          errorMessage = "API access forbidden - falling back to rule-based extraction";
+        } else if (response.status >= 500) {
+          console.error("[GPT Intelligence] Server error - OpenAI service may be down");
+          errorMessage = "OpenAI service unavailable - falling back to rule-based extraction";
         }
         
-        throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+        throw new Error(`${errorMessage} - ${errorText}`);
       }
 
       const result = await response.json();
@@ -254,7 +303,25 @@ Extract any new DCA parameters from this message and provide the next question f
 
       // console.log("[GPT Intelligence] Cleaned response:", cleanedResponse);
 
-      const parsed = JSON.parse(cleanedResponse);
+      let parsed;
+      try {
+        parsed = JSON.parse(cleanedResponse);
+      } catch (jsonError) {
+        console.error("[GPT Intelligence] JSON parsing failed:", jsonError);
+        console.error("[GPT Intelligence] Raw response that failed to parse:", cleanedResponse);
+        throw new Error(`Failed to parse GPT response as JSON: ${jsonError instanceof Error ? jsonError.message : String(jsonError)}`);
+      }
+
+      // Validate the parsed response structure
+      if (!parsed || typeof parsed !== 'object') {
+        throw new Error("GPT response is not a valid object");
+      }
+
+      if (!parsed.extractedData || typeof parsed.extractedData !== 'object') {
+        console.warn("[GPT Intelligence] GPT response missing extractedData, using empty object");
+        parsed.extractedData = {};
+      }
+
       const updatedPlanData = { ...currentPlanData, ...parsed.extractedData };
 
       // Remove null values
@@ -277,8 +344,23 @@ Extract any new DCA parameters from this message and provide the next question f
       };
     } catch (error) {
       console.error("[GPT Intelligence] GPT extraction failed:", error);
-      // Fallback to rule-based extraction
-      return this.extractWithRules(userMessage, currentPlanData);
+      console.error("[GPT Intelligence] Error details:", {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      console.warn("[GPT Intelligence] Falling back to rule-based extraction...");
+      
+      // Always fallback to rule-based extraction on any GPT error
+      try {
+        const fallbackResult = this.extractWithRules(userMessage, currentPlanData);
+        console.log("[GPT Intelligence] Fallback extraction successful:", fallbackResult);
+        return fallbackResult;
+      } catch (fallbackError) {
+        console.error("[GPT Intelligence] Fallback extraction also failed:", fallbackError);
+        // Return a safe minimal result that won't break the system
+        return this.createSafeExtractionResult(userMessage, currentPlanData);
+      }
     }
   }
 
@@ -289,15 +371,87 @@ Extract any new DCA parameters from this message and provide the next question f
     userMessage: string,
     currentPlanData: Partial<DCAPlanData>
   ): ExtractionResult {
-    const extracted = this.extractParametersWithRules(userMessage);
-    const updatedPlanData = { ...currentPlanData, ...extracted };
-    const validation = this.validatePlanData(updatedPlanData);
+    console.log("[Rule-based Extraction] Starting extraction with current data:", currentPlanData);
+    
+    try {
+      const extracted = this.extractParametersWithRules(userMessage, currentPlanData);
+      console.log("[Rule-based Extraction] Extracted parameters:", extracted);
+      
+      const updatedPlanData = { ...currentPlanData, ...extracted };
+      
+      // Set default slippage if not provided
+      if (!updatedPlanData.slippage) {
+        updatedPlanData.slippage = "2";
+      }
+      
+      console.log("[Rule-based Extraction] Updated plan data:", updatedPlanData);
+      
+      const validation = this.validatePlanData(updatedPlanData);
+      console.log("[Rule-based Extraction] Validation result:", validation);
 
+      return {
+        isComplete: validation.isComplete,
+        planData: updatedPlanData,
+        missingFields: validation.missingFields,
+        nextQuestion: validation.nextQuestion,
+        validationErrors: validation.validationErrors,
+      };
+    } catch (error) {
+      console.error("[Rule-based Extraction] Error in rule-based extraction:", error);
+      // If rule-based extraction fails, return a safe result
+      return this.createSafeExtractionResult(userMessage, currentPlanData);
+    }
+  }
+
+  /**
+   * Create a safe extraction result when all other methods fail
+   */
+  private createSafeExtractionResult(
+    userMessage: string,
+    currentPlanData: Partial<DCAPlanData>
+  ): ExtractionResult {
+    console.log("[Safe Extraction] Creating safe fallback result");
+    
+    // Try to extract at least some basic information safely
+    const safeExtracted: Partial<DCAPlanData> = {};
+    
+    // Safe token extraction - only look for common tokens
+    const commonTokens = ['USDC', 'USDT', 'DAI', 'ETH', 'WETH', 'BTC', 'WBTC', 'ARB'];
+    const foundTokens = commonTokens.filter(token => 
+      userMessage.toUpperCase().includes(token)
+    );
+    
+    if (foundTokens.length >= 2) {
+      safeExtracted.fromToken = foundTokens[0];
+      safeExtracted.toToken = foundTokens[1];
+    } else if (foundTokens.length === 1) {
+      // Default behavior: if only one token found, assume it's the target
+      safeExtracted.toToken = foundTokens[0];
+    }
+    
+    // Safe amount extraction - only look for clear numbers
+    const amountMatch = userMessage.match(/\b(\d+(?:\.\d+)?)\b/);
+    if (amountMatch) {
+      safeExtracted.amount = amountMatch[1];
+    }
+    
+    // Safe interval extraction - only look for clear keywords
+    if (userMessage.toLowerCase().includes('daily')) {
+      safeExtracted.interval = 'daily';
+    } else if (userMessage.toLowerCase().includes('weekly')) {
+      safeExtracted.interval = 'weekly';
+    } else if (userMessage.toLowerCase().includes('monthly')) {
+      safeExtracted.interval = 'monthly';
+    }
+    
+    const updatedPlanData = { ...currentPlanData, ...safeExtracted };
+    const validation = this.validatePlanData(updatedPlanData);
+    
     return {
-      isComplete: validation.isComplete,
+      isComplete: false, // Always incomplete in safe mode
       planData: updatedPlanData,
       missingFields: validation.missingFields,
-      nextQuestion: validation.nextQuestion,
+      nextQuestion: validation.nextQuestion || "I need more information to create your DCA plan. Could you please specify the tokens, amount, frequency, and duration?",
       validationErrors: validation.validationErrors,
     };
   }
@@ -305,56 +459,83 @@ Extract any new DCA parameters from this message and provide the next question f
   /**
    * Rule-based parameter extraction
    */
-  private extractParametersWithRules(message: string): Partial<DCAPlanData> {
+  private extractParametersWithRules(message: string, currentPlanData: Partial<DCAPlanData> = {}): Partial<DCAPlanData> {
+    console.log("[Rule-based Extraction] Processing message:", message);
+    console.log("[Rule-based Extraction] Current plan data:", currentPlanData);
     const lowerMessage = message.toLowerCase();
     const extracted: Partial<DCAPlanData> = {};
 
     // Extract amount - improved to handle dollar intent better
     // First check for dollar patterns ($ or "dollar" word)
     const dollarAmountMatch = message.match(
-      /(\d+(?:\.\d+)?)\s*(?:dollars?|\$)\s*(?:of|worth\s*of)?\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i
+      /(\d+(?:\.\d+)?)\s*(?:dollars?|\$)\s*(?:of|worth\s*of)?\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc|link|uni|aave|comp|mkr|snx|1inch|crv|bal|yfi)/i
     );
     
     if (dollarAmountMatch) {
       // User wants X dollars worth of token - mark this for USD conversion
       extracted.amount = dollarAmountMatch[1];
       (extracted as any)._isDollarAmount = true; // Internal flag for USD conversion
-      console.log('🔍 [GPT Intelligence] Detected dollar amount pattern:', dollarAmountMatch[0], 'Amount:', dollarAmountMatch[1]);
+      console.log('[Rule-based Extraction] Detected dollar amount pattern:', dollarAmountMatch[0], 'Amount:', dollarAmountMatch[1]);
     } else {
-      // Check for regular token amount pattern
+      // Check for regular token amount pattern - expanded token list
       const tokenAmountMatch = message.match(
-        /(\d+(?:\.\d+)?)\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i
+        /(\d+(?:\.\d+)?)\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc|link|uni|aave|comp|mkr|snx|1inch|crv|bal|yfi)/i
       );
       if (tokenAmountMatch) {
         extracted.amount = tokenAmountMatch[1];
         (extracted as any)._isDollarAmount = false;
-        console.log('🔍 [GPT Intelligence] Detected token amount pattern:', tokenAmountMatch[0], 'Amount:', tokenAmountMatch[1]);
+        console.log('[Rule-based Extraction] Detected token amount pattern:', tokenAmountMatch[0], 'Amount:', tokenAmountMatch[1]);
+      } else {
+        // Try to extract just numbers if no token is specified
+        const numberMatch = message.match(/(\d+(?:\.\d+)?)/);
+        if (numberMatch) {
+          extracted.amount = numberMatch[1];
+          (extracted as any)._isDollarAmount = false;
+          console.log('[Rule-based Extraction] Detected number pattern:', numberMatch[0], 'Amount:', numberMatch[1]);
+        }
       }
     }
 
     // Extract tokens
     const tokens = Object.keys(availableTokens);
     const tokenRegex = new RegExp(`\\b(${tokens.join("|")})\\b`, "gi");
-    const foundTokens = message.match(tokenRegex) || [];
+    const matchedTokens = message.match(tokenRegex) || [];
+    // Filter out empty strings
+    const foundTokens = matchedTokens.filter(token => token && token.trim() !== '');
+    
+    console.log('[Rule-based Extraction] TOKEN EXTRACTION START');
+    console.log('[Rule-based Extraction] foundTokens:', foundTokens);
+    console.log('[Rule-based Extraction] foundTokens.length:', foundTokens.length);
 
     if (foundTokens.length >= 2) {
       extracted.fromToken = foundTokens[0]!.toUpperCase();
       extracted.toToken = foundTokens[1]!.toUpperCase();
     } else if (foundTokens.length === 1) {
-      // Try to determine if it's from or to based on context
       const token = foundTokens[0]!.toUpperCase();
-      if (
-        lowerMessage.includes("from " + token.toLowerCase()) ||
-        lowerMessage.includes(token.toLowerCase() + " into")
-      ) {
-        extracted.fromToken = token;
-      } else if (
-        lowerMessage.includes("into " + token.toLowerCase()) ||
-        lowerMessage.includes("buy " + token.toLowerCase())
-      ) {
+      
+      // Simple logic: if fromToken exists, new token is toToken; otherwise it's fromToken
+      console.log('[Rule-based Extraction] Single token found:', token);
+      console.log('[Rule-based Extraction] currentPlanData.fromToken:', currentPlanData.fromToken);
+      console.log('[Rule-based Extraction] currentPlanData.fromToken type:', typeof currentPlanData.fromToken);
+      
+      const hasFromToken = currentPlanData.fromToken && currentPlanData.fromToken.trim() !== '';
+      console.log('[Rule-based Extraction] hasFromToken:', hasFromToken);
+      
+      if (hasFromToken) {
         extracted.toToken = token;
+        console.log('[Rule-based Extraction] ✅ fromToken exists, setting as toToken:', token);
+      } else {
+        extracted.fromToken = token;
+        console.log('[Rule-based Extraction] ❌ No fromToken, setting as fromToken:', token);
       }
+    } else {
+      console.log('[Rule-based Extraction] No tokens found or unexpected length:', foundTokens.length);
     }
+    
+    console.log('[Rule-based Extraction] Final extracted tokens:', {
+      fromToken: extracted.fromToken,
+      toToken: extracted.toToken
+    });
 
     // Extract interval (keep as string format for backend parsing)
     // Handle typos like "minitues" -> "minutes"
@@ -574,6 +755,7 @@ Extract any new DCA parameters from this message and provide the next question f
 
     return { valid: errors.length === 0, errors };
   }
+
 }
 
 function sanitizeSymbol(symbol?: string): string | null {
