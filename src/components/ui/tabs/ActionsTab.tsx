@@ -1229,7 +1229,7 @@ export function ActionsTab() {
 
               const triggerXResult = await createTriggerXJobForPlan({
                 planId: result.data.agentResponse.id,
-                userAddress: result.data.agentResponse.userAddress,
+                userAddress: address || result.data.agentResponse.userAddress,
                 fromToken: result.data.agentResponse.fromToken,
                 toToken: result.data.agentResponse.toToken,
                 amount: result.data.agentResponse.amount,
@@ -1301,7 +1301,7 @@ export function ActionsTab() {
                   let currentBalance = "0";
                   try {
                     const balance = await checkTgBalanceForUser(address || "");
-                    currentBalance = balance?balance.data?.ethBalance || "0" : "0";
+                    currentBalance = balance ? balance.data?.ethBalance || "0" : "0";
                   } catch (e) {
                     console.error("Failed to fetch balance", e);
                   }
