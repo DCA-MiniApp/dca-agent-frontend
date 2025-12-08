@@ -51,25 +51,24 @@ export function PlanDetailsModal({
                 <p className="text-xs text-white/70 flex items-center gap-2">
                   {selectedPlan.fromToken} → {selectedPlan.toToken}
                   <span
-                    className={`text-xs font-bold px-2 py-1 rounded-full ${
-                      selectedPlan.jobStatus === "completed"
+                    className={`text-xs font-bold px-2 py-1 rounded-full ${selectedPlan.jobStatus === "completed"
                         ? "bg-green-400/20 text-green-300 border border-green-400/40"
                         : selectedPlan.jobStatus === "running"
-                        ? "bg-blue-400/20 text-blue-300 border border-blue-400/40"
-                        : selectedPlan.jobStatus === "pending"
-                        ? "bg-yellow-400/20 text-yellow-300 border border-yellow-400/40"
-                        : selectedPlan.jobStatus === "deleted"
-                        ? "bg-red-400/20 text-red-300 border border-red-400/40"
-                        : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
-                    }`}
+                          ? "bg-blue-400/20 text-blue-300 border border-blue-400/40"
+                          : selectedPlan.jobStatus === "pending"
+                            ? "bg-yellow-400/20 text-yellow-300 border border-yellow-400/40"
+                            : selectedPlan.jobStatus === "deleted"
+                              ? "bg-red-400/20 text-red-300 border border-red-400/40"
+                              : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
+                      }`}
                   >
                     {(selectedPlan.jobStatus ||
                       selectedPlan.status ||
                       "Unknown") === "pending"
                       ? "Live"
                       : selectedPlan.jobStatus ||
-                        selectedPlan.status ||
-                        "Unknown"}
+                      selectedPlan.status ||
+                      "Unknown"}
                   </span>
                 </p>
               </div>
@@ -108,9 +107,9 @@ export function PlanDetailsModal({
               <p className="text-sm font-bold text-white">
                 {formatInterval(
                   selectedPlan.intervalSeconds ||
-                    (selectedPlan.intervalMinutes
-                      ? selectedPlan.intervalMinutes * 60
-                      : 0)
+                  (selectedPlan.intervalMinutes
+                    ? selectedPlan.intervalMinutes * 60
+                    : 0)
                 )}
               </p>
             </div>
@@ -119,9 +118,9 @@ export function PlanDetailsModal({
               <p className="text-sm font-bold text-white">
                 {formatDuration(
                   selectedPlan.durationSeconds ||
-                    (selectedPlan.durationWeeks
-                      ? selectedPlan.durationWeeks * 604800
-                      : 0)
+                  (selectedPlan.durationWeeks
+                    ? selectedPlan.durationWeeks * 604800
+                    : 0)
                 )}
               </p>
             </div>
@@ -155,13 +154,13 @@ export function PlanDetailsModal({
                 Created ({getShortTimezone()})
               </p>
               <p className="text-sm font-bold text-white">
-                {new Date(selectedPlan.createdAt).toLocaleString("en-US", {
+                {new Date(selectedPlan.createdAt).toLocaleString(undefined, {
+                  year: "numeric",
                   month: "short",
                   day: "numeric",
-                  year: "numeric",
-                  hour: "2-digit",
+                  hour: "numeric",
                   minute: "2-digit",
-                  timeZone: "UTC",
+                  hour12: true,
                 })}
               </p>
             </div>
@@ -175,14 +174,33 @@ export function PlanDetailsModal({
                 <p className="text-sm font-bold text-white">
                   {(() => {
                     const taskData = selectedPlan.jobData?.data?.taskData;
+                    
+                    // If no interval, can't calculate next execution
+                    if (!selectedPlan.intervalSeconds) return "N/A";
+
+                    // If taskData is empty or doesn't exist, use createdAt + interval
                     if (
                       !taskData ||
                       !Array.isArray(taskData) ||
-                      taskData.length === 0 ||
-                      !selectedPlan.intervalSeconds
-                    )
-                      return "N/A";
+                      taskData.length === 0
+                    ) {
+                      const createdTime = new Date(selectedPlan.createdAt);
+                      const nextExecutionTime = new Date(
+                        createdTime.getTime() +
+                        selectedPlan.intervalSeconds * 1000
+                      );
 
+                      return nextExecutionTime.toLocaleString(undefined, {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12: true,
+                      });
+                    }
+
+                    // If taskData exists, use the latest task execution time
                     const latestTask = taskData.reduce((latest, current) =>
                       current.task_id > latest.task_id ? current : latest
                     );
@@ -194,7 +212,7 @@ export function PlanDetailsModal({
                     );
                     const nextExecutionTime = new Date(
                       lastExecutionTime.getTime() +
-                        selectedPlan.intervalSeconds * 1000
+                      selectedPlan.intervalSeconds * 1000
                     );
 
                     return nextExecutionTime.toLocaleString(undefined, {
@@ -216,9 +234,8 @@ export function PlanDetailsModal({
             <div className="pt-2">
               <button
                 onClick={() => handleDeletePlan(selectedPlan)}
-                className={`w-full bg-gradient-to-r from-red-500/20 to-red-500/10 hover:from-red-500/30 hover:to-red-500/20 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-300 text-sm border border-red-500/30 hover:border-red-500/50 ${
-                  isDeleting ? "opacity-50 cursor-not-allowed" : ""
-                }`}
+                className={`w-full bg-gradient-to-r from-red-500/20 to-red-500/10 hover:from-red-500/30 hover:to-red-500/20 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-300 text-sm border border-red-500/30 hover:border-red-500/50 ${isDeleting ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
                 disabled={isDeleting}
               >
                 {isDeleting ? "Deleting..." : "Delete Plan"}
