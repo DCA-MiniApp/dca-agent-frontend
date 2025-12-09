@@ -803,6 +803,7 @@ export function WalletTab() {
             isWithdrawLoading={isWithdrawLoading}
             isConnected={isConnected}
             withdrawStatus={withdrawStatus}
+            tgBalance={tgBalance}
           />
         </div>
       )}

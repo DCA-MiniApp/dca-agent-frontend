@@ -747,7 +747,7 @@ export function ActionsTab() {
           userAddress: address,
           conversationHistory: messages.slice(-6), // Include last 6 messages for context
           isPlanCreationRequest: isPlanRequest, // Flag to help API determine response type
-          fid: context?.user?.fid || 727291,
+          fid: context?.user?.fid || 0,
         }),
       });
 
@@ -1155,7 +1155,7 @@ export function ActionsTab() {
             userAddress: address,
             confirmationId: confirmationId,
             action: "confirm",
-            fid: context?.user?.fid || 727291,
+            fid: context?.user?.fid || 0,
           }),
         });
 
@@ -1171,6 +1171,7 @@ export function ActionsTab() {
 
         // Check if plan was created successfully
         if (result.success && result.data) {
+          console.log("Plan created successfully 1174:", result.data);
           const planId = result.data.agentResponse.id;
           // console.log("Plan created successfully:", planId);
 
@@ -1242,7 +1243,7 @@ export function ActionsTab() {
                   : result.data.agentResponse.durationWeeks,
                 slippage: result.data.agentResponse.slippage,
                 signer: ethersSigner,
-                fid: context?.user?.fid || 727291,
+                fid: context?.user?.fid || 0,
               });
 
               // console.log("TriggerX result:", triggerXResult);
@@ -2129,8 +2130,7 @@ export function ActionsTab() {
 
                 {/* Confirmation Buttons */}
                 {message.requiresConfirmation &&
-                  message.confirmationId &&
-                  !completedConfirmations.has(message.confirmationId) && (
+                  message.confirmationId && (
                     <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                       <div className="flex gap-2 justify-center">
                         <button
@@ -2204,7 +2204,7 @@ export function ActionsTab() {
                             isPlanCreationLoading ||
                             isApprovalLoading ||
                             isApprovePending ||
-                            isApprovalConfirming
+                            isApprovalConfirming 
                           }
                           className="flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
                         >

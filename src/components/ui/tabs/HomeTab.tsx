@@ -39,6 +39,42 @@ import {
 // Import utilities
 import { formatContractAddress } from "./HomeTab/utils/helpers";
 
+
+async function fetchETHBalance(address: string): Promise<string> {
+  try {
+    const response = await fetch("https://arb1.arbitrum.io/rpc", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "eth_getBalance",
+        params: [address, "latest"],
+        id: 1,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (data.result) {
+      // Convert hex to decimal
+      const hexBalance = data.result;
+      const decimalBalance = BigInt(hexBalance);
+      
+      // Convert Wei to ETH (1 ETH = 10^18 Wei)
+      const ethBalance = Number(decimalBalance) / Math.pow(10, 18);
+      
+      return ethBalance.toFixed(8);
+    }
+
+    return "0";
+  } catch (error) {
+    console.error("Error fetching ETH balance:", error);
+    return "0";
+  }
+}
+
 //Cache for plans to avoid re-computation
 // let plansCache: {
 //   activePlans: DCAPlan[];
@@ -67,7 +103,7 @@ export function HomeTab() {
     isTopupLoading,
     topupStatus,
     setTopupAmount,
-    handleTopupTg,
+    handleDeposit,
   } = useTriggerX(isConnected, address, wagmiWalletClient);
 
   // State management
@@ -75,6 +111,8 @@ export function HomeTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [totalInvested, setTotalInvested] = useState(0);
   const [portfolioUsd, setPortfolioUsd] = useState<number | null>(null);
+  const [ethBalance, setEthBalance] = useState<string>("0");
+    const [isEthBalanceLoading, setIsEthBalanceLoading] = useState(false);
   // UI state
   const [showWrongNetworkTooltip, setShowWrongNetworkTooltip] = useState(false);
   const [showTokenSearch, setShowTokenSearch] = useState(false);
@@ -99,6 +137,30 @@ export function HomeTab() {
   //Memoized/cache plans
   // const [activePlans, setActivePlans] = useState<DCAPlan[]>([]);
   // const [runningPlans, setRunningPlans] = useState<DCAPlan[]>([]);
+
+    // Fetch ETH balance
+  const fetchEthBalance = useCallback(async () => {
+    if (!address) {
+      setEthBalance("0");
+      return;
+    }
+
+    setIsEthBalanceLoading(true);
+    try {
+      const balance = await fetchETHBalance(address);
+      setEthBalance(balance);
+    } catch (error) {
+      console.error("Error fetching ETH balance:", error);
+      setEthBalance("0");
+    } finally {
+      setIsEthBalanceLoading(false);
+    }
+  }, [address]);
+
+
+  useEffect(() => {
+    fetchEthBalance();
+  }, [fetchEthBalance]);
 
   // Plan management hook
   const fetchUserData = useCallback(async () => {
@@ -432,10 +494,11 @@ export function HomeTab() {
       <TriggerXTopUpCard
         topupAmount={topupAmount}
         setTopupAmount={setTopupAmount}
-        handleTopupTg={handleTopupTg}
+        handleDeposit={handleDeposit}
         isTopupLoading={isTopupLoading}
         isConnected={isConnected}
         topupStatus={topupStatus}
+        ethBalance={ethBalance}
       />
 
       {/* Plan Details Modal */}
