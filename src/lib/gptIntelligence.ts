@@ -66,17 +66,17 @@ export class GPTIntelligenceService {
 
   constructor() {
     this.openaiApiKey = process.env.OPENAI_API_KEY || "";
-    
+
     // Check for force fallback mode first
-    const forceFallback = process.env.FORCE_FALLBACK_MODE === 'true' || 
-                         process.env.NODE_ENV === 'development' && !this.openaiApiKey;
-    
+    const forceFallback = process.env.FORCE_FALLBACK_MODE === 'true' ||
+      process.env.NODE_ENV === 'development' && !this.openaiApiKey;
+
     if (forceFallback) {
       console.warn("[GPT Intelligence] FORCE_FALLBACK_MODE enabled or no API key in development. Using rule-based extraction only.");
       this.openaiApiKey = "";
       return;
     }
-    
+
     if (!this.openaiApiKey) {
       console.warn(
         "[GPT Intelligence] No OpenAI API key provided. Using fallback extraction."
@@ -89,7 +89,7 @@ export class GPTIntelligenceService {
         "[GPT Intelligence] OpenAI API key loaded successfully. Length:",
         this.openaiApiKey.length
       );
-      
+
       // Validate API key format
       if (!this.isValidApiKeyFormat(this.openaiApiKey)) {
         console.error(
@@ -124,7 +124,7 @@ export class GPTIntelligenceService {
     console.log("[GPT Intelligence] Starting extraction for message:", userMessage.substring(0, 100) + "...");
     console.log("[GPT Intelligence] Has API key:", !!this.openaiApiKey);
     console.log("[GPT Intelligence] Current plan data:", currentPlanData);
-    
+
     try {
       // If we have OpenAI API key, use GPT for intelligent extraction
       if (this.openaiApiKey) {
@@ -144,7 +144,7 @@ export class GPTIntelligenceService {
       console.error("[GPT Intelligence] Error type:", error instanceof Error ? error.constructor.name : typeof error);
       console.error("[GPT Intelligence] Error message:", error instanceof Error ? error.message : String(error));
       console.warn("[GPT Intelligence] Falling back to rule-based extraction due to error");
-      
+
       // Always fallback to rule-based on any error
       try {
         const fallbackResult = this.extractWithRules(userMessage, currentPlanData);
@@ -182,11 +182,20 @@ Extract these parameters:
 - slippage: Optional slippage percentage
 - _isDollarAmount: true if user specified dollar amount (e.g., "$10 of ETH", "0.1 dollar of WETH"), false if token amount (e.g., "0.1 ETH", "10 USDC")
 
+CRITICAL VALIDATION RULE:
+- The interval MUST be LESS than the duration. If the user provides an interval that is greater than or equal to the duration, add a validation error: "Interval must be less than duration. Please provide a smaller interval or longer duration."
+
+CRITICAL NEXT QUESTION RULE:
+- If there are ANY validation errors, the nextQuestion MUST focus on fixing those errors. DO NOT ask for optional fields like slippage when there are validation errors.
+- Only ask for optional fields (like slippage) when all required fields are present AND there are no validation errors.
+
 EXAMPLES:
 - "0.1 dollar of WETH" → amount: "0.1", _isDollarAmount: true, fromToken: "WETH"
 - "0.1 WETH" → amount: "0.1", _isDollarAmount: false, fromToken: "WETH"
 - "$5 worth of ETH" → amount: "5", _isDollarAmount: true, fromToken: "ETH"
 - "10 USDC into ETH" → amount: "10", _isDollarAmount: false, fromToken: "USDC"
+- "every 1 week for 3 days" → validationErrors: ["Interval must be less than duration. Please provide a smaller interval or longer duration."], nextQuestion: "The interval (1 week) must be less than the duration (3 days). Please provide a smaller interval or longer duration."
+- "every 2 hours for 1 hour" → validationErrors: ["Interval must be less than duration. Please provide a smaller interval or longer duration."], nextQuestion: "The interval (2 hours) must be less than the duration (1 hour). Please provide a smaller interval or longer duration."
 
 CRITICAL: Your response must be ONLY valid JSON in this exact format:
 {
@@ -244,9 +253,9 @@ Extract any new DCA parameters from this message and provide the next question f
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`[GPT Intelligence] OpenAI API error: ${response.status}`, errorText);
-        
+
         let errorMessage = `OpenAI API error: ${response.status}`;
-        
+
         if (response.status === 429) {
           console.error("[GPT Intelligence] Rate limit exceeded. This could be due to:");
           console.error("1. Too many requests per minute");
@@ -264,7 +273,7 @@ Extract any new DCA parameters from this message and provide the next question f
           console.error("[GPT Intelligence] Server error - OpenAI service may be down");
           errorMessage = "OpenAI service unavailable - falling back to rule-based extraction";
         }
-        
+
         throw new Error(`${errorMessage} - ${errorText}`);
       }
 
@@ -338,7 +347,10 @@ Extract any new DCA parameters from this message and provide the next question f
         isComplete: validation.isComplete,
         planData: updatedPlanData,
         missingFields: parsed.missingFields || validation.missingFields,
-        nextQuestion: parsed.nextQuestion || validation.nextQuestion,
+        // Prioritize validation's nextQuestion when there are validation errors
+        nextQuestion: validation.validationErrors && validation.validationErrors.length > 0
+          ? validation.nextQuestion
+          : (parsed.nextQuestion || validation.nextQuestion),
         validationErrors:
           parsed.validationErrors || validation.validationErrors,
       };
@@ -350,7 +362,7 @@ Extract any new DCA parameters from this message and provide the next question f
         stack: error instanceof Error ? error.stack : undefined
       });
       console.warn("[GPT Intelligence] Falling back to rule-based extraction...");
-      
+
       // Always fallback to rule-based extraction on any GPT error
       try {
         const fallbackResult = this.extractWithRules(userMessage, currentPlanData);
@@ -372,20 +384,20 @@ Extract any new DCA parameters from this message and provide the next question f
     currentPlanData: Partial<DCAPlanData>
   ): ExtractionResult {
     console.log("[Rule-based Extraction] Starting extraction with current data:", currentPlanData);
-    
+
     try {
       const extracted = this.extractParametersWithRules(userMessage, currentPlanData);
       console.log("[Rule-based Extraction] Extracted parameters:", extracted);
-      
+
       const updatedPlanData = { ...currentPlanData, ...extracted };
-      
+
       // Set default slippage if not provided
       if (!updatedPlanData.slippage) {
         updatedPlanData.slippage = "2";
       }
-      
+
       console.log("[Rule-based Extraction] Updated plan data:", updatedPlanData);
-      
+
       const validation = this.validatePlanData(updatedPlanData);
       console.log("[Rule-based Extraction] Validation result:", validation);
 
@@ -411,16 +423,16 @@ Extract any new DCA parameters from this message and provide the next question f
     currentPlanData: Partial<DCAPlanData>
   ): ExtractionResult {
     console.log("[Safe Extraction] Creating safe fallback result");
-    
+
     // Try to extract at least some basic information safely
     const safeExtracted: Partial<DCAPlanData> = {};
-    
+
     // Safe token extraction - only look for common tokens
     const commonTokens = ['USDC', 'USDT', 'DAI', 'ETH', 'WETH', 'BTC', 'WBTC', 'ARB'];
-    const foundTokens = commonTokens.filter(token => 
+    const foundTokens = commonTokens.filter(token =>
       userMessage.toUpperCase().includes(token)
     );
-    
+
     if (foundTokens.length >= 2) {
       safeExtracted.fromToken = foundTokens[0];
       safeExtracted.toToken = foundTokens[1];
@@ -428,13 +440,13 @@ Extract any new DCA parameters from this message and provide the next question f
       // Default behavior: if only one token found, assume it's the target
       safeExtracted.toToken = foundTokens[0];
     }
-    
+
     // Safe amount extraction - only look for clear numbers
     const amountMatch = userMessage.match(/\b(\d+(?:\.\d+)?)\b/);
     if (amountMatch) {
       safeExtracted.amount = amountMatch[1];
     }
-    
+
     // Safe interval extraction - only look for clear keywords
     if (userMessage.toLowerCase().includes('daily')) {
       safeExtracted.interval = 'daily';
@@ -443,10 +455,10 @@ Extract any new DCA parameters from this message and provide the next question f
     } else if (userMessage.toLowerCase().includes('monthly')) {
       safeExtracted.interval = 'monthly';
     }
-    
+
     const updatedPlanData = { ...currentPlanData, ...safeExtracted };
     const validation = this.validatePlanData(updatedPlanData);
-    
+
     return {
       isComplete: false, // Always incomplete in safe mode
       planData: updatedPlanData,
@@ -470,7 +482,7 @@ Extract any new DCA parameters from this message and provide the next question f
     const dollarAmountMatch = message.match(
       /(\d+(?:\.\d+)?)\s*(?:dollars?|\$)\s*(?:of|worth\s*of)?\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc|link|uni|aave|comp|mkr|snx|1inch|crv|bal|yfi)/i
     );
-    
+
     if (dollarAmountMatch) {
       // User wants X dollars worth of token - mark this for USD conversion
       extracted.amount = dollarAmountMatch[1];
@@ -502,7 +514,7 @@ Extract any new DCA parameters from this message and provide the next question f
     const matchedTokens = message.match(tokenRegex) || [];
     // Filter out empty strings
     const foundTokens = matchedTokens.filter(token => token && token.trim() !== '');
-    
+
     console.log('[Rule-based Extraction] TOKEN EXTRACTION START');
     console.log('[Rule-based Extraction] foundTokens:', foundTokens);
     console.log('[Rule-based Extraction] foundTokens.length:', foundTokens.length);
@@ -512,15 +524,15 @@ Extract any new DCA parameters from this message and provide the next question f
       extracted.toToken = foundTokens[1]!.toUpperCase();
     } else if (foundTokens.length === 1) {
       const token = foundTokens[0]!.toUpperCase();
-      
+
       // Simple logic: if fromToken exists, new token is toToken; otherwise it's fromToken
       console.log('[Rule-based Extraction] Single token found:', token);
       console.log('[Rule-based Extraction] currentPlanData.fromToken:', currentPlanData.fromToken);
       console.log('[Rule-based Extraction] currentPlanData.fromToken type:', typeof currentPlanData.fromToken);
-      
+
       const hasFromToken = currentPlanData.fromToken && currentPlanData.fromToken.trim() !== '';
       console.log('[Rule-based Extraction] hasFromToken:', hasFromToken);
-      
+
       if (hasFromToken) {
         extracted.toToken = token;
         console.log('[Rule-based Extraction] ✅ fromToken exists, setting as toToken:', token);
@@ -531,7 +543,7 @@ Extract any new DCA parameters from this message and provide the next question f
     } else {
       console.log('[Rule-based Extraction] No tokens found or unexpected length:', foundTokens.length);
     }
-    
+
     console.log('[Rule-based Extraction] Final extracted tokens:', {
       fromToken: extracted.fromToken,
       toToken: extracted.toToken
@@ -572,9 +584,8 @@ Extract any new DCA parameters from this message and provide the next question f
     if (durationMatch) {
       const duration = durationMatch[1];
       const unit = durationMatch[2].toLowerCase();
-      extracted.duration = `${duration} ${unit}${
-        parseInt(duration) > 1 ? "s" : ""
-      }`;
+      extracted.duration = `${duration} ${unit}${parseInt(duration) > 1 ? "s" : ""
+        }`;
     }
 
     // Extract slippage
@@ -584,6 +595,50 @@ Extract any new DCA parameters from this message and provide the next question f
     }
 
     return extracted;
+  }
+
+  /**
+   * Parse time string to minutes for comparison
+   * Handles formats like "2 minutes", "1 hour", "3 days", "weekly", "monthly", "every 24 hours", etc.
+   */
+  private parseTimeToMinutes(timeString: string): number | null {
+    if (!timeString) return null;
+
+    let lowerTime = timeString.toLowerCase().trim();
+
+    // Strip "every" prefix if present (e.g., "every 24 hours" -> "24 hours")
+    lowerTime = lowerTime.replace(/^every\s+/, '');
+
+    // Handle common keywords
+    if (lowerTime === 'hourly' || lowerTime === '1 hour') return 60;
+    if (lowerTime === 'daily' || lowerTime === '1 day') return 24 * 60;
+    if (lowerTime === 'weekly' || lowerTime === '1 week') return 7 * 24 * 60;
+    if (lowerTime === 'monthly' || lowerTime === '1 month') return 30 * 24 * 60; // Approximate
+    if (lowerTime === 'yearly' || lowerTime === '1 year') return 365 * 24 * 60; // Approximate
+
+    // Parse "X minutes/hours/days/weeks/months/years" format
+    const match = lowerTime.match(/^(\d+(?:\.\d+)?)\s*(minute|hour|day|week|month|year)s?$/);
+    if (match) {
+      const value = parseFloat(match[1]);
+      const unit = match[2];
+
+      switch (unit) {
+        case 'minute':
+          return value;
+        case 'hour':
+          return value * 60;
+        case 'day':
+          return value * 24 * 60;
+        case 'week':
+          return value * 7 * 24 * 60;
+        case 'month':
+          return value * 30 * 24 * 60; // Approximate
+        case 'year':
+          return value * 365 * 24 * 60; // Approximate
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -633,11 +688,40 @@ Extract any new DCA parameters from this message and provide the next question f
       validationErrors.push("Amount must be a positive number");
     }
 
+    // Validate interval vs duration - interval must be less than duration
+    if (planData.interval && planData.duration) {
+      const intervalMinutes = this.parseTimeToMinutes(planData.interval);
+      const durationMinutes = this.parseTimeToMinutes(planData.duration);
+
+      if (intervalMinutes !== null && durationMinutes !== null) {
+        if (intervalMinutes >= durationMinutes) {
+          validationErrors.push(
+            "Interval must be less than duration. Please provide a smaller interval or longer duration."
+          );
+        }
+      }
+    }
+
     // No duration validation - backend handles all formats and durations
 
     // Generate next question
     let nextQuestion: string | undefined;
-    if (missingFields.length > 0) {
+
+    // Prioritize validation errors over missing fields
+    if (validationErrors.length > 0) {
+      // If there's an interval vs duration error, provide specific guidance
+      const hasIntervalDurationError = validationErrors.some(err =>
+        err.includes("Interval must be less than duration")
+      );
+
+      if (hasIntervalDurationError) {
+        nextQuestion = `The interval (${planData.interval}) must be less than the duration (${planData.duration}). Please provide a smaller interval or longer duration.`;
+      } else {
+        // For other validation errors, just use the first error as guidance
+        nextQuestion = validationErrors[0];
+      }
+    } else if (missingFields.length > 0) {
+      // Only ask for missing fields if there are no validation errors
       const field = missingFields[0];
       switch (field) {
         case "fromToken":
@@ -651,9 +735,8 @@ Extract any new DCA parameters from this message and provide the next question f
           nextQuestion = `Which token would you like to invest into? Popular choices: ETH, BTC, ARB, WBTC, etc.`;
           break;
         case "amount":
-          nextQuestion = `How much ${
-            planData.fromToken || "tokens"
-          } would you like to invest per execution?`;
+          nextQuestion = `How much ${planData.fromToken || "tokens"
+            } would you like to invest per execution?`;
           break;
         case "interval":
           nextQuestion = `How often would you like to invest? (e.g., "2 minutes", "daily", "weekly", "monthly")`;
@@ -690,24 +773,23 @@ Extract any new DCA parameters from this message and provide the next question f
 
     // Determine if this was originally a dollar amount request
     // Check if the USD estimate significantly differs from amount * price (indicating conversion happened)
-    const wasOriginallyDollarAmount = planData.usdEstimate && 
-      planData.usdEstimate.amountUsd && 
+    const wasOriginallyDollarAmount = planData.usdEstimate &&
+      planData.usdEstimate.amountUsd &&
       planData.usdEstimate.tokenPriceUsd &&
       Math.abs((Number(planData.amount) * planData.usdEstimate.tokenPriceUsd) - planData.usdEstimate.amountUsd) > 0.05;
 
     const investmentLine = wasOriginallyDollarAmount
       ? `• Investment: $${planData.usdEstimate!.amountUsd.toFixed(2)} worth of ${planData.fromToken} (${planData.amount} ${planData.fromToken})`
-      : `• Investment: ${planData.amount} ${planData.fromToken}${
-          planData.usdEstimate
-            ? ` (~$${planData.usdEstimate.amountUsd.toFixed(2)})`
-            : ""
-        }`;
+      : `• Investment: ${planData.amount} ${planData.fromToken}${planData.usdEstimate
+        ? ` (~$${planData.usdEstimate.amountUsd.toFixed(2)})`
+        : ""
+      }`;
 
     const usdLine =
       planData.usdEstimate && isFinite(planData.usdEstimate.amountUsd) && !wasOriginallyDollarAmount
         ? `• USD equivalent (per execution): ~$${planData.usdEstimate.amountUsd.toFixed(
-            2
-          )}\n`
+          2
+        )}\n`
         : "";
 
     return (
@@ -820,21 +902,21 @@ export interface DollarIntentResult {
 
 export function detectDollarIntent(message: string): DollarIntentResult {
   if (!message) return { detected: false };
-  
+
   console.log('🔍 [Dollar Intent] Analyzing message:', message);
-  
+
   const normalized = message.replace(/,/g, "");
   const lowerMessage = normalized.toLowerCase();
-  
+
   // Check for patterns like "X dollar of TOKEN", "$X of TOKEN", "X dollars worth of TOKEN"
   const dollarOfTokenPattern = /(\d+(?:\.\d+)?)\s*(?:dollars?|\$)\s*(?:of|worth\s*of)\s*(?:usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i;
   const dollarOfTokenMatch = normalized.match(dollarOfTokenPattern);
-  
+
   if (dollarOfTokenMatch) {
     console.log('🔍 [Dollar Intent] Found "dollar of token" pattern:', dollarOfTokenMatch[0]);
-    return { 
-      detected: true, 
-      usdAmount: parseFloat(dollarOfTokenMatch[1]) 
+    return {
+      detected: true,
+      usdAmount: parseFloat(dollarOfTokenMatch[1])
     };
   }
 
@@ -869,7 +951,7 @@ export async function applyUsdIntelligence(
   usdInputAmount?: number
 ): Promise<void> {
   console.log('🔍 [USD Intelligence] Input:', { planData, usdInputAmount });
-  
+
   const priceInfo = await fetchTokenUsdPrice(planData.fromToken);
   if (!priceInfo) {
     console.log('🔍 [USD Intelligence] No price info found for token:', planData.fromToken);
@@ -884,11 +966,11 @@ export async function applyUsdIntelligence(
   const isDollarAmount = planData._isDollarAmount === true || (usdInputAmount && usdInputAmount > 0);
   const dollarAmount = usdInputAmount || (isDollarAmount ? Number(planData.amount) : 0);
 
-  console.log('🔍 [USD Intelligence] Analysis:', { 
-    isDollarAmount, 
-    dollarAmount, 
+  console.log('🔍 [USD Intelligence] Analysis:', {
+    isDollarAmount,
+    dollarAmount,
     _isDollarAmount: planData._isDollarAmount,
-    originalAmount: planData.amount 
+    originalAmount: planData.amount
   });
 
   if (isDollarAmount && dollarAmount > 0) {
@@ -896,14 +978,14 @@ export async function applyUsdIntelligence(
     const tokenAmount = dollarAmount / priceInfo.priceUsd;
     // Round to reasonable precision to avoid floating point issues
     const formattedTokenAmount = tokenAmount.toFixed(6);
-    
+
     console.log('🔍 [USD Intelligence] Converting USD to token:', {
       dollarAmount,
       tokenPrice: priceInfo.priceUsd,
       calculatedTokenAmount: tokenAmount,
       formattedTokenAmount
     });
-    
+
     planData.amount = formattedTokenAmount;
     planData.usdEstimate = {
       amountUsd: dollarAmount,
@@ -915,13 +997,13 @@ export async function applyUsdIntelligence(
     // Amount is in token units - keep original amount, just calculate USD equivalent
     const tokenAmount = Number(planData.amount);
     if (!isFinite(tokenAmount) || tokenAmount <= 0) return;
-    
+
     console.log('🔍 [USD Intelligence] Calculating USD equivalent for token amount:', {
       tokenAmount,
       tokenPrice: priceInfo.priceUsd,
       usdEquivalent: tokenAmount * priceInfo.priceUsd
     });
-    
+
     // Don't modify the amount - keep user's original input
     planData.usdEstimate = {
       amountUsd: tokenAmount * priceInfo.priceUsd,
@@ -930,7 +1012,7 @@ export async function applyUsdIntelligence(
     // Clean up internal flag
     delete planData._isDollarAmount;
   }
-  
+
   console.log('🔍 [USD Intelligence] Final planData:', planData);
 }
 

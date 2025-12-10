@@ -42,6 +42,7 @@ interface ChatMessage {
   requiresConfirmation?: boolean;
   confirmationId?: string;
   confirmationData?: any;
+  confirmationStatus?: "pending" | "proceeding" | "cancelled" | "completed";
   // Transaction hash for copy functionality
   transactionHash?: string;
   // Loading state for plan creation
@@ -1220,7 +1221,11 @@ export function ActionsTab() {
                 timestamp: new Date(),
               };
               setMessages((prev) => [
-                ...prev.filter((msg) => !msg.isCreatingPlan),
+                ...prev.filter((msg) => !msg.isCreatingPlan).map((msg) =>
+                  msg.confirmationId === `approve-${confirmationId}`
+                    ? { ...msg, confirmationStatus: "completed" as const }
+                    : msg
+                ),
                 walletErrorMessage,
               ]);
             } else {
@@ -1277,7 +1282,11 @@ export function ActionsTab() {
                   shareText,
                 };
                 setMessages((prev) => [
-                  ...prev.filter((msg) => !msg.isCreatingPlan),
+                  ...prev.filter((msg) => !msg.isCreatingPlan).map((msg) =>
+                    msg.confirmationId === `approve-${confirmationId}`
+                      ? { ...msg, confirmationStatus: "completed" as const }
+                      : msg
+                  ),
                   automationMessage,
                 ]);
               } else {
@@ -1332,7 +1341,11 @@ export function ActionsTab() {
                   messageIdForDeposit: automationErrorMessageId,
                 };
                 setMessages((prev) => [
-                  ...prev.filter((msg) => !msg.isCreatingPlan),
+                  ...prev.filter((msg) => !msg.isCreatingPlan).map((msg) =>
+                    msg.confirmationId === `approve-${confirmationId}`
+                      ? { ...msg, confirmationStatus: "completed" as const }
+                      : msg
+                  ),
                   automationErrorMessage,
                 ]);
               }
@@ -1351,7 +1364,11 @@ export function ActionsTab() {
               timestamp: new Date(),
             };
             setMessages((prev) => [
-              ...prev.filter((msg) => !msg.isCreatingPlan),
+              ...prev.filter((msg) => !msg.isCreatingPlan).map((msg) =>
+                msg.confirmationId === `approve-${confirmationId}`
+                  ? { ...msg, confirmationStatus: "completed" as const }
+                  : msg
+              ),
               automationErrorMessage,
             ]);
           }
@@ -1650,6 +1667,15 @@ export function ActionsTab() {
       triggerHaptic();
       const planData = confirmationMessage?.confirmationData;
 
+      // Update message status to 'proceeding'
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.confirmationId === confirmationId
+            ? { ...msg, confirmationStatus: "proceeding" as const }
+            : msg
+        )
+      );
+
       if (planData) {
         setIsApprovalLoading(true);
         await startApprovalProcess(originalConfirmationId, planData);
@@ -1662,6 +1688,15 @@ export function ActionsTab() {
     async (confirmationId: string) => {
       triggerHaptic();
       if (!confirmationId) return;
+
+      // Update message status to 'cancelled'
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.confirmationId === confirmationId
+            ? { ...msg, confirmationStatus: "cancelled" as const }
+            : msg
+        )
+      );
 
       // Mark this confirmation as completed
       setCompletedConfirmations((prev) => new Set(prev).add(confirmationId));
@@ -2132,82 +2167,14 @@ export function ActionsTab() {
                 {message.requiresConfirmation &&
                   message.confirmationId && (
                     <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                      <div className="flex gap-2 justify-center">
-                        <button
-                          onClick={() => {
-                            if (
-                              message.confirmationId?.startsWith("approve-")
-                            ) {
-                              handleApproveConfirm(message.confirmationId);
-                            } else {
-                              // This case should ideally not be reached for plan creation requests
-                              // but as a fallback, we can call handleConfirmPlan if it were still here
-                              // For now, we'll just show the cancel button
-                              handleCancelPlan(
-                                message.confirmationId as string
-                              );
-                            }
-                          }}
-                          disabled={
-                            isPlanCreationLoading ||
-                            isApprovalLoading ||
-                            isApprovePending ||
-                            isApprovalConfirming
-                          }
-                          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-                        >
-                          {isApprovePending || isApprovalConfirming ? (
-                            <>
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              {isApprovePending
-                                ? "Wallet Approval..."
-                                : "Confirming Approval..."}
-                            </>
-                          ) : isApprovalLoading ? (
-                            <>
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              {message.confirmationId?.startsWith("approve-")
-                                ? "Starting Approval..."
-                                : "Creating Plan..."}
-                            </>
-                          ) : isPlanCreationLoading ? (
-                            <>
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              &apos;Processing...&apos;
-                            </>
-                          ) : (
-                            <>
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M5 13l4 4L19 7"
-                                />
-                              </svg>
-                              {message.confirmationId?.startsWith("approve-")
-                                ? "Proceed with Approval"
-                                : "Review Plan Details"}
-                            </>
-                          )}
-                        </button>
-                        <button
-                          onClick={() =>
-                            handleCancelPlan(message.confirmationId!)
-                          }
-                          disabled={
-                            isPlanCreationLoading ||
-                            isApprovalLoading ||
-                            isApprovePending ||
-                            isApprovalConfirming 
-                          }
-                          className="flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-                        >
+                      {/* Show status badge if user has clicked a button */}
+                      {message.confirmationStatus === "proceeding" ? (
+                        <div className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-500/20 text-blue-200 border border-blue-500/30 rounded-lg">
+                          <div className="w-4 h-4 border-2 border-blue-200 border-t-transparent rounded-full animate-spin" />
+                          <span className="text-sm font-medium">Processing...</span>
+                        </div>
+                      ) : message.confirmationStatus === "cancelled" ? (
+                        <div className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-500/20 text-gray-200 border border-gray-500/30 rounded-lg">
                           <svg
                             className="w-4 h-4"
                             fill="none"
@@ -2221,9 +2188,120 @@ export function ActionsTab() {
                               d="M6 18L18 6M6 6l12 12"
                             />
                           </svg>
-                          Cancel
-                        </button>
-                      </div>
+                          <span className="text-sm font-medium">Cancelled</span>
+                        </div>
+                      ) : message.confirmationStatus === "completed" ? (
+                        <div className="flex items-center justify-center gap-2 px-4 py-2 bg-green-500/20 text-green-200 border border-green-500/30 rounded-lg">
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                          <span className="text-sm font-medium">Completed</span>
+                        </div>
+                      ) : (
+                        /* Show buttons only when status is pending or undefined */
+                        <div className="flex gap-2 justify-center">
+                          <button
+                            onClick={() => {
+                              if (
+                                message.confirmationId?.startsWith("approve-")
+                              ) {
+                                handleApproveConfirm(message.confirmationId);
+                              } else {
+                                // This case should ideally not be reached for plan creation requests
+                                // but as a fallback, we can call handleConfirmPlan if it were still here
+                                // For now, we'll just show the cancel button
+                                handleCancelPlan(
+                                  message.confirmationId as string
+                                );
+                              }
+                            }}
+                            disabled={
+                              isPlanCreationLoading ||
+                              isApprovalLoading ||
+                              isApprovePending ||
+                              isApprovalConfirming
+                            }
+                            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                          >
+                            {isApprovePending || isApprovalConfirming ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                {isApprovePending
+                                  ? "Wallet Approval..."
+                                  : "Confirming Approval..."}
+                              </>
+                            ) : isApprovalLoading ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                {message.confirmationId?.startsWith("approve-")
+                                  ? "Starting Approval..."
+                                  : "Creating Plan..."}
+                              </>
+                            ) : isPlanCreationLoading ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                &apos;Processing...&apos;
+                              </>
+                            ) : (
+                              <>
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M5 13l4 4L19 7"
+                                  />
+                                </svg>
+                                {message.confirmationId?.startsWith("approve-")
+                                  ? "Proceed with Approval"
+                                  : "Review Plan Details"}
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleCancelPlan(message.confirmationId!)
+                            }
+                            disabled={
+                              isPlanCreationLoading ||
+                              isApprovalLoading ||
+                              isApprovePending ||
+                              isApprovalConfirming
+                            }
+                            className="flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                            Cancel
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
 
