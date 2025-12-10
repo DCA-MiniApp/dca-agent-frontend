@@ -99,9 +99,9 @@ const PLAN_SIMULATION_STEPS: PlanSimulationStep[] = [
     weight: 0.14,
   },
   {
-    id: "tg-balance",
-    label: "Checking TG balance (TriggerX)",
-    description: "Ensuring TriggerX can execute your plan",
+    id: "deposit-balance",
+    label: "Checking deposit balance",
+    description: "Verifying you have enough deposit to execute your plan",
     weight: 0.14,
   },
   {
@@ -1294,7 +1294,11 @@ export function ActionsTab() {
                 let requiresDeposit = false;
                 let depositAmount = '';
 
-                if (triggerXResult.error && triggerXResult.error.startsWith('INSUFFICIENT_BALANCE:')) {
+                if (triggerXResult.error && triggerXResult.error.includes("Failed to fetch job cost prediction")) {
+                  errorContent = `⚠️ **Automation Setup Failed**\n\nWe couldn't estimate the gas costs for your automation job right now. This is likely a temporary network issue.\n\nPlease try creating your plan again.`;
+                } else if (triggerXResult.error && triggerXResult.error.includes("Invalid response from /api/fees: missing total_fee")) {
+                  errorContent = `⚠️ **Automation Setup Failed**\n\nWe received an invalid response when calculating fees. This might be a temporary server issue.\n\nPlease try creating your plan again.`;
+                } else if (triggerXResult.error && triggerXResult.error.startsWith('INSUFFICIENT_BALANCE:')) {
                   const ethAmount = triggerXResult.error.split(':')[1];
                   console.log('[ActionsTab] Extracted ETH amount:', ethAmount);
 
@@ -2204,7 +2208,7 @@ export function ActionsTab() {
                             isPlanCreationLoading ||
                             isApprovalLoading ||
                             isApprovePending ||
-                            isApprovalConfirming 
+                            isApprovalConfirming
                           }
                           className="flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
                         >

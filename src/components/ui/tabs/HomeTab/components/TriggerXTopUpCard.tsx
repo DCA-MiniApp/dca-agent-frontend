@@ -1,5 +1,6 @@
 import React from "react";
-import { HiCurrencyDollar } from "react-icons/hi2";
+import { HiCurrencyDollar, HiInformationCircle } from "react-icons/hi2";
+import { useState } from "react";
 
 interface TriggerXTopUpCardProps {
   topupAmount: string;
@@ -9,6 +10,7 @@ interface TriggerXTopUpCardProps {
   isConnected: boolean;
   topupStatus: string | null;
   ethBalance: string; // Add this prop for user's ETH balance
+  isEthBalanceLoading: boolean;
 }
 
 export function TriggerXTopUpCard({
@@ -19,10 +21,12 @@ export function TriggerXTopUpCard({
   isConnected,
   topupStatus,
   ethBalance,
+  isEthBalanceLoading,
 }: TriggerXTopUpCardProps) {
   const balance = parseFloat(ethBalance) || 0;
   const amount = parseFloat(topupAmount) || 0;
   const isInsufficientBalance = amount > balance && topupAmount !== "";
+  const [showInfo, setShowInfo] = useState(false);
 
   const handleMaxClick = () => {
     // setTopupAmount(ethBalance);
@@ -39,7 +43,32 @@ export function TriggerXTopUpCard({
               <HiCurrencyDollar className="text-emerald-300 size-6" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white">Top up ETH</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-white">Top up ETH</h3>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowInfo(!showInfo)}
+                    className="text-white/50 hover:text-white transition-colors focus:outline-none flex items-center"
+                  >
+                    <HiInformationCircle className="w-4 h-4" />
+                  </button>
+
+                  {showInfo && (
+                    <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2.5 w-56 z-50">
+                      <div className="relative">
+                        <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#c199e4] rotate-45 rounded-[1px]"></div>
+                        <div className="bg-[#c199e4] p-3 rounded-xl shadow-xl relative">
+                          <p className="text-xs text-white font-medium leading-relaxed text-center">
+                            The Top Up is used to pay for your transactions
+                            executed by TriggerX
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
               <p className="text-xs text-white/70">
                 Add ETH to run your plans smoothly.
               </p>
@@ -50,7 +79,13 @@ export function TriggerXTopUpCard({
           <div className="mt-3 mb-3 flex items-center justify-between">
             <span className="text-xs text-white/70">Available Balance</span>
             <span className="text-sm font-semibold text-emerald-300">
-              {parseFloat(ethBalance).toFixed(7)} ETH
+              {isEthBalanceLoading ? (
+                <span className="text-xs text-emerald-300/70 animate-pulse">
+                  Fetching balance...
+                </span>
+              ) : (
+                `${parseFloat(ethBalance).toFixed(7)} ETH`
+              )}
             </span>
           </div>
 
@@ -66,11 +101,10 @@ export function TriggerXTopUpCard({
                     value={topupAmount}
                     onChange={(e) => setTopupAmount(e.target.value)}
                     placeholder="Enter ETH amount"
-                    className={`w-full rounded-2xl border px-4 py-2.5 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 transition-all duration-300 bg-black/20 ${
-                      isInsufficientBalance
-                        ? "border-red-500/60 focus:ring-red-500/60 focus:border-red-500/60"
-                        : "border-white/25 focus:ring-[#c199e4]/60 focus:border-[#c199e4]/60"
-                    }`}
+                    className={`w-full rounded-2xl border px-4 py-2.5 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 transition-all duration-300 bg-black/20 ${isInsufficientBalance
+                      ? "border-red-500/60 focus:ring-red-500/60 focus:border-red-500/60"
+                      : "border-white/25 focus:ring-[#c199e4]/60 focus:border-[#c199e4]/60"
+                      }`}
                   />
                 </div>
               </div>

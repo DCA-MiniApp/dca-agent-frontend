@@ -84,7 +84,10 @@ function useFarcasterAutoConnect() {
       typeof window !== "undefined" &&
       (sdk?.isInMiniApp || window.location.href.includes("neynar.app")); // adjust detection
 
-    if (!isMiniApp || isConnected || hasManualDisconnect) return;
+    // Double check storage directly to avoid race conditions with state updates
+    const storedDisconnect = readManualDisconnectFlag();
+
+    if (!isMiniApp || isConnected || hasManualDisconnect || storedDisconnect) return;
 
     const farcasterConnector = connectors.find(
       (connector) => connector.id === "farcaster" || connector.name === "Farcaster"

@@ -172,6 +172,15 @@ export interface QuickStats {
 }
 
 let quickStatsCache: { data: QuickStats; fetchedAt: number } | null = null;
+interface PreviousStats {
+  totalExecutions: number;
+  totalValueSwapped: number;
+}
+
+let previousStats: PreviousStats = {
+  totalExecutions: 0,
+  totalValueSwapped: 0,
+};
 
 
 
@@ -567,51 +576,10 @@ export async function fetchPlatformStatsForMonitor(): Promise<JobMonitorData | n
   }
 }
 
-// export async function fetchQuickStats(): Promise<QuickStats | null> {
-//   const now = Date.now();
-
-//   // Use cached stats if they are fresher than 2 minutes
-//   if (
-//     quickStatsCache &&
-//     now - quickStatsCache.fetchedAt < 5 * 60 * 1000
-//   ) {
-//     return quickStatsCache.data;
-//   }
-
-//   try {
-//     const response = await fetch(`${API_BASE_URL}/api/dca/platform-stats`, {
-//       method: "GET",
-//       headers: {
-//         Accept: "application/json",
-//         ishome: "true",
-//       },
-//     });
-
-//     if (!response.ok) {
-//       console.error("Failed to fetch quick stats:", response.status);
-//       return null;
-//     }
-
-//     const result: ApiResponse<QuickStats> = await response.json();
-//     if (result.success && result.data) {
-//       quickStatsCache = {
-//         data: result.data,
-//         fetchedAt: now,
-//       };
-//       return result.data;
-//     } else {
-//       console.error("Failed to fetch quick stats:", result.message);
-//       return null;
-//     }
-//   } catch (error) {
-//     console.error("Error fetching quick stats:", error);
-//     return null;
-//   }
-// }
-
-
-// In api.ts
-export async function fetchQuickStats(): Promise<{ data: QuickStats | null; fromCache: boolean }> {
+export async function fetchQuickStats(): Promise<{ 
+  data: QuickStats | null; 
+  fromCache: boolean 
+}> {
   const now = Date.now();
 
   if (
@@ -637,11 +605,38 @@ export async function fetchQuickStats(): Promise<{ data: QuickStats | null; from
 
     const result: ApiResponse<QuickStats> = await response.json();
     if (result.success && result.data) {
+      const newExecutions = result.data.total_job_live_count ?? 0;
+      const newVolume = result.data.total_value_swapped ?? 0;
+
+      // Don't cache if values are 0
+      if (newExecutions === 0 || newVolume === 0) {
+        console.warn("Received zero values, not caching");
+        return { data: result.data, fromCache: false };
+      }
+
+      // Ensure monotonic increase - use previous value if new value is less
+      const finalExecutions = Math.max(newExecutions, previousStats.totalExecutions);
+      const finalVolume = Math.max(newVolume, previousStats.totalValueSwapped);
+
+      // Update previous stats
+      previousStats = {
+        totalExecutions: finalExecutions,
+        totalValueSwapped: finalVolume,
+      };
+
+      // Cache with corrected values
+      const correctedData = {
+        ...result.data,
+        total_job_live_count: finalExecutions,
+        total_value_swapped: finalVolume,
+      };
+
       quickStatsCache = {
-        data: result.data,
+        data: correctedData,
         fetchedAt: now,
       };
-      return { data: result.data, fromCache: false };
+
+      return { data: correctedData, fromCache: false };
     } else {
       console.error("Failed to fetch quick stats:", result.message);
       return { data: null, fromCache: false };

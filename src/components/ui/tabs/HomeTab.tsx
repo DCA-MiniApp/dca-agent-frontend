@@ -61,10 +61,8 @@ async function fetchETHBalance(address: string): Promise<string> {
       // Convert hex to decimal
       const hexBalance = data.result;
       const decimalBalance = BigInt(hexBalance);
-      
       // Convert Wei to ETH (1 ETH = 10^18 Wei)
       const ethBalance = Number(decimalBalance) / Math.pow(10, 18);
-      
       return ethBalance.toFixed(8);
     }
 
@@ -112,7 +110,7 @@ export function HomeTab() {
   const [totalInvested, setTotalInvested] = useState(0);
   const [portfolioUsd, setPortfolioUsd] = useState<number | null>(null);
   const [ethBalance, setEthBalance] = useState<string>("0");
-    const [isEthBalanceLoading, setIsEthBalanceLoading] = useState(false);
+  const [isEthBalanceLoading, setIsEthBalanceLoading] = useState(true);
   // UI state
   const [showWrongNetworkTooltip, setShowWrongNetworkTooltip] = useState(false);
   const [showTokenSearch, setShowTokenSearch] = useState(false);
@@ -138,10 +136,11 @@ export function HomeTab() {
   // const [activePlans, setActivePlans] = useState<DCAPlan[]>([]);
   // const [runningPlans, setRunningPlans] = useState<DCAPlan[]>([]);
 
-    // Fetch ETH balance
+  // Fetch ETH balance
   const fetchEthBalance = useCallback(async () => {
     if (!address) {
       setEthBalance("0");
+      setIsEthBalanceLoading(false);
       return;
     }
 
@@ -348,7 +347,7 @@ export function HomeTab() {
           console.log("Using cached quick stats data");
           setIsQuickStatsLoading(false);
           setTotalExecutions(stats?.total_job_live_count ?? 0);
-          setTotalValueSwapped(stats?.total_value_swapped ?? 0);        
+          setTotalValueSwapped(stats?.total_value_swapped ?? 0);
         } else {
           console.log("Fetched fresh quick stats data");
           const nextExecutions = stats?.total_job_live_count ?? 0;
@@ -406,9 +405,8 @@ export function HomeTab() {
   }, [userPlans.length, setCurrentPlanIndex]);
 
   // Computed values
-  const userGreeting = `Welcome back, ${
-    context?.user?.username ?? "John Doe"
-  } 👋`;
+  const userGreeting = `Welcome back, ${context?.user?.username ?? "John Doe"
+    } 👋`;
 
 
   const activePlans = userPlans.filter((plan) => plan.status === "ACTIVE");
@@ -499,6 +497,7 @@ export function HomeTab() {
         isConnected={isConnected}
         topupStatus={topupStatus}
         ethBalance={ethBalance}
+        isEthBalanceLoading={isEthBalanceLoading}
       />
 
       {/* Plan Details Modal */}

@@ -34,7 +34,7 @@ export function UserGreetingCard({
       {!isConnected && (
         <div className="mt-3">
           <p className="text-sm text-white/70 mb-3">
-            Connect your wallet to view balances and manage your DCA strategies.
+            Connect your wallet and manage your DCA strategies.
           </p>
           <motion.button
             whileHover={{ scale: 1.02 }}
