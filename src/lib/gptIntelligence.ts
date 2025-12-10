@@ -689,10 +689,11 @@ Extract any new DCA parameters from this message and provide the next question f
     };
 
     // Determine if this was originally a dollar amount request
+    // Check if the USD estimate significantly differs from amount * price (indicating conversion happened)
     const wasOriginallyDollarAmount = planData.usdEstimate && 
       planData.usdEstimate.amountUsd && 
       planData.usdEstimate.tokenPriceUsd &&
-      Math.abs((Number(planData.amount) * planData.usdEstimate.tokenPriceUsd) - planData.usdEstimate.amountUsd) > 0.01;
+      Math.abs((Number(planData.amount) * planData.usdEstimate.tokenPriceUsd) - planData.usdEstimate.amountUsd) > 0.05;
 
     const investmentLine = wasOriginallyDollarAmount
       ? `• Investment: $${planData.usdEstimate!.amountUsd.toFixed(2)} worth of ${planData.fromToken} (${planData.amount} ${planData.fromToken})`
@@ -877,8 +878,10 @@ export async function applyUsdIntelligence(
 
   console.log('🔍 [USD Intelligence] Price info:', priceInfo);
 
-  // Check if the amount is specified in dollars (either from detectDollarIntent or internal flag)
-  const isDollarAmount = planData._isDollarAmount || (usdInputAmount && usdInputAmount > 0);
+  // Check if the amount is specified in dollars
+  // ONLY convert if explicitly marked as dollar amount OR if usdInputAmount is provided
+  // Do NOT convert if _isDollarAmount is explicitly false
+  const isDollarAmount = planData._isDollarAmount === true || (usdInputAmount && usdInputAmount > 0);
   const dollarAmount = usdInputAmount || (isDollarAmount ? Number(planData.amount) : 0);
 
   console.log('🔍 [USD Intelligence] Analysis:', { 
@@ -891,7 +894,8 @@ export async function applyUsdIntelligence(
   if (isDollarAmount && dollarAmount > 0) {
     // Convert USD amount to token amount
     const tokenAmount = dollarAmount / priceInfo.priceUsd;
-    const formattedTokenAmount = Number(tokenAmount.toFixed(8)).toString();
+    // Round to reasonable precision to avoid floating point issues
+    const formattedTokenAmount = tokenAmount.toFixed(6);
     
     console.log('🔍 [USD Intelligence] Converting USD to token:', {
       dollarAmount,
@@ -908,7 +912,7 @@ export async function applyUsdIntelligence(
     // Clean up internal flag
     delete planData._isDollarAmount;
   } else {
-    // Amount is in token units, calculate USD equivalent
+    // Amount is in token units - keep original amount, just calculate USD equivalent
     const tokenAmount = Number(planData.amount);
     if (!isFinite(tokenAmount) || tokenAmount <= 0) return;
     
@@ -918,6 +922,7 @@ export async function applyUsdIntelligence(
       usdEquivalent: tokenAmount * priceInfo.priceUsd
     });
     
+    // Don't modify the amount - keep user's original input
     planData.usdEstimate = {
       amountUsd: tokenAmount * priceInfo.priceUsd,
       tokenPriceUsd: priceInfo.priceUsd,
