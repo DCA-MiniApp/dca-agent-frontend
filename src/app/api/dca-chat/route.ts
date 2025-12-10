@@ -7,7 +7,7 @@ import { planSessionManager } from '../../../lib/planSessionManager';
 const ChatRequestSchema = z.object({
   message: z.string(),
   userAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address').optional(),
-  fid: z.number().int().positive().optional(),
+  fid: z.number().int().optional(),
   conversationHistory: z.array(z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string(),

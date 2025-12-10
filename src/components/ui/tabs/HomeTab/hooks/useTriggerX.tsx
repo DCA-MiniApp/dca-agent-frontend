@@ -62,7 +62,7 @@ export function useTriggerX(isConnected: boolean, address?: string, wagmiWalletC
     return signer;
   };
 
-  const handleTopupTg = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleDeposit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!isConnected || !wagmiWalletClient) {
       setTopupStatus("Please connect your wallet on Arbitrum first.");
@@ -182,7 +182,7 @@ export function useTriggerX(isConnected: boolean, address?: string, wagmiWalletC
     withdrawStatus,
     setTopupAmount,
     setWithdrawAmount,
-    handleTopupTg,
+    handleDeposit,
     handleWithdrawTg,
     setTgBalance,
   };

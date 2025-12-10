@@ -43,13 +43,13 @@ export function WalletBalanceCard({
       return "0.000000 ETH";
     }
     
-    return `${Number(tgBalance).toFixed(6)} ETH`;
+    return `${Number(tgBalance).toFixed(8)} ETH`;
   };
   return (
-    <div className="bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-3xl p-6 text-white border border-[#c199e4]/30 shadow-lg hover:shadow-xl hover:border-[#c199e4]/50 transition-all duration-500 hover:scale-[1.02] group">
+    <div className="bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-3xl p-6 text-white border border-[#c199e4]/30 shadow-lg hover:shadow-xl transition-all duration-300 group">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-12 h-12 bg-gradient-to-br from-[#c199e4]/30 to-[#c199e4]/20 rounded-2xl flex items-center justify-center group-hover:from-[#c199e4]/40 group-hover:to-[#c199e4]/30 transition-all duration-300">
+        <div className="w-12 h-12 bg-gradient-to-br from-[#c199e4]/30 to-[#c199e4]/20 rounded-2xl flex items-center justify-center transition-all duration-300">
           <HiCurrencyDollar className="text-[#c199e4] size-7" />
         </div>
         <div>
@@ -154,7 +154,7 @@ export function WalletBalanceCard({
                 </p>
               )}
             </div>
-            <div className="flex items-center justify-between">
+            {/* <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
                 <span className="text-xs text-white/60 uppercase tracking-wide font-medium">
@@ -166,7 +166,7 @@ export function WalletBalanceCard({
                   ETH: ${ethPrice.toFixed(2)}
                 </span>
               )}
-            </div>
+            </div> */}
           </div>
         </motion.div>
       </div>
