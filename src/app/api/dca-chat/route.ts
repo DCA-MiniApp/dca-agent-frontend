@@ -42,8 +42,8 @@ interface DCABackendResponse {
 // Configuration for DCA backend connection
 const DCA_BACKEND_URL = process.env.DCA_BACKEND_URL;
 const DCA_API_URL = process.env.NEXT_PUBLIC_API_URL;
-console.log("DCA_API_URL",DCA_API_URL);
-console.log("DCA_BACKEND_URL",DCA_BACKEND_URL);
+console.log("DCA_API_URL", DCA_API_URL);
+console.log("DCA_BACKEND_URL", DCA_BACKEND_URL);
 
 /**
  * Chat API endpoint that interfaces with the DCA VibeKit Agent
@@ -83,16 +83,16 @@ export async function POST(request: NextRequest) {
 
     // Get or create session for intelligent plan creation
     const session = planSessionManager.getOrCreateSession(userAddress);
-    
+
     // Check if this is plan creation intent or continuing plan creation
     const isPlanCreation = planSessionManager.isPlanCreationIntent(message, session.id) || isPlanCreationRequest;
-    
+
     if (isPlanCreation) {
       console.log('[Intelligent Plan Creation] Processing plan creation request');
-      
+
       // Add user message to conversation history
       planSessionManager.addToConversationHistory(session.id, 'user', message);
-      
+
       // Use GPT intelligence to extract plan data
       const extractionResult = await gptIntelligence.extractPlanData(
         message,
@@ -121,32 +121,32 @@ export async function POST(request: NextRequest) {
         extractionResult.isComplete = true;
         extractionResult.missingFields = [];
       }
-      
+
       // Update session with extracted data
       planSessionManager.updateSessionPlanData(session.id, extractionResult.planData);
-      
-      // Check if plan is complete
-      if (extractionResult.isComplete) {
+
+      // Check if plan is complete AND has no validation errors
+      if (extractionResult.isComplete && (!extractionResult.validationErrors || extractionResult.validationErrors.length === 0)) {
         console.log('[Plan Creation] Plan data complete, showing confirmation');
-        
+
         const completePlanData = extractionResult.planData as DCAPlanData;
-        
+
         // IMPORTANT: Apply USD conversion FIRST before generating confirmation ID
         // This ensures the confirmationId contains the converted token amount, not the dollar amount
         await applyUsdIntelligence(
           completePlanData,
           dollarIntent.usdAmount
         );
-        
+
         // Now generate confirmation ID with the converted amount
         const confirmationId = generateConfirmationId(completePlanData);
         planSessionManager.updateSessionPlanData(session.id, completePlanData);
         const confirmationMessage =
           gptIntelligence.generatePlanSummary(completePlanData);
-        
+
         // Add assistant response to conversation
         planSessionManager.addToConversationHistory(session.id, 'assistant', confirmationMessage);
-        
+
         return NextResponse.json({
           success: true,
           response: confirmationMessage,
@@ -159,13 +159,13 @@ export async function POST(request: NextRequest) {
       } else {
         // Plan is incomplete, ask for missing information
         let responseMessage = '';
-        
+
         if (extractionResult.validationErrors && extractionResult.validationErrors.length > 0) {
           responseMessage += `❌ **Issues found:**\n${extractionResult.validationErrors.map(err => `• ${err}`).join('\n')}\n\n`;
         }
 
         console.log('[Plan Creation] Extraction result:', extractionResult);
-        
+
         if (Object.keys(extractionResult.planData).length > 0) {
           responseMessage += `✅ **Information collected so far:**\n`;
           if (extractionResult.planData.fromToken) responseMessage += `• From token: ${extractionResult.planData.fromToken}\n`;
@@ -175,12 +175,12 @@ export async function POST(request: NextRequest) {
           if (extractionResult.planData.duration) responseMessage += `• Duration: ${extractionResult.planData.duration}\n`;
           responseMessage += '\n';
         }
-        
+
         responseMessage += `❓ **${extractionResult.nextQuestion}**`;
-        
+
         // Add assistant response to conversation
         planSessionManager.addToConversationHistory(session.id, 'assistant', responseMessage);
-        
+
         return NextResponse.json({
           success: true,
           response: responseMessage,
@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
 
     // For non-plan creation messages, send to VibeKit agent
     const vibekitResponse = await sendToVibeKitAgent(message, userAddress, conversationHistory, fid);
-    
+
     return NextResponse.json({
       success: true,
       response: vibekitResponse.response,
@@ -205,7 +205,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('[DCA Chat API] Error:', error);
-    
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { success: false, error: 'Validation error', details: error.errors },
@@ -235,13 +235,13 @@ async function handleConfirmationAction(
   data?: any;
 }> {
   console.log('[Confirmation] Handling action:', { confirmationId, action, userAddress });
-  
+
   if (action === 'cancel') {
     // Clear the session for this user
     if (userAddress) {
       planSessionManager.clearSession(userAddress);
     }
-    
+
     return {
       success: true,
       response: "✅ **Plan creation cancelled.** No DCA plan was created. Is there anything else I can help you with?",
@@ -263,19 +263,19 @@ async function handleConfirmationAction(
       // Format: "create-plan-{timestamp}-{base64encodedData}"
       const [, , , encodedData] = confirmationId.split('-');
       const planData = JSON.parse(Buffer.from(encodedData, 'base64').toString());
-      
+
       console.log('[Confirmation] Creating confirmed plan:', planData);
-      
+
       // Clear the session since plan creation is confirmed
       planSessionManager.clearSession(userAddress);
-      
+
       // Create instruction for VibeKit agent
       console.log('🔍 [DCA CHAT API CONFIRMATION] userAddress before VibeKit:', userAddress);
       console.log('🔍 [DCA CHAT API CONFIRMATION] Address length:', userAddress?.length);
       console.log('🔍 [DCA CHAT API CONFIRMATION] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(userAddress || ''));
       const createInstruction = `Create DCA plan: Invest ${planData.amount} ${planData.fromToken} into ${planData.toToken} every ${planData.interval} for ${planData.duration} with ${planData.slippage || 2}% slippage`;
       const vibekitResponse = await sendToVibeKitAgent(createInstruction, userAddress, [], fid);
-      
+
       return {
         success: true,
         response: vibekitResponse.response, // Show the actual SSE response directly
@@ -304,8 +304,8 @@ async function handleConfirmationAction(
  * Check if user has approved sufficient token spending
  */
 async function checkTokenApproval(
-  token: string, 
-  amount: string, 
+  token: string,
+  amount: string,
   userAddress: string
 ): Promise<{
   approved: boolean;
@@ -315,13 +315,13 @@ async function checkTokenApproval(
   try {
     // For now, simulate approval check (in real implementation, query blockchain)
     console.log('[Token Approval] Checking approval for:', { token, amount, userAddress });
-    
+
     // TODO: Implement actual token approval checking
     // This would involve:
     // 1. Get the DCA contract address
     // 2. Call token.allowance(userAddress, dcaContractAddress)
     // 3. Compare with required amount
-    
+
     // For demo purposes, assume approval is needed
     return {
       approved: false,
@@ -341,121 +341,121 @@ async function checkTokenApproval(
 /**
  * Handle direct DCA operations based on message content analysis
  */
-async function handleDCAOperation(message: string, userAddress?: string): Promise<{
-  success: boolean;
-  message?: string;
-  action?: string;
-  data?: any;
-}> {
-  const lowerMessage = message.toLowerCase();
+// async function handleDCAOperation(message: string, userAddress?: string): Promise<{
+//   success: boolean;
+//   message?: string;
+//   action?: string;
+//   data?: any;
+// }> {
+//   const lowerMessage = message.toLowerCase();
 
-  try {
-    // Check user's DCA plans
-    if (lowerMessage.includes('show') && (lowerMessage.includes('plans') || lowerMessage.includes('strategies'))) {
-      if (!userAddress) {
-        return {
-          success: true,
-          message: "I'd be happy to show your DCA plans! However, I need your wallet address to fetch your specific plans. Please connect your wallet first.",
-          action: 'request_wallet_connection'
-        };
-      }
+//   try {
+//     // Check user's DCA plans
+//     if (lowerMessage.includes('show') && (lowerMessage.includes('plans') || lowerMessage.includes('strategies'))) {
+//       if (!userAddress) {
+//         return {
+//           success: true,
+//           message: "I'd be happy to show your DCA plans! However, I need your wallet address to fetch your specific plans. Please connect your wallet first.",
+//           action: 'request_wallet_connection'
+//         };
+//       }
 
-      const plansResponse = await fetch(`${DCA_API_URL}/api/dca/plans/${userAddress}`);
-      const plansData: DCABackendResponse = await plansResponse.json();
+//       const plansResponse = await fetch(`${DCA_API_URL}/api/dca/plans/${userAddress}`);
+//       const plansData: DCABackendResponse = await plansResponse.json();
 
-      if (plansData.success && plansData.data) {
-        const plans = plansData.data;
-        if (plans.length === 0) {
-          return {
-            success: true,
-            message: "You don't have any DCA plans yet. Would you like me to help you create your first investment strategy?",
-            action: 'suggest_create_plan'
-          };
-        }
+//       if (plansData.success && plansData.data) {
+//         const plans = plansData.data;
+//         if (plans.length === 0) {
+//           return {
+//             success: true,
+//             message: "You don't have any DCA plans yet. Would you like me to help you create your first investment strategy?",
+//             action: 'suggest_create_plan'
+//           };
+//         }
 
-        const plansText = plans.map((plan: any, index: number) => {
-          const jobIdStr = String(plan.jobId || '');
-          const jobIdLine = plan.jobId
-            ? `   Job ID: ${jobIdStr.slice(0, 7)}...${jobIdStr.slice(-5)}`
-            : '';
-          return `${index + 1}. **${plan.fromToken} → ${plan.toToken}**\n` +
-            `   Amount: ${plan.amount} ${plan.fromToken}\n` +
-            `   Interval: Every ${plan.intervalMinutes} minutes\n` +
-            `   Status: ${plan.status}\n` +
-            `   Progress: ${plan.executionCount}/${plan.totalExecutions} executions\n` +
-            (jobIdLine ? `${jobIdLine}\n` : '') +
-            `   Next: ${plan.nextExecution ? new Date(plan.nextExecution).toLocaleString() : 'Completed'}`;
-        }).join('\n\n');
+//         const plansText = plans.map((plan: any, index: number) => {
+//           const jobIdStr = String(plan.jobId || '');
+//           const jobIdLine = plan.jobId
+//             ? `   Job ID: ${jobIdStr.slice(0, 7)}...${jobIdStr.slice(-5)}`
+//             : '';
+//           return `${index + 1}. **${plan.fromToken} → ${plan.toToken}**\n` +
+//             `   Amount: ${plan.amount} ${plan.fromToken}\n` +
+//             `   Interval: Every ${plan.intervalMinutes} minutes\n` +
+//             `   Status: ${plan.status}\n` +
+//             `   Progress: ${plan.executionCount}/${plan.totalExecutions} executions\n` +
+//             (jobIdLine ? `${jobIdLine}\n` : '') +
+//             `   Next: ${plan.nextExecution ? new Date(plan.nextExecution).toLocaleString() : 'Completed'}`;
+//         }).join('\n\n');
 
-        return {
-          success: true,
-          message: `Here are your current DCA plans:\n\n${plansText}\n\nWould you like to modify any of these plans or create a new one?`,
-          action: 'show_plans',
-          data: plans
-        };
-      }
-    }
+//         return {
+//           success: true,
+//           message: `Here are your current DCA plans:\n\n${plansText}\n\nWould you like to modify any of these plans or create a new one?`,
+//           action: 'show_plans',
+//           data: plans
+//         };
+//       }
+//     }
 
-    // Get platform statistics
-    if (lowerMessage.includes('stats') || lowerMessage.includes('statistics') || lowerMessage.includes('platform')) {
-      const statsResponse = await fetch(`${DCA_API_URL}/api/dca/stats`);
-      const statsData: DCABackendResponse = await statsResponse.json();
+//     // Get platform statistics
+//     if (lowerMessage.includes('stats') || lowerMessage.includes('statistics') || lowerMessage.includes('platform')) {
+//       const statsResponse = await fetch(`${DCA_API_URL}/api/dca/stats`);
+//       const statsData: DCABackendResponse = await statsResponse.json();
 
-      if (statsData.success && statsData.data) {
-        const stats = statsData.data;
-        const message = `📊 **Platform Statistics**\n\n` +
-          `💰 Total Plans: ${stats.totalPlans}\n` +
-          `🔥 Active Plans: ${stats.activePlans}\n` +
-          `👥 Total Users: ${stats.totalUsers}\n` +
-          `⚡ Total Executions: ${stats.totalExecutions}\n` +
-          `📈 Last 24h: ${stats.last24hExecutions} executions\n` +
-          `📅 Last 7 days: ${stats.last7dExecutions} executions\n\n` +
-          `The platform is actively helping users with their DCA strategies!`;
+//       if (statsData.success && statsData.data) {
+//         const stats = statsData.data;
+//         const message = `📊 **Platform Statistics**\n\n` +
+//           `💰 Total Plans: ${stats.totalPlans}\n` +
+//           `🔥 Active Plans: ${stats.activePlans}\n` +
+//           `👥 Total Users: ${stats.totalUsers}\n` +
+//           `⚡ Total Executions: ${stats.totalExecutions}\n` +
+//           `📈 Last 24h: ${stats.last24hExecutions} executions\n` +
+//           `📅 Last 7 days: ${stats.last7dExecutions} executions\n\n` +
+//           `The platform is actively helping users with their DCA strategies!`;
 
-        return {
-          success: true,
-          message,
-          action: 'show_stats',
-          data: stats
-        };
-      }
-    }
+//         return {
+//           success: true,
+//           message,
+//           action: 'show_stats',
+//           data: stats
+//         };
+//       }
+//     }
 
-    // Check if asking for help
-    if (lowerMessage.includes('help') || lowerMessage.includes('what can you do')) {
-      return {
-        success: true,
-        message: `🤖 **I'm your DCA Investment Assistant!** Here's what I can help you with:\n\n` +
-          `📈 **Create DCA Plans**: Set up automated investment strategies\n` +
-          `💼 **Manage Plans**: View, pause, resume, or cancel your strategies\n` +
-          `📊 **Track Performance**: Monitor your investment progress\n` +
-          `🎯 **Smart Recommendations**: Get personalized investment advice\n` +
-          `⚙️ **Platform Stats**: View overall platform performance\n\n` +
-          `**Quick Commands:**\n` +
-          `• "Show my plans" - View your DCA strategies\n` +
-          `• "Create plan" - Set up new investment strategy\n` +
-          `• "Platform stats" - See platform statistics\n` +
-          `• "Pause plan [ID]" - Pause a specific plan\n\n` +
-          `Just ask me anything in natural language!`,
-        action: 'show_help'
-      };
-    }
+//     // Check if asking for help
+//     if (lowerMessage.includes('help') || lowerMessage.includes('what can you do')) {
+//       return {
+//         success: true,
+//         message: `🤖 **I'm your DCA Investment Assistant!** Here's what I can help you with:\n\n` +
+//           `📈 **Create DCA Plans**: Set up automated investment strategies\n` +
+//           `💼 **Manage Plans**: View, pause, resume, or cancel your strategies\n` +
+//           `📊 **Track Performance**: Monitor your investment progress\n` +
+//           `🎯 **Smart Recommendations**: Get personalized investment advice\n` +
+//           `⚙️ **Platform Stats**: View overall platform performance\n\n` +
+//           `**Quick Commands:**\n` +
+//           `• "Show my plans" - View your DCA strategies\n` +
+//           `• "Create plan" - Set up new investment strategy\n` +
+//           `• "Platform stats" - See platform statistics\n` +
+//           `• "Pause plan [ID]" - Pause a specific plan\n\n` +
+//           `Just ask me anything in natural language!`,
+//         action: 'show_help'
+//       };
+//     }
 
-    // If no specific operation matched, return false to let VibeKit handle it
-    return { success: false };
+//     // If no specific operation matched, return false to let VibeKit handle it
+//     return { success: false };
 
-  } catch (error) {
-    console.error('[DCA Operation] Error:', error);
-    return { success: false };
-  }
-}
+//   } catch (error) {
+//     console.error('[DCA Operation] Error:', error);
+//     return { success: false };
+//   }
+// }
 
 /**
  * Send message to DCA VibeKit Agent for natural language processing
  */
 async function sendToVibeKitAgent(
-  message: string, 
-  userAddress?: string, 
+  message: string,
+  userAddress?: string,
   conversationHistory: any[] = [],
   fid?: number
 ): Promise<{
@@ -469,7 +469,7 @@ async function sendToVibeKitAgent(
     console.log('🔍 [SEND TO VIBEKIT] userAddress before sending:', userAddress);
     console.log('🔍 [SEND TO VIBEKIT] Address length:', userAddress?.length);
     console.log('🔍 [SEND TO VIBEKIT] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(userAddress || ''));
-    
+
     // Generate unique request ID to avoid conflicts
     const requestId = Date.now() + Math.floor(Math.random() * 1000);
     console.log('[VibeKit Agent] Using request ID:', requestId);
@@ -493,10 +493,10 @@ async function sendToVibeKitAgent(
         }
       }
     };
-    
+
     console.log('🔍 [SEND TO VIBEKIT] Request body arguments:', requestBody.params.arguments);
     console.log('🔍 [SEND TO VIBEKIT] userAddress in request body:', requestBody.params.arguments.userAddress);
-    
+
     // Send to DCA skill via MCP tool call format using the session ID
     const response = await fetch(`${DCA_BACKEND_URL}/messages?sessionId=${sessionId}`, {
       method: 'POST',
@@ -507,25 +507,25 @@ async function sendToVibeKitAgent(
     });
 
     if (!response.ok) {
-      reader.cancel().catch(() => {});
+      reader.cancel().catch(() => { });
       const errorText = await response.text();
       throw new Error(`VibeKit agent responded with ${response.status}: ${errorText}`);
     }
 
     const initialResponse = await response.text();
-    
+
     // The /messages endpoint returns "Accepted" and the real response comes via SSE
     if (initialResponse === 'Accepted' || initialResponse.includes('Accepted')) {
       console.log('[VibeKit Agent] Request accepted, waiting for SSE response...');
-      
+
       // Step 3: Wait for the actual response via the established SSE connection
       try {
         const sseResponse = await waitForSSEResponseWithReader(requestId, reader, sessionId);
-        
+
         // Parse the SSE response format
         let responseText = 'I understand your request, but I encountered an issue processing it. Could you please try again?';
         let artifactsData: any = null;
-        
+
         if (sseResponse.error) {
           responseText = `Error: ${sseResponse.error.message || 'Unknown MCP error'}`;
         } else if (sseResponse.result && sseResponse.result.content) {
@@ -536,10 +536,10 @@ async function sendToVibeKitAgent(
             try {
               const taskData = JSON.parse(resourceContent.resource.text);
               console.log('[Response Parser] Parsed task data:', taskData);
-              
+
               // Handle different response structures
               let textPart = null;
-              
+
               if (taskData.parts && Array.isArray(taskData.parts)) {
                 // Direct parts array (current structure)
                 textPart = taskData.parts.find((part: any) => part.kind === 'text');
@@ -547,17 +547,17 @@ async function sendToVibeKitAgent(
                 // Standard structure with status.message.parts
                 textPart = taskData.status.message.parts.find((part: any) => part.kind === 'text');
               }
-              
+
               // Extract artifacts data if available
               if (taskData.artifacts && Array.isArray(taskData.artifacts) && taskData.artifacts.length > 0) {
                 artifactsData = taskData.artifacts[0];
                 console.log('[Response Parser] Found artifacts data:', artifactsData);
               }
-              
+
               console.log('[Response Parser] Found text part:', textPart);
               if (textPart && textPart.text) {
                 responseText = textPart.text;
-                
+
                 // Enhance response with artifacts data if available
                 if (artifactsData && artifactsData.data) {
                   responseText = enhanceResponseWithData(textPart.text, artifactsData.data);
@@ -568,12 +568,12 @@ async function sendToVibeKitAgent(
             }
           }
         }
-        
+
         console.log('[VibeKit Agent] Extracted response text:', responseText);
-        
+
         // For regular messages, show the actual VibeKit response
         // Plan creation confirmations are handled at the frontend level now
-        
+
         // Analyze response to determine if any action was taken  
         const action = analyzeResponseForActions(responseText);
 
@@ -591,9 +591,9 @@ async function sendToVibeKitAgent(
         };
       }
     }
-    
+
     // Handle case where we got a direct response (shouldn't happen but just in case)
-    reader.cancel().catch(() => {});
+    reader.cancel().catch(() => { });
     return {
       response: initialResponse,
       action: undefined,
@@ -602,7 +602,7 @@ async function sendToVibeKitAgent(
 
   } catch (error) {
     console.error('[VibeKit Agent] Error:', error);
-    
+
     // Fallback to intelligent response based on message content
     return generateFallbackResponse(message, userAddress);
   }
@@ -674,7 +674,7 @@ async function establishSSEConnection(): Promise<{
         }
       } catch (error) {
         clearTimeout(timeout);
-        reader.cancel().catch(() => {});
+        reader.cancel().catch(() => { });
         reject(error);
       }
     } catch (error) {
@@ -689,7 +689,7 @@ async function establishSSEConnection(): Promise<{
  * Wait for SSE response using existing reader and session
  */
 async function waitForSSEResponseWithReader(
-  requestId: number, 
+  requestId: number,
   reader: ReadableStreamDefaultReader<Uint8Array>,
   sessionId: string
 ): Promise<any> {
@@ -728,7 +728,7 @@ async function waitForSSEResponseWithReader(
                   hasResult: !!data.result,
                   hasError: !!data.error
                 });
-                
+
                 // Check if this is the response to our request
                 if (data.id === requestId) {
                   clearTimeout(timeout);
@@ -748,7 +748,7 @@ async function waitForSSEResponseWithReader(
       console.error('[SSE] Reader error:', error);
       reject(error);
     } finally {
-      reader.cancel().catch(() => {/* ignore cleanup errors */});
+      reader.cancel().catch(() => {/* ignore cleanup errors */ });
     }
   });
 }
@@ -761,52 +761,52 @@ function enhanceResponseWithData(responseText: string, data: any): string {
   // If data looks like platform statistics
   if (data && typeof data === 'object' && 'totalPlans' in data) {
     return `${responseText}\n\n📊 **Platform Statistics:**\n` +
-           `💰 Total Plans Created: ${data.totalPlans}\n` +
-          //  `🔥 Active Plans: ${data.activePlans}\n` +
-           `👥 Total Users: ${data.totalUsers}\n` +
-           `⚡ Total Executions: ${data.totalExecutions}\n` +
-           `📈 Last 24h: ${data.last24hExecutions} executions\n` +
-           `📅 Last 7 days: ${data.last7dExecutions} executions`;
+      `💰 Total Plans Created: ${data.totalPlans}\n` +
+      //  `🔥 Active Plans: ${data.activePlans}\n` +
+      `👥 Total Users: ${data.totalUsers}\n` +
+      `⚡ Total Executions: ${data.totalExecutions}\n` +
+      `📈 Last 24h: ${data.last24hExecutions} executions\n` +
+      `📅 Last 7 days: ${data.last7dExecutions} executions`;
   }
-  
+
   // If data looks like DCA plan information
   if (data && typeof data === 'object' && 'id' in data && 'fromToken' in data) {
     return `${responseText}\n\n📋 **Plan Details:**\n` +
-           `🆔 Plan ID: ${data.id}\n` +
-           `💱 ${data.fromToken} → ${data.toToken}\n` +
-           `💰 Amount: ${data.amount} ${data.fromToken}\n` +
-           `⏱️ Interval: Every ${data.intervalMinutes} minutes\n` +
-           `📅 Duration: ${data.durationWeeks} weeks\n` +
-           `📊 Status: ${data.status}\n\n⚡ **Next Steps:**\nTriggerX will automatically handle the execution schedule. Your plan is now ready for automated execution at the specified intervals.`;
+      `🆔 Plan ID: ${data.id}\n` +
+      `💱 ${data.fromToken} → ${data.toToken}\n` +
+      `💰 Amount: ${data.amount} ${data.fromToken}\n` +
+      `⏱️ Interval: Every ${formatInterval(data.intervalSeconds || ((data.intervalMinutes || 0) * 60))}\n` +
+      `📅 Duration: ${data.durationSeconds ? formatInterval(data.durationSeconds) : (data.durationWeeks ? data.durationWeeks + ' weeks' : 'Unknown')}\n` +
+      `📊 Status: ${data.status}\n\n⚡ **Next Steps:**\nTriggerX will automatically handle the execution schedule. Your plan is now ready for automated execution at the specified intervals.`;
   }
-  
+
   // If data looks like user plans array
   if (data && Array.isArray(data) && data.length > 0 && 'fromToken' in data[0]) {
-    const plansText = data.map((plan: any, index: number) => 
+    const plansText = data.map((plan: any, index: number) =>
       `${index + 1}. **${plan.fromToken} → ${plan.toToken}**\n` +
       `   Amount: ${plan.amount} ${plan.fromToken}\n` +
-      `   Interval: Every ${plan.intervalMinutes} minutes\n` +
+      `   Interval: Every ${formatInterval(plan.intervalSeconds)}\n` +
       `   Status: ${plan.jobDataStatus}\n` +
       `   Progress: ${plan.successCount}/${plan.totalExecutions} executions\n` +
       (plan.jobId
         ? `   Job ID: \`${String(plan.jobId).slice(0, 7)}...${String(plan.jobId).slice(-5)}\``
         : '')
     ).join('\n\n');
-    
+
     return `${responseText}\n\n📋 **Your DCA Plans:**\n\n${plansText}`;
   }
-  
+
   // If data looks like execution history
   if (data && Array.isArray(data) && data.length > 0 && 'txHash' in data[0]) {
-    const historyText = data.slice(0, 5).map((execution: any, index: number) => 
+    const historyText = data.slice(0, 5).map((execution: any, index: number) =>
       `${index + 1}. **${execution.status}** - ${execution.fromAmount} → ${execution.toAmount}\n` +
       `   Gas: ${execution.gasFee}\n` +
       `   TX: ${execution.txHash?.substring(0, 10)}...`
     ).join('\n\n');
-    
+
     return `${responseText}\n\n📝 **Recent Executions:**\n\n${historyText}`;
   }
-  
+
   // For other data types, just return the original text
   return responseText;
 }
@@ -816,172 +816,172 @@ function enhanceResponseWithData(responseText: string, data: any): string {
  */
 function analyzeResponseForActions(responseText: string): { type: string; data?: any } | null {
   const lowerResponse = responseText.toLowerCase();
-  
+
   if (lowerResponse.includes('plan created') || lowerResponse.includes('dca plan')) {
     return { type: 'plan_created' };
   }
-  
+
   if (lowerResponse.includes('plan paused') || lowerResponse.includes('paused')) {
     return { type: 'plan_paused' };
   }
-  
+
   if (lowerResponse.includes('plan resumed') || lowerResponse.includes('activated')) {
     return { type: 'plan_resumed' };
   }
-  
+
   if (lowerResponse.includes('execution') || lowerResponse.includes('swap')) {
     return { type: 'execution_triggered' };
   }
-  
+
   return null;
 }
 
 /**
  * Analyze if the user's message suggests creating a DCA plan
  */
-function analyzePlanCreationIntent(userMessage: string, agentResponse: string, isPlanCreationRequest?: boolean): {
-  shouldConfirm: boolean;
-  planData?: any;
-} {
-  const lowerUserMessage = userMessage.toLowerCase();
-  
-  // Check if user wants to create a plan
-  const creationKeywords = ['create', 'make', 'set up', 'start', 'begin', 'invest'];
-  const planKeywords = ['plan', 'strategy', 'dca', 'investment'];
-  
-  const hasCreationIntent = creationKeywords.some(keyword => lowerUserMessage.includes(keyword)) &&
-                           planKeywords.some(keyword => lowerUserMessage.includes(keyword));
-  
-  // If frontend flagged this as a plan creation request, be more lenient
-  const shouldAnalyze = hasCreationIntent || isPlanCreationRequest;
-  
-  if (shouldAnalyze) {
-    // Try to extract plan parameters from the user message
-    const planData = extractPlanParameters(userMessage);
-    console.log('[Plan Analysis] Extracted plan data:', planData);
-    
-    // Check if we have the minimum required data for a plan
-    const hasRequiredData = planData.fromToken && planData.toToken && planData.amount;
-    console.log('[Plan Analysis] Has required data:', hasRequiredData, {
-      fromToken: planData.fromToken,
-      toToken: planData.toToken,
-      amount: planData.amount
-    });
-    
-    if (hasRequiredData) {
-      return {
-        shouldConfirm: true,
-        planData
-      };
-    } else if (isPlanCreationRequest) {
-      // If frontend explicitly flagged this as plan creation but we don't have complete data,
-      // still show confirmation with what we have and let user provide more details
-      return {
-        shouldConfirm: true,
-        planData: {
-          ...planData,
-          // Set defaults for missing fields
-          fromToken: planData.fromToken || 'USDC',
-          toToken: planData.toToken || 'ETH',
-          amount: planData.amount || '100',
-          intervalMinutes: planData.intervalMinutes || 10080, // weekly
-          durationWeeks: planData.durationWeeks || 4, // 1 month
-          slippage: planData.slippage || 200 // 2%
-        }
-      };
-    } else {
-      console.log('[Plan Analysis] Missing required data, will let VibeKit handle incomplete request');
-    }
-  }
+// function analyzePlanCreationIntent(userMessage: string, agentResponse: string, isPlanCreationRequest?: boolean): {
+//   shouldConfirm: boolean;
+//   planData?: any;
+// } {
+//   const lowerUserMessage = userMessage.toLowerCase();
 
-  return { shouldConfirm: false };
-}
+//   // Check if user wants to create a plan
+//   const creationKeywords = ['create', 'make', 'set up', 'start', 'begin', 'invest'];
+//   const planKeywords = ['plan', 'strategy', 'dca', 'investment'];
+
+//   const hasCreationIntent = creationKeywords.some(keyword => lowerUserMessage.includes(keyword)) &&
+//     planKeywords.some(keyword => lowerUserMessage.includes(keyword));
+
+//   // If frontend flagged this as a plan creation request, be more lenient
+//   const shouldAnalyze = hasCreationIntent || isPlanCreationRequest;
+
+//   if (shouldAnalyze) {
+//     // Try to extract plan parameters from the user message
+//     const planData = extractPlanParameters(userMessage);
+//     console.log('[Plan Analysis] Extracted plan data:', planData);
+
+//     // Check if we have the minimum required data for a plan
+//     const hasRequiredData = planData.fromToken && planData.toToken && planData.amount;
+//     console.log('[Plan Analysis] Has required data:', hasRequiredData, {
+//       fromToken: planData.fromToken,
+//       toToken: planData.toToken,
+//       amount: planData.amount
+//     });
+
+//     if (hasRequiredData) {
+//       return {
+//         shouldConfirm: true,
+//         planData
+//       };
+//     } else if (isPlanCreationRequest) {
+//       // If frontend explicitly flagged this as plan creation but we don't have complete data,
+//       // still show confirmation with what we have and let user provide more details
+//       return {
+//         shouldConfirm: true,
+//         planData: {
+//           ...planData,
+//           // Set defaults for missing fields
+//           fromToken: planData.fromToken || 'USDC',
+//           toToken: planData.toToken || 'ETH',
+//           amount: planData.amount || '100',
+//           intervalMinutes: planData.intervalMinutes || 10080, // weekly
+//           durationWeeks: planData.durationWeeks || 4, // 1 month
+//           slippage: planData.slippage || 200 // 2%
+//         }
+//       };
+//     } else {
+//       console.log('[Plan Analysis] Missing required data, will let VibeKit handle incomplete request');
+//     }
+//   }
+
+//   return { shouldConfirm: false };
+// }
 
 /**
  * Extract plan parameters from user message
  */
-function extractPlanParameters(message: string): any {
-  // Common token mappings
-  const tokenMap: { [key: string]: string } = {
-    'usdc': 'USDC', 'usdt': 'USDT', 'dai': 'DAI',
-    'eth': 'ETH', 'ethereum': 'ETH', 'weth': 'WETH',
-    'btc': 'BTC', 'bitcoin': 'BTC', 'wbtc': 'WBTC',
-    'arb': 'ARB', 'arbitrum': 'ARB'
-  };
-  
-  const planData: any = {
-    slippage: '200' // Default: 2%
-  };
+// function extractPlanParameters(message: string): any {
+//   // Common token mappings
+//   const tokenMap: { [key: string]: string } = {
+//     'usdc': 'USDC', 'usdt': 'USDT', 'dai': 'DAI',
+//     'eth': 'ETH', 'ethereum': 'ETH', 'weth': 'WETH',
+//     'btc': 'BTC', 'bitcoin': 'BTC', 'wbtc': 'WBTC',
+//     'arb': 'ARB', 'arbitrum': 'ARB'
+//   };
 
-  const lowerMessage = message.toLowerCase();
-  console.log('[Parameter Extraction] Processing message:', message);
+//   const planData: any = {
+//     slippage: '200' // Default: 2%
+//   };
 
-  // Extract amount and tokens - multiple patterns
-  let amountMatch = message.match(/(\d+(?:\.\d+)?)\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
-  if (!amountMatch) {
-    // Try alternative patterns
-    amountMatch = message.match(/(\d+(?:\.\d+)?)\s*(?:usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
-  }
-  if (!amountMatch) {
-    // Try $ amount pattern
-    amountMatch = message.match(/\$(\d+(?:\.\d+)?)/i);
-    if (amountMatch) {
-      planData.amount = amountMatch[1];
-      planData.fromToken = 'USDC'; // Assume USDC for $ amounts
-    }
-  } else {
-    planData.amount = amountMatch[1];
-    planData.fromToken = tokenMap[amountMatch[2].toLowerCase()] || amountMatch[2].toUpperCase();
-  }
+//   const lowerMessage = message.toLowerCase();
+//   console.log('[Parameter Extraction] Processing message:', message);
 
-  // Extract target token - multiple patterns
-  let intoMatch = message.match(/(?:into|to|buy|invest\s+in)\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
-  if (!intoMatch) {
-    // Try pattern like "USDC into ETH"
-    intoMatch = message.match(/(?:usdc|usdt|dai|eth|btc|arb|weth|wbtc)\s+(?:into|to)\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
-  }
-  if (!intoMatch) {
-    // Try pattern like "invest in ETH"
-    intoMatch = message.match(/invest\s+(?:in\s+)?(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
-  }
-  
-  if (intoMatch) {
-    planData.toToken = tokenMap[intoMatch[1].toLowerCase()] || intoMatch[1].toUpperCase();
-  }
+//   // Extract amount and tokens - multiple patterns
+//   let amountMatch = message.match(/(\d+(?:\.\d+)?)\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
+//   if (!amountMatch) {
+//     // Try alternative patterns
+//     amountMatch = message.match(/(\d+(?:\.\d+)?)\s*(?:usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
+//   }
+//   if (!amountMatch) {
+//     // Try $ amount pattern
+//     amountMatch = message.match(/\$(\d+(?:\.\d+)?)/i);
+//     if (amountMatch) {
+//       planData.amount = amountMatch[1];
+//       planData.fromToken = 'USDC'; // Assume USDC for $ amounts
+//     }
+//   } else {
+//     planData.amount = amountMatch[1];
+//     planData.fromToken = tokenMap[amountMatch[2].toLowerCase()] || amountMatch[2].toUpperCase();
+//   }
 
-  // Extract frequency
-  if (lowerMessage.includes('daily') || lowerMessage.includes('day')) {
-    planData.intervalMinutes = 1440; // 24 hours
-  } else if (lowerMessage.includes('weekly') || lowerMessage.includes('week')) {
-    planData.intervalMinutes = 10080; // 7 days
-  } else if (lowerMessage.includes('monthly') || lowerMessage.includes('month')) {
-    planData.intervalMinutes = 43200; // 30 days
-  } else if (lowerMessage.includes('hourly') || lowerMessage.includes('hour')) {
-    planData.intervalMinutes = 60; // 1 hour
-  }
+//   // Extract target token - multiple patterns
+//   let intoMatch = message.match(/(?:into|to|buy|invest\s+in)\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
+//   if (!intoMatch) {
+//     // Try pattern like "USDC into ETH"
+//     intoMatch = message.match(/(?:usdc|usdt|dai|eth|btc|arb|weth|wbtc)\s+(?:into|to)\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
+//   }
+//   if (!intoMatch) {
+//     // Try pattern like "invest in ETH"
+//     intoMatch = message.match(/invest\s+(?:in\s+)?(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
+//   }
 
-  // Extract duration
-  let durationMatch = message.match(/(?:for|over)\s*(\d+)\s*(week|month|day)/i);
-  if (!durationMatch) {
-    // Try alternative patterns
-    durationMatch = message.match(/(\d+)\s*(week|month|day)/i);
-  }
-  
-  if (durationMatch) {
-    const duration = parseInt(durationMatch[1]);
-    const unit = durationMatch[2].toLowerCase();
-    if (unit.startsWith('week')) {
-      planData.durationWeeks = duration;
-    } else if (unit.startsWith('month')) {
-      planData.durationWeeks = duration * 4;
-    } else if (unit.startsWith('day')) {
-      planData.durationWeeks = Math.ceil(duration / 7);
-    }
-  }
+//   if (intoMatch) {
+//     planData.toToken = tokenMap[intoMatch[1].toLowerCase()] || intoMatch[1].toUpperCase();
+//   }
 
-  console.log('[Parameter Extraction] Extracted plan data:', planData);
-  return planData;
-}
+//   // Extract frequency
+//   if (lowerMessage.includes('daily') || lowerMessage.includes('day')) {
+//     planData.intervalMinutes = 1440; // 24 hours
+//   } else if (lowerMessage.includes('weekly') || lowerMessage.includes('week')) {
+//     planData.intervalMinutes = 10080; // 7 days
+//   } else if (lowerMessage.includes('monthly') || lowerMessage.includes('month')) {
+//     planData.intervalMinutes = 43200; // 30 days
+//   } else if (lowerMessage.includes('hourly') || lowerMessage.includes('hour')) {
+//     planData.intervalMinutes = 60; // 1 hour
+//   }
+
+//   // Extract duration
+//   let durationMatch = message.match(/(?:for|over)\s*(\d+)\s*(week|month|day)/i);
+//   if (!durationMatch) {
+//     // Try alternative patterns
+//     durationMatch = message.match(/(\d+)\s*(week|month|day)/i);
+//   }
+
+//   if (durationMatch) {
+//     const duration = parseInt(durationMatch[1]);
+//     const unit = durationMatch[2].toLowerCase();
+//     if (unit.startsWith('week')) {
+//       planData.durationWeeks = duration;
+//     } else if (unit.startsWith('month')) {
+//       planData.durationWeeks = duration * 4;
+//     } else if (unit.startsWith('day')) {
+//       planData.durationWeeks = Math.ceil(duration / 7);
+//     }
+//   }
+
+//   console.log('[Parameter Extraction] Extracted plan data:', planData);
+//   return planData;
+// }
 
 /**
  * Generate confirmation ID for tracking
@@ -995,31 +995,31 @@ function generateConfirmationId(planData: any): string {
 /**
  * Generate confirmation message with plan summary
  */
-function generateConfirmationMessage(planData: any): string {
-  const frequencyText = planData.intervalMinutes === 1440 ? 'daily' :
-                       planData.intervalMinutes === 10080 ? 'weekly' :
-                       planData.intervalMinutes === 43200 ? 'monthly' :
-                       `every ${planData.intervalMinutes} minutes`;
-  
-  const durationText = planData.durationWeeks === 4 ? '1 month' :
-                      planData.durationWeeks === 52 ? '1 year' :
-                      `${planData.durationWeeks} weeks`;
-  
-  const totalExecutions = Math.floor((planData.durationWeeks * 7 * 24 * 60) / planData.intervalMinutes);
-  const totalInvestment = (parseFloat(planData.amount) * totalExecutions).toFixed(2);
+// function generateConfirmationMessage(planData: any): string {
+//   const frequencyText = planData.intervalMinutes === 1440 ? 'daily' :
+//     planData.intervalMinutes === 10080 ? 'weekly' :
+//       planData.intervalMinutes === 43200 ? 'monthly' :
+//         `every ${planData.intervalMinutes} minutes`;
 
-  return `🔐 **Token Approval Required**\n\n` +
-         `📊 **Plan Summary:**\n` +
-         `• **Investment:** ${planData.amount} ${planData.fromToken}\n` +
-         `• **Target:** ${planData.toToken}\n` +
-         `• **Duration:** ${durationText}\n` +
-         `• **frequency:** ${frequencyText}\n` +
-         `• **Total Investment:** ${totalInvestment} ${planData.fromToken}\n` +
-         `• **Total Executions:** ${totalExecutions}\n` +
-         `• **Slippage:** ${planData.slippage/100}%\n\n` +
-         `⚠️ **Approval Required:** To create this DCA plan, you need to approve spending of ${totalInvestment} ${planData.fromToken} tokens.\n\n` +
-         `Ready to proceed with token approval?`;
-}
+//   const durationText = planData.durationWeeks === 4 ? '1 month' :
+//     planData.durationWeeks === 52 ? '1 year' :
+//       `${planData.durationWeeks} weeks`;
+
+//   const totalExecutions = Math.floor((planData.durationWeeks * 7 * 24 * 60) / planData.intervalMinutes);
+//   const totalInvestment = (parseFloat(planData.amount) * totalExecutions).toFixed(2);
+
+//   return `🔐 **Token Approval Required**\n\n` +
+//     `📊 **Plan Summary:**\n` +
+//     `• **Investment:** ${planData.amount} ${planData.fromToken}\n` +
+//     `• **Target:** ${planData.toToken}\n` +
+//     `• **Duration:** ${durationText}\n` +
+//     `• **frequency:** ${frequencyText}\n` +
+//     `• **Total Investment:** ${totalInvestment} ${planData.fromToken}\n` +
+//     `• **Total Executions:** ${totalExecutions}\n` +
+//     `• **Slippage:** ${planData.slippage / 100}%\n\n` +
+//     `⚠️ **Approval Required:** To create this DCA plan, you need to approve spending of ${totalInvestment} ${planData.fromToken} tokens.\n\n` +
+//     `Ready to proceed with token approval?`;
+// }
 
 /**
  * Check if message is general conversation (not DCA related)
@@ -1030,7 +1030,7 @@ function isGeneralConversation(message: string): boolean {
     'dca', 'plan', 'invest', 'strategy', 'swap', 'trade', 'buy', 'sell',
     'usdc', 'eth', 'btc', 'arb', 'token', 'crypto', 'portfolio', 'balance'
   ];
-  
+
   const generalGreetings = [
     'hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening',
     'how are you', 'what\'s up', 'thanks', 'thank you', 'bye', 'goodbye'
@@ -1043,11 +1043,11 @@ function isGeneralConversation(message: string): boolean {
 
   // Check if it's a general greeting or question
   const isGreetingOrGeneral = generalGreetings.some(keyword => lowerMessage.includes(keyword)) ||
-                             generalQuestions.some(keyword => lowerMessage.includes(keyword));
-  
+    generalQuestions.some(keyword => lowerMessage.includes(keyword));
+
   // Check if it contains DCA-related keywords
   const hasDCAKeywords = dcaKeywords.some(keyword => lowerMessage.includes(keyword));
-  
+
   // It's general conversation if it's a greeting/general question AND doesn't contain DCA keywords
   return isGreetingOrGeneral && !hasDCAKeywords;
 }
@@ -1057,21 +1057,21 @@ function isGeneralConversation(message: string): boolean {
  */
 function handleGeneralConversation(message: string, userAddress?: string): string {
   const lowerMessage = message.toLowerCase();
-  
+
   // Greetings
   if (lowerMessage.includes('hello') || lowerMessage.includes('hi') || lowerMessage.includes('hey')) {
     return `👋 **Hello!** I'm your DCA Investment Assistant.\n\n` +
-           `💡 **Quick actions:**\n` +
-           `• "Create a DCA plan"\n` +
-           `• "Show my plans"\n` +
-           `• "Platform stats"\n\n` +
-           `${userAddress ? `Wallet connected (${userAddress.slice(0, 6)}...${userAddress.slice(-4)})` : 'Connect wallet to start!'}`;
+      `💡 **Quick actions:**\n` +
+      `• "Create a DCA plan"\n` +
+      `• "Show my plans"\n` +
+      `• "Platform stats"\n\n` +
+      `${userAddress ? `Wallet connected (${userAddress.slice(0, 6)}...${userAddress.slice(-4)})` : 'Connect wallet to start!'}`;
   }
 
   // Good morning/afternoon/evening
   if (lowerMessage.includes('good morning') || lowerMessage.includes('good afternoon') || lowerMessage.includes('good evening')) {
-    const timeGreeting = lowerMessage.includes('morning') ? 'Good morning' : 
-                        lowerMessage.includes('afternoon') ? 'Good afternoon' : 'Good evening';
+    const timeGreeting = lowerMessage.includes('morning') ? 'Good morning' :
+      lowerMessage.includes('afternoon') ? 'Good afternoon' : 'Good evening';
     return `${timeGreeting}! ☀️ Ready to optimize your crypto investments today? I can help you set up automated DCA strategies or check on your existing plans.`;
   }
 
@@ -1083,33 +1083,33 @@ function handleGeneralConversation(message: string, userAddress?: string): strin
   // What can you do
   if (lowerMessage.includes('what can you do') || lowerMessage.includes('capabilities')) {
     return `🤖 **DCA Investment Assistant**\n\n` +
-           `📈 Create DCA Plans\n` +
-           `💼 Manage Plans\n` +
-           `📊 Track Performance\n` +
-           `⚙️ Platform Stats\n\n` +
-           `**Quick Commands:**\n` +
-           `• "Show my plans"\n` +
-           `• "Create plan"\n` +
-           `• "Platform stats"`;
+      `📈 Create DCA Plans\n` +
+      `💼 Manage Plans\n` +
+      `📊 Track Performance\n` +
+      `⚙️ Platform Stats\n\n` +
+      `**Quick Commands:**\n` +
+      `• "Show my plans"\n` +
+      `• "Create plan"\n` +
+      `• "Platform stats"`;
   }
 
   // Who are you / What are you
   if (lowerMessage.includes('who are you') || lowerMessage.includes('what are you')) {
     return `🤖 **DCA Investment Assistant**\n\n` +
-           `💡 I help you:\n` +
-           `• Set up automated investment plans\n` +
-           `• Monitor portfolio performance\n` +
-           `• Make smart investment decisions\n\n` +
-           `Your personal crypto advisor! 🚀`;
+      `💡 I help you:\n` +
+      `• Set up automated investment plans\n` +
+      `• Monitor portfolio performance\n` +
+      `• Make smart investment decisions\n\n` +
+      `Your personal crypto advisor! 🚀`;
   }
 
   // Generic fallback for other general messages
   return `🤔 I understand you're asking about: "${message}"\n\n` +
-         `I'm specialized in helping with DCA (Dollar Cost Averaging) investment strategies. While I love chatting, I'm most helpful when it comes to:\n\n` +
-         `💰 **Creating investment plans**\n` +
-         `📊 **Tracking your portfolio**\n` +
-         `⚙️ **Managing your DCA strategies**\n\n` +
-         `Would you like to learn about DCA investing or create your first automated investment plan?`;
+    `I'm specialized in helping with DCA (Dollar Cost Averaging) investment strategies. While I love chatting, I'm most helpful when it comes to:\n\n` +
+    `💰 **Creating investment plans**\n` +
+    `📊 **Tracking your portfolio**\n` +
+    `⚙️ **Managing your DCA strategies**\n\n` +
+    `Would you like to learn about DCA investing or create your first automated investment plan?`;
 }
 
 /**
@@ -1121,7 +1121,7 @@ function generateFallbackResponse(message: string, userAddress?: string): {
   data?: any;
 } {
   const lowerMessage = message.toLowerCase();
-  
+
   if (lowerMessage.includes('create') && (lowerMessage.includes('plan') || lowerMessage.includes('strategy'))) {
     return {
       response: `I'd be happy to help you create a DCA plan! To get started, I'll need some information:\n\n` +
@@ -1136,7 +1136,7 @@ function generateFallbackResponse(message: string, userAddress?: string): {
       action: 'request_plan_details'
     };
   }
-  
+
   if (lowerMessage.includes('balance') || lowerMessage.includes('portfolio')) {
     return {
       response: `To check your portfolio balance and performance, I need to connect to your wallet data. ` +
@@ -1145,7 +1145,7 @@ function generateFallbackResponse(message: string, userAddress?: string): {
       action: userAddress ? 'fetch_portfolio' : 'request_wallet_connection'
     };
   }
-  
+
   return {
     response: `I understand you're asking about: "${message}"\n\n` +
       `I'm here to help with your DCA investment strategies! Here are some things you can ask me:\n\n` +
@@ -1157,4 +1157,39 @@ function generateFallbackResponse(message: string, userAddress?: string): {
       `What would you like to do?`,
     action: 'show_help'
   };
+}
+
+/**
+ * Format interval in seconds to human readable string
+ */
+function formatInterval(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+
+  if (minutes < 60) {
+    return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    if (minutes % 60 === 0) {
+      return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+    }
+    return `${(minutes / 60).toFixed(1).replace(/\.0$/, '')} hours`;
+  }
+
+  const days = Math.floor(hours / 24);
+
+  // Check for months (approx 30 days)
+  if (days >= 30 && days % 30 === 0) {
+    const months = days / 30;
+    return `${months} ${months === 1 ? 'month' : 'months'}`;
+  }
+
+  // Check for weeks
+  if (days >= 7 && days % 7 === 0) {
+    const weeks = days / 7;
+    return `${weeks} ${weeks === 1 ? 'week' : 'weeks'}`;
+  }
+
+  return `${days} ${days === 1 ? 'day' : 'days'}`;
 }
