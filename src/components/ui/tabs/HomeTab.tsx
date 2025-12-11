@@ -39,7 +39,6 @@ import {
 // Import utilities
 import { formatContractAddress } from "./HomeTab/utils/helpers";
 
-
 async function fetchETHBalance(address: string): Promise<string> {
   try {
     const response = await fetch("https://arb1.arbitrum.io/rpc", {
@@ -156,7 +155,6 @@ export function HomeTab() {
     }
   }, [address]);
 
-
   useEffect(() => {
     fetchEthBalance();
   }, [fetchEthBalance]);
@@ -183,6 +181,7 @@ export function HomeTab() {
             fromToken: p.fromToken,
             amount: p.amount,
             jobId: p.jobId,
+            successcount: p.successCount,
           }))
         );
         setPortfolioUsd(usd);
@@ -306,8 +305,6 @@ export function HomeTab() {
   //   }
   // }, [userPlans, address]);
 
-
-
   useEffect(() => {
     if (showTokenSearch) {
       const timeout = setTimeout(
@@ -343,23 +340,15 @@ export function HomeTab() {
         const { data: stats, fromCache } = await fetchQuickStats();
         if (isCancelled) return;
 
-        if (fromCache) {
-          console.log("Using cached quick stats data");
-          setIsQuickStatsLoading(false);
-          setTotalExecutions(stats?.total_job_live_count ?? 0);
-          setTotalValueSwapped(stats?.total_value_swapped ?? 0);
-        } else {
-          console.log("Fetched fresh quick stats data");
-          const nextExecutions = stats?.total_job_live_count ?? 0;
-          const nextVolume = stats?.total_value_swapped ?? 0;
-          setTotalExecutions(nextExecutions);
-          setTotalValueSwapped(nextVolume);
-        }
+        const logPrefix = fromCache ? "Using cached" : "Fetched fresh";
+        // console.log(`${logPrefix} quick stats data`);
+
+        // Stats are already corrected in fetchQuickStats
+        setTotalExecutions(stats?.total_job_live_count ?? 0);
+        setTotalValueSwapped(stats?.total_value_swapped ?? 0);
       } catch (error) {
-        if (!isCancelled) {
-          setTotalExecutions(0);
-          setTotalValueSwapped(0);
-        }
+        console.error("Error loading quick stats:", error);
+        // Don't reset to 0 on error - keep previous values
       } finally {
         if (!isCancelled) {
           setIsQuickStatsLoading(false);
@@ -405,9 +394,9 @@ export function HomeTab() {
   }, [userPlans.length, setCurrentPlanIndex]);
 
   // Computed values
-  const userGreeting = `Welcome back, ${context?.user?.username ?? "John Doe"
-    } 👋`;
-
+  const userGreeting = `Welcome back, ${
+    context?.user?.username ?? "John Doe"
+  } 👋`;
 
   const activePlans = userPlans.filter((plan) => plan.status === "ACTIVE");
   const runningPlans = userPlans.filter(

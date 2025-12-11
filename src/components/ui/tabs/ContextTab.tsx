@@ -44,7 +44,7 @@ export function ContextTab() {
     taskStatus: TaskStatus;
     txUrl: string;
     slippage: string;
-    gasFee: string | null;
+    gasFee: { totalFeeETH: string } | null;
     tgCostETH?: string | null;
     inputAmount: string | null;
     outputAmount: string;
@@ -138,7 +138,7 @@ export function ContextTab() {
           txHash: item.executionTxHash || null,
           txUrl: item.txUrl || null,
           slippage: item.slippage || null,
-          gasFee: item.gasFee || null,
+          gasFee: item.gasFee?.totalFeeETH || null,
           tgCostETH: item.tgCostETH || null,
           inputAmount: item.inputAmount || null,
           outputAmount: item.outputAmount || null,
@@ -228,7 +228,7 @@ export function ContextTab() {
   const [selectedTx, setSelectedTx] = useState<TransactionRow | null>(null);
   const openModal = (tx: TransactionRow) => setSelectedTx(tx);
   const closeModal = () => setSelectedTx(null);
-  
+
   // Tooltip state for exchange rate details
   const [showExchangeTooltip, setShowExchangeTooltip] = useState(false);
 
@@ -595,11 +595,10 @@ export function ContextTab() {
                   <button
                     key={pageNum}
                     onClick={() => setPage(pageNum)}
-                    className={`px-3 py-2 rounded-xl text-sm font-medium transition-all duration-300 ${
-                      currentPage === pageNum
-                        ? "bg-gradient-to-br from-[#c199e4]/40 to-[#b380db]/40 text-white border border-[#c199e4]/50 shadow-lg"
-                        : "bg-gradient-to-br from-[#4a2b7a]/40 to-[#341e64]/20 text-white border border-[#c199e4]/30 hover:from-[#c199e4]/20 hover:to-[#b380db]/20"
-                    }`}
+                    className={`px-3 py-2 rounded-xl text-sm font-medium transition-all duration-300 ${currentPage === pageNum
+                      ? "bg-gradient-to-br from-[#c199e4]/40 to-[#b380db]/40 text-white border border-[#c199e4]/50 shadow-lg"
+                      : "bg-gradient-to-br from-[#4a2b7a]/40 to-[#341e64]/20 text-white border border-[#c199e4]/30 hover:from-[#c199e4]/20 hover:to-[#b380db]/20"
+                      }`}
                   >
                     {pageNum}
                   </button>
@@ -646,15 +645,14 @@ export function ContextTab() {
                         Execution Details
                       </h3>
                       <span
-                        className={`text-xs font-bold px-2.5 py-1 rounded-full transition-all duration-300 whitespace-nowrap ${
-                          selectedTx.status === "completed"
-                            ? "bg-green-400/20 text-green-300 border border-green-400/40"
-                            : selectedTx.status === "PENDING"
+                        className={`text-xs font-bold px-2.5 py-1 rounded-full transition-all duration-300 whitespace-nowrap ${selectedTx.status === "completed"
+                          ? "bg-green-400/20 text-green-300 border border-green-400/40"
+                          : selectedTx.status === "PENDING"
                             ? "bg-blue-400/20 text-blue-300 border border-blue-400/40"
                             : selectedTx.status === "failed"
-                            ? "bg-red-400/20 text-red-300 border border-red-400/40"
-                            : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
-                        }`}
+                              ? "bg-red-400/20 text-red-300 border border-red-400/40"
+                              : "bg-gray-400/20 text-gray-300 border border-gray-400/40"
+                          }`}
                       >
                         {selectedTx.status}
                       </span>

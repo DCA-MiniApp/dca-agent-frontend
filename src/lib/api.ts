@@ -1,7 +1,7 @@
 // API utilities for DCA backend integration
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ||'https://dca-backend.udonswap.org'; // Default to production URL
-console.log("API_BASE_URL", API_BASE_URL);
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://dca-backend.udonswap.org'; // Default to production URL
+// console.log("API_BASE_URL", API_BASE_URL);
 
 export interface TaskData {
   task_id: number;
@@ -59,7 +59,7 @@ export interface DCAPlan {
   intervalSeconds: number;
   durationSeconds: number;
   totalExecutions: number;
-  status: 'ACTIVE' | 'PAUSED' | 'completed' | 'CANCELLED'|'pending'|'processing';
+  status: 'ACTIVE' | 'PAUSED' | 'completed' | 'CANCELLED' | 'pending' | 'processing';
   slippage: string;
   createdAt: string;
   updatedAt: string;
@@ -160,7 +160,7 @@ export interface JobMonitorData {
   total_job_failed: number;
   total_job_processing: number;
   total_value_swapped: number;
-  total_successful_task:number;
+  total_successful_task: number;
   users: JobMonitorUser[];
   last_update: string;
 }
@@ -170,19 +170,6 @@ export interface QuickStats {
   total_value_swapped: number;
   last_update: string;
 }
-
-let quickStatsCache: { data: QuickStats; fetchedAt: number } | null = null;
-interface PreviousStats {
-  totalExecutions: number;
-  totalValueSwapped: number;
-}
-
-let previousStats: PreviousStats = {
-  totalExecutions: 0,
-  totalValueSwapped: 0,
-};
-
-
 
 export interface StoreUserPayload {
   fid: string;
@@ -194,6 +181,43 @@ export interface StoreUserPayload {
   notificationToken?: string;
   isNotification?: boolean;
 }
+
+export interface PreviousStats {
+  totalExecutions: number;
+  totalValueSwapped: number;
+}
+
+const CACHE_KEY = 'dca_quick_stats_cache';
+const PREV_STATS_KEY = 'dca_prev_stats';
+
+function getFromStorage<T>(key: string): T | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const item = sessionStorage.getItem(key);
+    return item ? JSON.parse(item) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveToStorage(key: string, value: any) {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {
+    console.warn('Failed to save to session storage:', e);
+  }
+}
+
+let quickStatsCache: { data: QuickStats; fetchedAt: number } | null = getFromStorage(CACHE_KEY);
+
+let previousStats: PreviousStats = getFromStorage(PREV_STATS_KEY) || {
+  totalExecutions: 0,
+  totalValueSwapped: 0,
+};
+
+
+
 
 export async function storeUser(payload: StoreUserPayload): Promise<boolean> {
   try {
@@ -229,7 +253,7 @@ export async function fetchUserDCAPlans(userAddress: string): Promise<DCAPlan[]>
     const result: ApiResponse<DCAPlan[]> = await response.json();
 
     if (result.success && result.data) {
-     
+
       result.data.forEach((plan: any) => {
         // console.log("plan in fetchUserDCAPlans", plan?.jobData?.data?.taskData);
         // Get jobStatus from jobData.data.jobData.status
@@ -277,93 +301,93 @@ export async function fetchUserExecutionHistory(userAddress: string, limit = 50,
 /**
  * Fetch execution history for a specific plan
  */
-export async function fetchPlanHistory(planId: string): Promise<ExecutionHistory[]> {
-  if (!planId) return [];
+// export async function fetchPlanHistory(planId: string): Promise<ExecutionHistory[]> {
+//   if (!planId) return [];
 
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/dca/history/${planId}`);
-    const result: ApiResponse<ExecutionHistory[]> = await response.json();
+//   try {
+//     const response = await fetch(`${API_BASE_URL}/api/dca/history/${planId}`);
+//     const result: ApiResponse<ExecutionHistory[]> = await response.json();
 
-    if (result.success && result.data) {
-      return result.data;
-    } else {
-      console.error('Failed to fetch plan history:', result.message);
-      return [];
-    }
-  } catch (error) {
-    console.error('Error fetching plan history:', error);
-    return [];
-  }
-}
+//     if (result.success && result.data) {
+//       return result.data;
+//     } else {
+//       console.error('Failed to fetch plan history:', result.message);
+//       return [];
+//     }
+//   } catch (error) {
+//     console.error('Error fetching plan history:', error);
+//     return [];
+//   }
+// }
 
 /**
  * Fetch platform statistics
  */
-export async function fetchPlatformStats(): Promise<PlatformStats | null> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/dca/stats`);
-    const result: ApiResponse<PlatformStats> = await response.json();
+// export async function fetchPlatformStats(): Promise<PlatformStats | null> {
+//   try {
+//     const response = await fetch(`${API_BASE_URL}/api/dca/stats`);
+//     const result: ApiResponse<PlatformStats> = await response.json();
 
-    if (result.success && result.data) {
-      return result.data;
-    } else {
-      console.error('Failed to fetch platform stats:', result.message);
-      return null;
-    }
-  } catch (error) {
-    console.error('Error fetching platform stats:', error);
-    return null;
-  }
-}
+//     if (result.success && result.data) {
+//       return result.data;
+//     } else {
+//       console.error('Failed to fetch platform stats:', result.message);
+//       return null;
+//     }
+//   } catch (error) {
+//     console.error('Error fetching platform stats:', error);
+//     return null;
+//   }
+// }
 
 /**
  * Update DCA plan status
  */
-export async function updatePlanStatus(planId: string, status: 'ACTIVE' | 'PAUSED' | 'CANCELLED'): Promise<boolean> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/dca/plans/${planId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ status }),
-    });
+// export async function updatePlanStatus(planId: string, status: 'ACTIVE' | 'PAUSED' | 'CANCELLED'): Promise<boolean> {
+//   try {
+//     const response = await fetch(`${API_BASE_URL}/api/dca/plans/${planId}`, {
+//       method: 'PUT',
+//       headers: {
+//         'Content-Type': 'application/json',
+//       },
+//       body: JSON.stringify({ status }),
+//     });
 
-    const result: ApiResponse = await response.json();
-    return result.success;
-  } catch (error) {
-    console.error('Error updating plan status:', error);
-    return false;
-  }
-}
+//     const result: ApiResponse = await response.json();
+//     return result.success;
+//   } catch (error) {
+//     console.error('Error updating plan status:', error);
+//     return false;
+//   }
+// }
 
 /**
  * Delete a DCA plan
  */
-export async function deletePlan(planId: string): Promise<boolean> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/dca/plans/${planId}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+// export async function deletePlan(planId: string): Promise<boolean> {
+//   try {
+//     const response = await fetch(`${API_BASE_URL}/api/dca/plans/${planId}`, {
+//       method: 'DELETE',
+//       headers: {
+//         'Content-Type': 'application/json',
+//       },
+//     });
 
-    const result: ApiResponse = await response.json();
-    return result.success;
-  } catch (error) {
-    console.error('Error deleting plan:', error);
-    return false;
-  }
-}
+//     const result: ApiResponse = await response.json();
+//     return result.success;
+//   } catch (error) {
+//     console.error('Error deleting plan:', error);
+//     return false;
+//   }
+// }
 
 /**
  * Fetch number of successful task executions for a given TriggerX jobId.
  * Tries the path under /api/dca first, then falls back to root /job route.
  */
-export async function fetchJobSuccessCount(jobId: string,userAddress:string): Promise<number | null> {
+export async function fetchJobSuccessCount(jobId: string, userAddress: string): Promise<number | null> {
   if (!jobId) return null;
-  const path=`${API_BASE_URL}/api/dca/userAddress/${userAddress}/job/${jobId}/success-count`;
+  const path = `${API_BASE_URL}/api/dca/userAddress/${userAddress}/job/${jobId}/success-count`;
 
   // console.log("paths", paths);
 
@@ -513,28 +537,28 @@ export function formatDuration(durationSeconds: number): string {
   if (durationSeconds < 31556952) {
     const months = Math.round(totalMonths * 10) / 10; // Round to 1 decimal
     const remainingWeeks = Math.round((durationSeconds % 2629746) / 604800 * 10) / 10;
-    
+
     let result = months === 1 ? '1 month' : `${months} months`;
-    
+
     // Add remaining weeks if significant (> 0.5 weeks)
     if (remainingWeeks >= 0.5) {
       result += ` ${remainingWeeks === 1 ? '1 week' : `${remainingWeeks} weeks`}`;
     }
-    
+
     return result;
   }
 
   // Handle years (>= 31556952 seconds)
   const years = Math.floor(totalYears);
   const remainingMonths = Math.round((durationSeconds % 31556952) / 2629746);
-  
+
   let result = years === 1 ? '1 year' : `${years} years`;
-  
+
   // Add remaining months if significant (> 0.5 months)
   if (remainingMonths >= 0.5) {
     result += ` ${remainingMonths === 1 ? '1 month' : `${remainingMonths} months`}`;
   }
-  
+
   return result;
 }
 
@@ -576,15 +600,15 @@ export async function fetchPlatformStatsForMonitor(): Promise<JobMonitorData | n
   }
 }
 
-export async function fetchQuickStats(): Promise<{ 
-  data: QuickStats | null; 
-  fromCache: boolean 
+export async function fetchQuickStats(): Promise<{
+  data: QuickStats | null;
+  fromCache: boolean
 }> {
   const now = Date.now();
 
   if (
     quickStatsCache &&
-    now - quickStatsCache.fetchedAt < 5 * 60 * 1000
+    now - quickStatsCache.fetchedAt < 15 * 60 * 1000 // 15 minutes cache validity reset when user exit from app 
   ) {
     return { data: quickStatsCache.data, fromCache: true };
   }
@@ -623,6 +647,7 @@ export async function fetchQuickStats(): Promise<{
         totalExecutions: finalExecutions,
         totalValueSwapped: finalVolume,
       };
+      saveToStorage(PREV_STATS_KEY, previousStats);
 
       // Cache with corrected values
       const correctedData = {
@@ -635,6 +660,7 @@ export async function fetchQuickStats(): Promise<{
         data: correctedData,
         fetchedAt: now,
       };
+      saveToStorage(CACHE_KEY, quickStatsCache);
 
       return { data: correctedData, fromCache: false };
     } else {

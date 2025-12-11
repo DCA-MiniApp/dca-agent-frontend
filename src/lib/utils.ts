@@ -95,6 +95,7 @@ type PlanForUsd = {
   executionCount?: number;
   jobId?: string | null;
   userAddress?: string;
+  successcount?: number;
 };
 const PORTFOLIO_CACHE_PREFIX = "dca_portfolio_usd_v1";
 
@@ -112,7 +113,7 @@ function buildPlansSignature(plans: PlanForUsd[]): string {
       const jobId = (plan as any).jobId ?? "";
       const from = (plan.fromToken || "").toUpperCase();
       const amount = String(plan.amount ?? "");
-      const execs = String(plan.executionCount ?? "");
+      const execs = String(plan.executionCount ?? plan.successcount ?? "");
       return `${jobId}|${from}|${amount}|${execs}`;
     })
     .sort()
@@ -168,7 +169,7 @@ export async function fetchArbitrumUsdPrices(addresses: string[]): Promise<Recor
 }
 
 export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<number> {
-  // console.log("Line number 107:",plans)
+  console.log("Line number 107:",plans)
   const cacheKey = buildPortfolioCacheKey(plans);
   const signature = buildPlansSignature(plans);
   if (cacheKey) {
@@ -184,7 +185,7 @@ export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<numb
           cached &&
           cached.signature === signature &&
           typeof cached.timestamp === "number" &&
-          Date.now() - cached.timestamp < 5 * 60 * 1000
+          Date.now() - cached.timestamp < 10 * 60 * 1000
         ) {
           return cached.value ?? 0;
         }
@@ -210,26 +211,30 @@ export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<numb
     if (addr) symbolToPrice[sym] = prices[addr.toLowerCase()] ?? 0;
   }
 
-  const successCounts = await Promise.all(
-    plans.map((p) => {
-      const jobId = p.jobId ?? null;
-      const userAddress = p.userAddress ?? null;
-      if (!jobId || !userAddress) {
-        return Promise.resolve(p.executionCount ?? 0);
-      }
-      return fetchJobSuccessCount(jobId, userAddress).catch(() =>
-        p.executionCount ?? 0
-      );
-    })
-  );
+  // const successCounts = await Promise.all(
+  //   plans.map((p) => {
+  //     if (typeof p.successcount === 'number') {
+  //       return Promise.resolve(p.successcount);
+  //     }
+  //     const jobId = p.jobId ?? null;
+  //     const userAddress = p.userAddress ?? null;
+  //     if (!jobId || !userAddress) {
+  //       return Promise.resolve(p.executionCount ?? 0);
+  //     }
+  //     return fetchJobSuccessCount(jobId, userAddress).catch(() =>
+  //       p.executionCount ?? 0
+  //     );
+  //   })
+  // );
   // console.log('successCounts 127', successCounts);
 
   let total = 0;
   for (let i = 0; i < plans.length; i++) {
     const plan = plans[i];
+    console.log("plan in computePlansInvestedUsd 134:", plan);
     const per = parseFloat(plan.amount);
     // console.log("per in computePlansInvestedUsd 138:", per);
-    const successCount = successCounts[i];
+    // const successCount = successCounts[i];
     // console.log("successCount in computePlansInvestedUsd 140:", successCount);
     if (!isFinite(per)) continue;
     const sym = (plan.fromToken || 'USDC').toUpperCase();
@@ -238,7 +243,7 @@ export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<numb
     const price = symbolToPrice[sym] ?? 0;
     // console.log("symbolToPrice in computePlansInvestedUsd", symbolToPrice);
     // console.log("price in computePlansInvestedUsd 147:", price);
-    total += per * price * (successCount ?? 0);
+    total += per * price * (plan.successcount ?? 0);
     // console.log("total in computePlansInvestedUsd 149:", total);
   }
   if (cacheKey && total > 0) {

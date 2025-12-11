@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
       body = composed;
     } else if (status === "low-balance") {
       const pct = percentageUsed != null ? percentageUsed.toFixed(2) : "70+";
-      title = "TG balance running low ⚠️";
+      title = "Deposit balance running low ⚠️";
       body =reason ??
         `Your Triggered Jobs have used ${pct}% of your TG balance. Consider topping up to ensure uninterrupted plan execution. Job Cost Prediction: ${jobCostPrediction}, Total Task Cost: ${totalTaskCost}.`;
     } else {
