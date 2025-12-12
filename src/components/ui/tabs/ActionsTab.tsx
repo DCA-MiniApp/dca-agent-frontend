@@ -654,6 +654,39 @@ export function ActionsTab() {
     scrollToBottom(true);
   }, [scrollToBottom]);
 
+  // Ensure the plan creation simulation UI starts reliably once we begin the
+  // creation flow (after approval tx confirms).
+  const startPlanCreationSimulation = useCallback(() => {
+    setIsPlanCreationLoading(true);
+
+    // Prime simulation progress immediately so the UI shows without delay.
+    setPlanSimulation((prev) => {
+      if (prev) return prev;
+      const initial = calculateStepState(0);
+      return {
+        startedAt: Date.now(),
+        progress: 0,
+        etaMs: PLAN_SIMULATION_DURATION_MS,
+        activeStepIndex: initial.activeIndex,
+        stepStatuses: initial.statuses,
+      };
+    });
+
+    // Ensure a loading message exists to host the simulation panel.
+    setMessages((prev) => {
+      const alreadyPresent = prev.some((msg) => msg.isCreatingPlan);
+      if (alreadyPresent) return prev;
+      const loadingMessage: ChatMessage = {
+        id: createMessageId("assistant"),
+        role: "assistant",
+        content: "🪄 Creating your DCA plan...",
+        timestamp: new Date(),
+        isCreatingPlan: true,
+      };
+      return [...prev, loadingMessage];
+    });
+  }, []);
+
   useEffect(() => {
     // Update chat context when wallet connection changes
     if (isWalletConnected && address) {
@@ -1133,17 +1166,7 @@ export function ActionsTab() {
           confirmationId
         );
 
-        setIsPlanCreationLoading(true);
-
-        // Add loading message for plan creation
-        const loadingMessage: ChatMessage = {
-          id: createMessageId("assistant"),
-          role: "assistant",
-          content: "🪄 Creating your DCA plan...",
-          timestamp: new Date(),
-          isCreatingPlan: true,
-        };
-        setMessages((prev) => [...prev, loadingMessage]);
+        startPlanCreationSimulation();
 
         // Call the API with confirmation
         const response = await fetch("/api/dca-chat", {
@@ -1437,7 +1460,7 @@ export function ActionsTab() {
         setConfirmationStep("summary");
       }
     },
-    [address, handleChatAction, walletClient, setMessages]
+    [address, handleChatAction, startPlanCreationSimulation, walletClient]
   );
 
   const startApprovalProcess = useCallback(

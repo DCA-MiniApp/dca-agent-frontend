@@ -169,7 +169,7 @@ export async function fetchArbitrumUsdPrices(addresses: string[]): Promise<Recor
 }
 
 export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<number> {
-  console.log("Line number 107:",plans)
+  // console.log("Line number 107:",plans)
   const cacheKey = buildPortfolioCacheKey(plans);
   const signature = buildPlansSignature(plans);
   if (cacheKey) {
@@ -231,7 +231,7 @@ export async function computePlansInvestedUsd(plans: PlanForUsd[]): Promise<numb
   let total = 0;
   for (let i = 0; i < plans.length; i++) {
     const plan = plans[i];
-    console.log("plan in computePlansInvestedUsd 134:", plan);
+    // console.log("plan in computePlansInvestedUsd 134:", plan);
     const per = parseFloat(plan.amount);
     // console.log("per in computePlansInvestedUsd 138:", per);
     // const successCount = successCounts[i];

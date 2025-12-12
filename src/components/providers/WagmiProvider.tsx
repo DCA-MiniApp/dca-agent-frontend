@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { useConnect, useAccount } from "wagmi";
 import React from "react";
 import { sdk } from "@farcaster/miniapp-sdk";
+import { storeUser } from "~/lib/api";
 
 // Custom hook for MetaMask detection and auto-connection
 // function useMetaMaskAutoConnect() {
@@ -101,6 +102,37 @@ function useFarcasterAutoConnect() {
   }, [isConnected, connect, connectors, hasManualDisconnect]);
 }
 
+function useUserSync() {
+  const { isConnected, address } = useAccount();
+
+  useEffect(() => {
+    const syncUser = async () => {
+      if (isConnected && address) {
+        try {
+          // Wait for SDK to be ready to ensure context is available
+          await sdk.actions.ready();
+          const context = await sdk.context;
+
+          if (context?.user?.fid) {
+            await storeUser({
+              fid: String(context.user.fid),
+              userAddress: address,
+              username: context.user.username,
+              pfpUrl: context.user.pfpUrl,
+              joinedAt: new Date().toISOString(),
+            });
+            // console.log("User synced to backend");
+          }
+        } catch (error) {
+          console.error("Failed to sync user:", error);
+        }
+      }
+    };
+
+    syncUser();
+  }, [isConnected, address]);
+}
+
 export const config = createConfig({
   chains: [arbitrum, mainnet],
   transports: {
@@ -138,6 +170,7 @@ const queryClient = new QueryClient();
 function AutoConnectWrapper({ children }: { children: React.ReactNode }) {
   // useMetaMaskAutoConnect();
   useFarcasterAutoConnect();
+  useUserSync();
   return <>{children}</>;
 }
 
