@@ -166,13 +166,33 @@ export async function POST(request: NextRequest) {
 
         console.log('[Plan Creation] Extraction result:', extractionResult);
 
+        // Clone plan data for display purposes to avoid modifying session state prematurely
+        const displayPlanData = { ...extractionResult.planData } as DCAPlanData;
+
+        // Apply USD intelligence for display if needed
+        if (displayPlanData.fromToken && displayPlanData.amount && (displayPlanData as any)._isDollarAmount) {
+          try {
+            await applyUsdIntelligence(displayPlanData);
+          } catch (error) {
+            console.error('[Plan Creation] Error handling USD display:', error);
+          }
+        }
+
         if (Object.keys(extractionResult.planData).length > 0) {
           responseMessage += `✅ **Information collected so far:**\n`;
-          if (extractionResult.planData.fromToken) responseMessage += `• From token: ${extractionResult.planData.fromToken}\n`;
-          if (extractionResult.planData.toToken) responseMessage += `• To token: ${extractionResult.planData.toToken}\n`;
-          if (extractionResult.planData.amount) responseMessage += `• Amount: ${extractionResult.planData.amount}\n`;
-          if (extractionResult.planData.interval) responseMessage += `• Frequency: ${extractionResult.planData.interval}\n`;
-          if (extractionResult.planData.duration) responseMessage += `• Duration: ${extractionResult.planData.duration}\n`;
+          if (displayPlanData.fromToken) responseMessage += `• From token: ${displayPlanData.fromToken}\n`;
+          if (displayPlanData.toToken) responseMessage += `• To token: ${displayPlanData.toToken}\n`;
+
+          if (displayPlanData.amount) {
+            if (displayPlanData.usdEstimate) {
+              responseMessage += `• Amount: $${displayPlanData.usdEstimate.amountUsd} (${displayPlanData.amount} ${displayPlanData.fromToken || ''})\n`;
+            } else {
+              responseMessage += `• Amount: ${displayPlanData.amount}\n`;
+            }
+          }
+
+          if (displayPlanData.interval) responseMessage += `• Frequency: ${displayPlanData.interval}\n`;
+          if (displayPlanData.duration) responseMessage += `• Duration: ${displayPlanData.duration}\n`;
           responseMessage += '\n';
         }
 
