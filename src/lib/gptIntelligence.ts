@@ -37,7 +37,7 @@ export interface ExtractionResult {
   planData: Partial<DCAPlanData>;
   missingFields: string[];
   nextQuestion?: string;
-  validationErrors?: string[];
+  validationErrors: string[];
 }
 
 export interface TokenInfo {
@@ -140,9 +140,18 @@ export class GPTIntelligenceService {
         return this.extractWithRules(userMessage, currentPlanData);
       }
     } catch (error) {
-      console.error("[GPT Intelligence] Extraction error:", error);
-      console.error("[GPT Intelligence] Error type:", error instanceof Error ? error.constructor.name : typeof error);
-      console.error("[GPT Intelligence] Error message:", error instanceof Error ? error.message : String(error));
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isNetworkError =
+        errorMessage.includes("fetch failed") ||
+        errorMessage.includes("timeout") ||
+        errorMessage.includes("ETIMEDOUT") ||
+        errorMessage.includes("ECONNREFUSED");
+
+      if (isNetworkError) {
+        console.warn(`[GPT Intelligence] Network issue detected: ${errorMessage}. Falling back to rule-based extraction.`);
+      } else {
+        console.error("[GPT Intelligence] Extraction error:", error);
+      }
       console.warn("[GPT Intelligence] Falling back to rule-based extraction due to error");
 
       // Always fallback to rule-based on any error
@@ -194,8 +203,6 @@ EXAMPLES:
 - "0.1 WETH" → amount: "0.1", _isDollarAmount: false, fromToken: "WETH"
 - "$5 worth of ETH" → amount: "5", _isDollarAmount: true, fromToken: "ETH"
 - "10 USDC into ETH" → amount: "10", _isDollarAmount: false, fromToken: "USDC"
-- "every 1 week for 3 days" → validationErrors: ["Interval must be less than duration. Please provide a smaller interval or longer duration."], nextQuestion: "The interval (1 week) must be less than the duration (3 days). Please provide a smaller interval or longer duration."
-- "every 2 hours for 1 hour" → validationErrors: ["Interval must be less than duration. Please provide a smaller interval or longer duration."], nextQuestion: "The interval (2 hours) must be less than the duration (1 hour). Please provide a smaller interval or longer duration."
 
 CRITICAL: Your response must be ONLY valid JSON in this exact format:
 {
@@ -228,25 +235,57 @@ Extract any new DCA parameters from this message and provide the next question f
         console.warn("[GPT Intelligence] Request timeout after 30 seconds");
       }, 30000);
 
-      const response = await fetch(this.apiUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.openaiApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [
-            { role: "system", content: systemPrompt },
-            ...conversationHistory.slice(-4), // Include recent context
-            { role: "user", content: userPrompt },
-          ],
-          temperature: 0.1,
-          max_tokens: 500,
-          response_format: { type: "json_object" },
-        }),
-        signal: controller.signal,
-      });
+      // Add retry logic for network robustness
+      let response;
+      let lastError;
+
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          // Reset controller for each attempt if needed, but here we use one overall timeout 
+          // or we can set per-request timeout. Let's keep the overall 30s timeout for simplicity
+          // but if we want to retry connection timeouts, we need to be careful not to exceed global timeout.
+
+          if (controller.signal.aborted) break;
+
+          response = await fetch(this.apiUrl, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${this.openaiApiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "gpt-4o-mini",
+              messages: [
+                { role: "system", content: systemPrompt },
+                ...conversationHistory.slice(-4), // Include recent context
+                { role: "user", content: userPrompt },
+              ],
+              temperature: 0.1,
+              max_tokens: 500,
+              response_format: { type: "json_object" },
+            }),
+            signal: controller.signal,
+          });
+
+          // If we get a response, break the loop (handle HTTP errors outside)
+          break;
+        } catch (err) {
+          lastError = err;
+          console.warn(`[GPT Intelligence] Attempt ${attempt} failed: ${err instanceof Error ? err.message : String(err)}`);
+
+          if (attempt < 3 && !controller.signal.aborted) {
+            // Wait 1s before retry
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+      }
+
+      // If response is still undefined, rethrow the last error
+      if (!response && lastError) {
+        throw lastError;
+      } else if (!response) {
+        throw new Error("Failed to fetch from OpenAI API after retries");
+      }
 
       clearTimeout(timeoutId);
 
@@ -347,12 +386,13 @@ Extract any new DCA parameters from this message and provide the next question f
         isComplete: validation.isComplete,
         planData: updatedPlanData,
         missingFields: parsed.missingFields || validation.missingFields,
-        // Prioritize validation's nextQuestion when there are validation errors
-        nextQuestion: validation.validationErrors && validation.validationErrors.length > 0
+        // Prioritize internal validation over GPT's hallucinations
+        validationErrors: validation.validationErrors,
+        // If we have local validation errors, use local nextQuestion logic or fallback to GPT's
+        // But if GPT has no validation errors and we do, we definitely want OUR question.
+        nextQuestion: validation.validationErrors.length > 0
           ? validation.nextQuestion
           : (parsed.nextQuestion || validation.nextQuestion),
-        validationErrors:
-          parsed.validationErrors || validation.validationErrors,
       };
     } catch (error) {
       console.error("[GPT Intelligence] GPT extraction failed:", error);
@@ -617,25 +657,19 @@ Extract any new DCA parameters from this message and provide the next question f
     if (lowerTime === 'yearly' || lowerTime === '1 year') return 365 * 24 * 60; // Approximate
 
     // Parse "X minutes/hours/days/weeks/months/years" format
-    const match = lowerTime.match(/^(\d+(?:\.\d+)?)\s*(minute|hour|day|week|month|year)s?$/);
+    // Enhanced regex to handle typos like "minitues", "minutues", etc.
+    const match = lowerTime.match(/^(\d+(?:\.\d+)?)\s*([a-z]+)/);
+
     if (match) {
       const value = parseFloat(match[1]);
-      const unit = match[2];
+      const unitStr = match[2];
 
-      switch (unit) {
-        case 'minute':
-          return value;
-        case 'hour':
-          return value * 60;
-        case 'day':
-          return value * 24 * 60;
-        case 'week':
-          return value * 7 * 24 * 60;
-        case 'month':
-          return value * 30 * 24 * 60; // Approximate
-        case 'year':
-          return value * 365 * 24 * 60; // Approximate
-      }
+      if (unitStr.includes('min')) return value;
+      if (unitStr.includes('hour')) return value * 60;
+      if (unitStr.includes('day')) return value * 24 * 60;
+      if (unitStr.includes('week')) return value * 7 * 24 * 60;
+      if (unitStr.includes('month')) return value * 30 * 24 * 60;
+      if (unitStr.includes('year')) return value * 365 * 24 * 60;
     }
 
     return null;
@@ -648,7 +682,7 @@ Extract any new DCA parameters from this message and provide the next question f
     isComplete: boolean;
     missingFields: string[];
     nextQuestion?: string;
-    validationErrors?: string[];
+    validationErrors: string[];
   } {
     const missingFields: string[] = [];
     const validationErrors: string[] = [];
@@ -663,8 +697,8 @@ Extract any new DCA parameters from this message and provide the next question f
     // Validate token availability
     if (
       planData.fromToken &&
-      (!availableTokens[planData.fromToken] ||
-        availableTokens[planData.fromToken].length === 0)
+      (!availableTokens[planData.fromToken.toUpperCase()] ||
+        availableTokens[planData.fromToken.toUpperCase()].length === 0)
     ) {
       validationErrors.push(
         `Token ${planData.fromToken} is not available on Arbitrum`
@@ -672,8 +706,8 @@ Extract any new DCA parameters from this message and provide the next question f
     }
     if (
       planData.toToken &&
-      (!availableTokens[planData.toToken] ||
-        availableTokens[planData.toToken].length === 0)
+      (!availableTokens[planData.toToken.toUpperCase()] ||
+        availableTokens[planData.toToken.toUpperCase()].length === 0)
     ) {
       validationErrors.push(
         `Token ${planData.toToken} is not available on Arbitrum`
@@ -849,6 +883,7 @@ function sanitizeSymbol(symbol?: string): string | null {
 async function fetchTokenUsdPrice(
   tokenSymbol: string
 ): Promise<{ priceUsd: number; address: string } | null> {
+  console.log('🔍 [Token Price] Fetching USD price for:', tokenSymbol);
   const normalized = sanitizeSymbol(tokenSymbol);
   if (!normalized) return null;
   const tokenInfo = availableTokens[normalized]?.[0];
