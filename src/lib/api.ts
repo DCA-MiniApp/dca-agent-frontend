@@ -701,7 +701,7 @@ export async function fetchQuickStats(): Promise<{
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/dca/platform-stats`, {
+    const response = await fetch(`/api/fetch-platform-stats`, {
       method: "GET",
       headers: {
         Accept: "application/json",

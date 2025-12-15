@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ;
 export async function GET(req: Request, context: { params: Promise<{ address: string }> }) {
-  const { address } = await context.params; // ⬅ FIX
+  const { address } = await context.params; 
 
   if (!address) {
     return NextResponse.json({ success: false, message: "Missing address" }, { status: 400 });

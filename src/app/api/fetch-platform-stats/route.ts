@@ -2,15 +2,16 @@ import { NextResponse } from "next/server";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    // Build URL to backend
-    const url = `${API_BASE_URL}/api/dca/platform-stats`;
+    // Read incoming headers
+    const isHome = req.headers.get("ishome") || "false";
 
-    // Call real backend with secure API key
-    const response = await fetch(url, {
+    // Call backend with forwarded + secure headers
+    const response = await fetch(`${API_BASE_URL}/api/dca/platform-stats`, {
       headers: {
         Accept: "application/json",
+        ishome: isHome,                              
         "Access-Key": process.env.API_ACCESS_KEY || "",
       },
       cache: "no-store",
@@ -18,10 +19,7 @@ export async function GET() {
 
     if (!response.ok) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Failed to fetch platform stats",
-        },
+        { success: false, message: "Failed to fetch platform stats" },
         { status: response.status }
       );
     }

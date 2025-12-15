@@ -18,6 +18,12 @@ const TxEventSchema = z.object({
   totalTaskCost: z.number().optional(),
   percentageUsed: z.number().optional(),
 
+  // Success-specific
+  fromToken: z.string().optional(),
+  toToken: z.string().optional(),
+  amount: z.string().optional(),
+  username: z.string().optional(),
+
   message: z.string().optional(),
   notificationtoken: z.string().optional(),
   notification_url: z.string().url().optional(),
@@ -56,6 +62,10 @@ export async function POST(req: NextRequest) {
       jobCostPrediction,
       totalTaskCost,
       percentageUsed,
+      fromToken,
+      toToken,
+      amount,
+      username,
     } = parsed.data;
 
     if (!fid) {
@@ -81,10 +91,20 @@ export async function POST(req: NextRequest) {
     } else if (status === "low-balance") {
       const pct = percentageUsed != null ? percentageUsed.toFixed(2) : "70+";
       title = "Deposit balance running low ⚠️";
-      body =reason ??
-        `Your Triggered Jobs have used ${pct}% of your TG balance. Consider topping up to ensure uninterrupted plan execution. Job Cost Prediction: ${jobCostPrediction}, Total Task Cost: ${totalTaskCost}.`;
+      body =
+        reason ??
+        `Your Triggered Jobs have used ${pct}% of your ETH balance. Consider topping up to ensure uninterrupted plan execution. Job Cost Prediction: ${jobCostPrediction}, Total Task Cost: ${totalTaskCost}.`;
+    } else if (status === "success") {
+      title = "Plan executed successfully 🚀";
+      const friendlyAmount = amount ?? "";
+      const friendlyFrom = fromToken ?? "";
+      const friendlyTo = toToken ?? "";
+      const namePart = username ? `, ${username}` : "";
+      body =
+        reason ??
+        `Hello${namePart}, your plan ${friendlyFrom} -> ${friendlyTo} with amount ${friendlyAmount} was successfully executed. Task ID: ${taskId}. You can verify this in the History tab.`;
     } else {
-      // For pending/success or anything else we don't notify
+      // For pending or anything else we don't notify
       return NextResponse.json({ success: true, skipped: true });
     }
 
