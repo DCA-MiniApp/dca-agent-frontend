@@ -1,5 +1,5 @@
-import React from "react";
-import { HiCurrencyDollar } from "react-icons/hi2";
+import React, { useState } from "react";
+import { HiCurrencyDollar, HiInformationCircle } from "react-icons/hi2";
 
 interface TriggerXWithdrawCardProps {
   withdrawAmount: string;
@@ -20,6 +20,7 @@ export function TriggerXWithdrawCard({
   withdrawStatus,
   tgBalance,
 }: TriggerXWithdrawCardProps) {
+  const [showTooltip, setShowTooltip] = useState(false);
   const balance = tgBalance || 0;
   const amount = parseFloat(withdrawAmount) || 0;
   
@@ -40,9 +41,26 @@ export function TriggerXWithdrawCard({
               <HiCurrencyDollar className="text-emerald-300 size-6" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white">
-                Withdraw ETH
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-white">
+                  Withdraw ETH
+                </h3>
+                <div
+                  onMouseEnter={() => setShowTooltip(true)}
+                  onMouseLeave={() => setShowTooltip(false)}
+                  className="relative inline-flex items-center"
+                >
+                  <HiInformationCircle className="w-4 h-4 text-white/50 transition hover:text-white hover:scale-110 cursor-help" />
+                  {showTooltip && (
+                    <div className="absolute z-[10] left-1/2 -translate-x-1/2 top-full mt-2 w-64 rounded-lg bg-[#c199e4]  text-xs text-white px-3 py-2 shadow-2xl border border-emerald-400/30 pointer-events-none">
+                      <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#c199e4] border-l border-t border-[#c199e4] rotate-45" />
+                      <div className="text-left relative z-10">
+                        Withdraw your deposited ETH from TriggerX back to your wallet. This ETH was used to execute your DCA plans automatically.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
               <p className="text-xs text-white/70">Withdraw your Deposit ETH.</p>
             </div>
           </div>
@@ -67,7 +85,8 @@ export function TriggerXWithdrawCard({
                     value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(e.target.value)}
                     placeholder="Enter ETH amount"
-                    max={balance.toFixed(4)}
+                    step="any"
+                    min="0"
                     className={`w-full rounded-2xl border px-4 py-2.5 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 transition-all duration-300 bg-black/20 ${
                       isInsufficientBalance
                         ? "border-red-500/60 focus:ring-red-500/60 focus:border-red-500/60"

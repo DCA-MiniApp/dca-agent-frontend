@@ -374,7 +374,7 @@ function WalletControls({
   return (
     <div className="space-y-6">
       {/* Network Status */}
-      <div
+      {/* <div
         className={`p-6 backdrop-blur-lg rounded-3xl border transition-all duration-500 text-sm mb-7 ${isOnArbitrum
           ? "bg-gradient-to-br from-green-400/20 to-green-400/10 border-green-400/30 hover:border-green-400/50"
           : "bg-gradient-to-br from-red-400/20 to-red-400/10 border-red-400/30 hover:border-red-400/50"
@@ -444,7 +444,7 @@ function WalletControls({
             {isChainSwitchError && renderError(chainSwitchError)}
           </div>
         )}
-      </div>
+      </div> */}
 
       {/* Wallet Info */}
       {/* <div className="p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500">
@@ -741,7 +741,7 @@ export function WalletTab() {
           <div>
             <h2 className="text-xl font-bold text-white">Wallet Management</h2>
             <p className="text-sm text-white/70">
-              Connect and manage your Arbitrum wallet
+              Connect and manage your wallet
             </p>
           </div>
         </div>

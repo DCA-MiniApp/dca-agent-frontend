@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
         reason ??
         `Your Triggered Jobs have used ${pct}% of your ETH balance. Consider topping up to ensure uninterrupted plan execution. Job Cost Prediction: ${jobCostPrediction}, Total Task Cost: ${totalTaskCost}.`;
     } else if (status === "success") {
-      title = "Plan executed successfully 🚀";
+      title = "Plan executed successfully 🎉";
       const friendlyAmount = amount ?? "";
       const friendlyFrom = fromToken ?? "";
       const friendlyTo = toToken ?? "";
