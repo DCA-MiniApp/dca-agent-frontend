@@ -59,16 +59,16 @@ function scaleAmountToUint(amountStr: string, decimals: number): string {
 export function generateDCAScript(params: DCAScriptParams): string {
   const { userAddress, fromToken, toToken, amount, slippage } = params;
 
-  console.log('🔍 [DCA SCRIPT GENERATOR] userAddress in params:', userAddress);
-  console.log('🔍 [DCA SCRIPT GENERATOR] Address length:', userAddress?.length);
-  console.log('🔍 [DCA SCRIPT GENERATOR] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(userAddress || ''));
+  console.info('[DCA SCRIPT GENERATOR] userAddress in params:', userAddress);
+  // console.log('🔍 [DCA SCRIPT GENERATOR] Address length:', userAddress?.length);
+  // console.log('🔍 [DCA SCRIPT GENERATOR] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(userAddress || ''));
 
   // Resolve token addresses from the Arbitrum token map
   const fromTokenAddress = resolveTokenAddressFromMap(fromToken) ?? "";
   const fromTokenDecimals = resolveTokenDecimalsFromMap(fromToken, fromTokenAddress) ?? 18;
   const scaledAmount = scaleAmountToUint(amount, fromTokenDecimals);
-  console.log('scaledAmount', scaledAmount);
-  console.log('🔍 [DCA SCRIPT GENERATOR] userAddress that will be embedded in script:', userAddress);
+  // console.log('scaledAmount', scaledAmount);
+  console.info('[DCA SCRIPT GENERATOR] userAddress that will be embedded in script:', userAddress);
   const script = `package main
 
 import (

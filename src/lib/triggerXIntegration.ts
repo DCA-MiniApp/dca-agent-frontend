@@ -113,10 +113,10 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
 
   try {
     // console.log('🚀 Starting TriggerX job creation for plan:', planId);
-    console.log("params", params);
-    console.log('🔍 [TRIGGERX INTEGRATION] userAddress from params:', userAddress);
-    console.log('🔍 [TRIGGERX INTEGRATION] Address length:', userAddress?.length);
-    console.log('🔍 [TRIGGERX INTEGRATION] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(userAddress || ''));
+    // console.log("params", params);
+    console.info('[TRIGGERX INTEGRATION] userAddress from params:', userAddress);
+    // console.log('🔍 [TRIGGERX INTEGRATION] Address length:', userAddress?.length);
+    // console.log('🔍 [TRIGGERX INTEGRATION] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(userAddress || ''));
 
     // Step 1: Get token addresses and validate script parameters
     const fromTokenInfo = getTokenInfo(fromToken);
@@ -132,9 +132,9 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
       slippage,
     };
 
-    console.log('🔍 [TRIGGERX INTEGRATION] scriptParams.userAddress:', scriptParams.userAddress);
-    console.log('🔍 [TRIGGERX INTEGRATION] scriptParams address length:', scriptParams.userAddress?.length);
-    console.log('🔍 [TRIGGERX INTEGRATION] scriptParams address regex test:', /^0x[a-fA-F0-9]{40}$/.test(scriptParams.userAddress || ''));
+    console.info('[TRIGGERX INTEGRATION] scriptParams.userAddress:', scriptParams.userAddress);
+    // console.log('🔍 [TRIGGERX INTEGRATION] scriptParams address length:', scriptParams.userAddress?.length);
+    // console.log('🔍 [TRIGGERX INTEGRATION] scriptParams address regex test:', /^0x[a-fA-F0-9]{40}$/.test(scriptParams.userAddress || ''));
 
     const validation = validateDCAScriptParams(scriptParams);
     if (!validation.isValid) {
@@ -152,12 +152,12 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
       throw new Error(`IPFS upload failed: ${uploadResult.error}`);
     }
 
-    console.log('✅ Minimal script uploaded to IPFS:', uploadResult.scriptIpfsUrl);
-    console.log("Script HASH:", uploadResult.scriptIpfsHash);
+    console.info('Minimal script uploaded to IPFS:', uploadResult.scriptIpfsUrl);
+    console.info("Script HASH:", uploadResult.scriptIpfsHash);
     const scriptIpfsUrl = `https://ipfs.io/ipfs/${uploadResult.scriptIpfsHash}`;
 
     // Step 3: Create TriggerX job input
-    console.log('🔍 [TRIGGERX INTEGRATION] userAddress before createDCAJobInput:', userAddress);
+    // console.log('🔍 [TRIGGERX INTEGRATION] userAddress before createDCAJobInput:', userAddress);
     const jobInput = createDCAJobInput({
       planId,
       contractAddress: EXECUTOR_CONTRACT_ADDRESS,
@@ -169,7 +169,7 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
       amount,
       scriptIpfsUrl: scriptIpfsUrl,
     });
-    console.log('🔍 [TRIGGERX INTEGRATION] jobInput created (check for userAddress in it):', JSON.stringify(jobInput, null, 2));
+    console.info('[TRIGGERX INTEGRATION] jobInput created (check for userAddress in it):', JSON.stringify(jobInput, null, 2));
 
     // Step 4: Create TriggerX job
     // console.log('⚡ Creating TriggerX job...');
@@ -178,15 +178,15 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
 
     const client = new TriggerXClient(apiKey);
     // console.log("📡 TriggerX Client:", client);
-    console.log("📝 Job Input (full):", JSON.stringify(jobInput, null, 2));
-    console.log("🔗 IPFS URL being passed:", jobInput.dynamicArgumentsScriptUrl);
+    console.info("📝 Job Input (full):", JSON.stringify(jobInput, null, 2));
+    console.info("🔗 IPFS URL being passed:", jobInput.dynamicArgumentsScriptUrl);
     // console.log("✍️ Signer:", signer);
 
     let result;
     try {
-      console.log('📤 Calling createJob...');
+      // console.log('📤 Calling createJob...');
       result = await createJob(client, { jobInput, signer });
-      console.log('📥 CreateJob result:', result);
+      console.info('CreateJob result:', result);
     } catch (error) {
       console.error('❌ CreateJob error details:', error);
       console.error('❌ Error message:', (error as any)?.message);
@@ -216,7 +216,7 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
       (result as any)?.data?.id ||
       null
     );
-    console.log('✅ TriggerX job created:', jobId);
+    console.info('TriggerX job created:', jobId);
 
     // Step 5: Update plan with job details
     const ipfsLink = uploadResult.scriptIpfsUrl;
@@ -254,18 +254,18 @@ export async function createTriggerXJobForPlan(params: CreateTriggerXJobParams):
         const details = errorObj.details || {};
         const ethAmount = details.ethAmount;
 
-        console.log('[TriggerX] ethAmount from details:', ethAmount);
+        // console.log('[TriggerX] ethAmount from details:', ethAmount);
 
         if (ethAmount) {
           // Convert bigint to ETH (assuming wei)
           const ethAmountInEth = (Number(ethAmount) / 1e18).toFixed(6);
-          console.log('[TriggerX] Converted to ETH:', ethAmountInEth);
+          // console.log('[TriggerX] Converted to ETH:', ethAmountInEth);
           errorMessage = `INSUFFICIENT_BALANCE:${ethAmountInEth}`;
         } else {
           errorMessage = 'INSUFFICIENT_BALANCE:unknown';
         }
 
-        console.log('[TriggerX] Final error message:', errorMessage);
+        console.info('[TriggerX] Final error message:', errorMessage);
       } else {
         console.log('[TriggerX] Not a balance error, using original message');
       }
@@ -292,7 +292,7 @@ export async function updatePlanWithJobDetails(
 ): Promise<void> {
   try {
     const DCA_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3031';
-    console.log('[Plan Update] Updating plan:', planId, { jobId, ipfsLink });
+    // console.info('[Plan Update] Updating plan:', planId, { jobId, ipfsLink });
 
     const response = await fetch(`${DCA_API_URL}/api/dca/plans/${planId}/details`, {
       method: 'PUT',
@@ -312,7 +312,7 @@ export async function updatePlanWithJobDetails(
     }
 
     const result = await response.json();
-    console.log('[Plan Update] Plan updated successfully:', result);
+    console.info('[Plan Update] Plan updated successfully:', result);
 
   } catch (error) {
     console.error('[Plan Update] Failed to update plan:', error);
@@ -469,12 +469,12 @@ export async function minimalTriggerXExample() {
 
   // 4. Create job
   const result = await createJob(client, { jobInput, signer });
-  console.log("result", result);
+  // console.log("result", result);
 
   // 5. Handle response
   if (result.success && result.data) {
     const jobId = result.data.job_id;
-    console.log('Job created:', jobId);
+    // console.log('Job created:', jobId);
     return jobId;
   } else {
     throw new Error(result.error || 'Job creation failed');
@@ -549,7 +549,7 @@ export async function deleteTriggerXJobForPlan(jobId: string, signer: any, chain
     // Delete the job using the TriggerX SDK (requires signer and chainId)
     try {
       const result = await deleteJob(client, jobId, wrappedSigner, chainId);
-      console.log('deleteJob result:', result);
+      // console.log('deleteJob result:', result);
 
       // Check if result is an object with success property (like createJob)
       if (result && typeof result === 'object') {
@@ -593,7 +593,7 @@ export async function deleteTriggerXJobForPlan(jobId: string, signer: any, chain
 
       // Check if this is a user rejection from the wrapped signer
       if (apiError?.isUserRejection || apiError?.message === 'user_rejected') {
-        console.log('ℹ️ User rejected the transaction');
+        console.warn('ℹUser rejected the transaction');
         return { success: false, error: 'user_rejected' };
       }
 
@@ -613,7 +613,7 @@ export async function deleteTriggerXJobForPlan(jobId: string, signer: any, chain
         msg.includes('rejected') ||
         msg.includes('user cancelled');
 
-      console.log('Is user rejection:', isUserRejection);
+      // console.log('Is user rejection:', isUserRejection);
 
       // Propagate user rejection distinctly so UI does NOT update backend
       if (isUserRejection) {

@@ -278,7 +278,7 @@ async function fetchDefiLlamaInfo(contractAddress: string): Promise<{ price: num
     if (!json.coins) return { price: 0, decimals: null };
 
     const coinData = json.coins[`arbitrum:${contractAddress.toLowerCase()}`];
-    console.log("coinData in fetchDefiLlamaPrice:", coinData);
+    // console.log("coinData in fetchDefiLlamaPrice:", coinData);
     if (!coinData || typeof coinData.price !== "number") return { price: 0, decimals: null };
 
     return {
@@ -362,107 +362,6 @@ async function getTokenBalances(userAddress: string): Promise<TokenBalance[]> {
     return [];
   }
 }
-/**
- * Get token metadata for a contract address using Alchemy API
- */
-// async function getTokenMetadata(contractAddress: string): Promise<TokenMetadata | null> {
-//   if (!ALCHEMY_API_KEY) {
-//     console.warn("Alchemy API key not configured");
-//     return null;
-//   }
-
-//   try {
-//     const url = `${ALCHEMY_URL}/${ALCHEMY_API_KEY}`;
-//     const res = await fetch(url, {
-//       method: "POST",
-//       headers: { "Content-Type": "application/json" },
-//       body: JSON.stringify({
-//         jsonrpc: "2.0",
-//         id: 1,
-//         method: "alchemy_getTokenMetadata",
-//         params: [contractAddress],
-//       }),
-//     });
-
-//     if (!res.ok) {
-//       console.error("Alchemy metadata API error:", res.status, res.statusText);
-//       return null;
-//     }
-
-//     const { result } = await res.json();
-//     if (!result) return null;
-
-//     return {
-//       name: result.name || "Unknown",
-//       symbol: result.symbol || "UNKNOWN",
-//       decimals: result.decimals || 18,
-//       logo: result.logo,
-//     };
-//   } catch (error) {
-//     console.error("Error fetching token metadata from Alchemy:", error);
-//     return null;
-//   }
-// }
-
-/**
- * Calculate total USD value of all tokens in a wallet
- */
-// export async function calculateWalletTotalUsdValue(userAddress: string): Promise<number> {
-//   if (!userAddress || !ALCHEMY_API_KEY) {
-//     return 0;
-//   }
-
-//   try {
-//     // Step 1: Get token balances
-//     const balances = await getTokenBalances(userAddress);
-//     if (balances.length === 0) return 0;
-
-//     // Step 2: Get metadata for all tokens in parallel
-//     const metadataList = await Promise.all(
-//       balances.map((t) => getTokenMetadata(t.contractAddress))
-//     );
-
-//     // Filter out tokens with no metadata
-//     const validTokens = balances
-//       .map((balance, i) => ({
-//         balance,
-//         metadata: metadataList[i],
-//       }))
-//       .filter((item) => item.metadata !== null);
-
-//     if (validTokens.length === 0) return 0;
-
-//     // Step 3: Get prices from CoinGecko
-//     const addresses = validTokens.map((t) => t.balance.contractAddress);
-//     const prices = await fetchArbitrumUsdPrices(addresses);
-
-//     // Step 4: Calculate total USD value
-//     let totalUSD = 0;
-
-//     validTokens.forEach(({ balance, metadata }) => {
-//       if (!metadata) return;
-
-//       // Convert hex balance to decimal
-//       const balanceBigInt = BigInt(balance.tokenBalance);
-//       const decimals = metadata.decimals || 18;
-//       const divisor = BigInt(10 ** decimals);
-//       const balanceDecimal = Number(balanceBigInt) / Number(divisor);
-
-//       // Get price
-//       const priceKey = balance.contractAddress.toLowerCase();
-//       const price = prices[priceKey] || 0;
-
-//       // Calculate value
-//       const valueUSD = balanceDecimal * price;
-//       totalUSD += valueUSD;
-//     });
-
-//     return totalUSD;
-//   } catch (error) {
-//     console.error("Error calculating wallet total USD value:", error);
-//     return 0;
-//   }
-// }
 
 
 export async function calculateWalletTotalUsdValue(userAddress: string): Promise<number> {
@@ -497,7 +396,7 @@ export async function calculateWalletTotalUsdValue(userAddress: string): Promise
       const info = await fetchDefiLlamaInfo(contractAddress);
       const price = info.price;
       if (!price || price <= 0) {
-        console.log(`Skipping ${contractAddress} due to missing price`);
+        console.info(`Skipping ${contractAddress} due to missing price`);
         continue;
       }
 

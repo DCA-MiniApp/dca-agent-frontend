@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   const requestJson = await request.json();
   const requestBody = requestSchema.safeParse(requestJson);
   console.log("Notification endpoint called with body:", requestJson);
-  console.log("Parsed result:", requestBody);
+  // console.log("Parsed result:", requestBody);
 
   if (requestBody.success === false) {
     return Response.json(

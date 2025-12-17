@@ -50,7 +50,7 @@ export class PinataService {
     metadata?: PinataMetadata
   ): Promise<PinataUploadResult> {
     try {
-      console.log('📤 Uploading file to Pinata IPFS:', fileName);
+      console.info(' Uploading file to Pinata IPFS:', fileName);
 
       // Create FormData for the file upload
       const formData = new FormData();
@@ -93,7 +93,7 @@ export class PinataService {
       }
 
       const result = await response.json();
-      console.log('✅ File uploaded to Pinata:', result);
+      console.info('File uploaded to Pinata:', result);
 
       return {
         success: true,
@@ -150,7 +150,7 @@ export class PinataService {
       }
 
       const result = await response.json();
-      console.log('✅ JSON uploaded to Pinata:', result);
+      console.info('JSON uploaded to Pinata:', result);
 
       return {
         success: true,

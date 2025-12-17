@@ -620,18 +620,18 @@ export function WalletTab() {
       try {
         // Get WETH address for Arbitrum
         const wethAddress = getArbitrumAddressBySymbol('WETH');
-        console.log('WETH Address:', wethAddress);
+        // console.log('WETH Address:', wethAddress);
 
         if (wethAddress) {
           const prices = await fetchArbitrumUsdPrices([wethAddress]);
-          console.log('Fetched prices:', prices);
+          // console.log('Fetched prices:', prices);
 
           const price = prices[wethAddress.toLowerCase()];
-          console.log('ETH Price:', price);
+          // console.log('ETH Price:', price);
 
           if (price) {
             setEthPrice(price);
-            console.log('ETH price set to:', price);
+            console.info('ETH price set to:', price);
           }
         }
       } catch (error) {
@@ -649,7 +649,7 @@ export function WalletTab() {
 
   // --- Handlers ---
   const handleSwitchToArbitrum = useCallback(async () => {
-    console.log("Switching to Arbitrum");
+    // console.log("Switching to Arbitrum");
     try {
       if (switchChainAsync) {
         await switchChainAsync({ chainId: arbitrum.id });
@@ -704,7 +704,7 @@ export function WalletTab() {
   // Auto-switch to Arbitrum after connection - ALWAYS enforce Arbitrum
   useEffect(() => {
     if (isConnected && effectiveChainId && effectiveChainId !== arbitrum.id && !isChainSwitchPending) {
-      console.log(`Auto-switching from chain ${effectiveChainId} to Arbitrum (${arbitrum.id})`);
+      console.info(`Auto-switching from chain ${effectiveChainId} to Arbitrum (${arbitrum.id})`);
       // Immediate switch for better UX
       handleSwitchToArbitrum().catch((error) => {
         console.warn("Auto-switch to Arbitrum failed:", error);

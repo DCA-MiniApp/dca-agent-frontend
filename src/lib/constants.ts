@@ -17,7 +17,7 @@ import { type AccountAssociation } from '@farcaster/miniapp-core/src/manifest';
  * Used for generating absolute URLs for assets and API endpoints.
  */
 export const APP_URL: string = process.env.NEXT_PUBLIC_URL!;
-console.log('APP_URL:', APP_URL);
+// console.log('APP_URL:', APP_URL);
 
 /**
  * The name of the mini app as displayed to users.

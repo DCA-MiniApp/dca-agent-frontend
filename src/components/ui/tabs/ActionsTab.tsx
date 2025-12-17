@@ -196,11 +196,11 @@ export async function getEthersSigner(
           ? "Detected Farcaster connector → trying Wagmi transport first"
           : "Using Wagmi walletClient transport path"
       );
-      console.log("Wallet Client:", walletClient);
-      console.log("Wallet Client chain ID:", walletClient?.chain?.id);
-      console.log('🔍 [GET ETHERS SIGNER] walletClient.account.address:', walletClient.account?.address);
-      console.log('🔍 [GET ETHERS SIGNER] Address length:', walletClient.account?.address?.length);
-      console.log('🔍 [GET ETHERS SIGNER] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(walletClient.account?.address || ''));
+      console.info("Wallet Client:", walletClient);
+      console.info("Wallet Client chain ID:", walletClient?.chain?.id);
+      // console.log('🔍 [GET ETHERS SIGNER] walletClient.account.address:', walletClient.account?.address);
+      // console.log('🔍 [GET ETHERS SIGNER] Address length:', walletClient.account?.address?.length);
+      // console.log('🔍 [GET ETHERS SIGNER] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(walletClient.account?.address || ''));
 
       const requestFn = (walletClient.transport as any).request;
       if (typeof requestFn === "function") {
@@ -213,7 +213,7 @@ export async function getEthersSigner(
             ? new BrowserProvider(eip1193Provider, walletClient.chain.id)
             : new BrowserProvider(eip1193Provider);
 
-          console.log("Provider:", provider);
+          console.info("Provider:", provider);
 
           const signer = await Promise.race([
             provider.getSigner(walletClient.account.address),
@@ -222,22 +222,22 @@ export async function getEthersSigner(
             ),
           ]);
 
-          console.log("Signer:", signer);
+          // console.log("Signer:", signer);
 
           const address = await signer.getAddress();
-          console.log('🔍 [GET ETHERS SIGNER] Signer address (Wagmi path):', address);
-          console.log('🔍 [GET ETHERS SIGNER] Signer address length:', address?.length);
-          console.log('🔍 [GET ETHERS SIGNER] Signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
+          console.info('[GET ETHERS SIGNER] Signer address (Wagmi path):', address);
+          // console.log('🔍 [GET ETHERS SIGNER] Signer address length:', address?.length);
+          // console.log('🔍 [GET ETHERS SIGNER] Signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
           try {
             const balance = await provider.getBalance(address);
-            console.log(
-              "Balance of signer (Wagmi transport):",
-              balance.toString()
-            );
+            // console.log(
+            //   "Balance of signer (Wagmi transport):",
+            //   balance.toString()
+            // );
           } catch (balanceErr) {
             console.warn("Could not fetch signer balance:", balanceErr);
           }
-          console.log(
+          console.info(
             isFarcasterConnector
               ? "✅ Signer obtained via Wagmi transport (Farcaster connector)"
               : "✅ Signer obtained via Wagmi transport",
@@ -256,7 +256,7 @@ export async function getEthersSigner(
 
     // 2. Fallback: If Farcaster connector and Wagmi transport didn't work → use SDK provider
     if (isFarcasterConnector) {
-      console.log(
+      console.info(
         "Farcaster connector detected but Wagmi transport unavailable/unsuccessful → falling back to SDK provider"
       );
       const farcasterProvider = await sdk.wallet.getEthereumProvider();
@@ -274,12 +274,12 @@ export async function getEthersSigner(
       ]);
 
       const address = await signer.getAddress();
-      console.log('🔍 [GET ETHERS SIGNER] Signer address (Farcaster SDK path):', address);
-      console.log('🔍 [GET ETHERS SIGNER] Signer address length:', address?.length);
-      console.log('🔍 [GET ETHERS SIGNER] Signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
+      console.info('[GET ETHERS SIGNER] Signer address (Farcaster SDK path):', address);
+      // console.log('🔍 [GET ETHERS SIGNER] Signer address length:', address?.length);
+      // console.log('🔍 [GET ETHERS SIGNER] Signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
       try {
         const balance = await provider.getBalance(address);
-        console.log("Balance of signer (Farcaster SDK):", balance.toString());
+        // console.log("Balance of signer (Farcaster SDK):", balance.toString());
       } catch (balanceErr) {
         console.warn("Could not fetch signer balance:", balanceErr);
       }
@@ -289,7 +289,7 @@ export async function getEthersSigner(
 
     // 3. Fallback: window.ethereum
     if (typeof window !== "undefined" && (window as any).ethereum) {
-      console.log("Falling back to window.ethereum provider");
+      console.info("Falling back to window.ethereum provider");
       const provider = new BrowserProvider((window as any).ethereum as any);
 
       // Check accounts
@@ -326,10 +326,10 @@ export async function getEthersSigner(
       ]);
 
       const address = await signer.getAddress();
-      console.log('🔍 [GET ETHERS SIGNER] Signer address (window.ethereum path):', address);
-      console.log('🔍 [GET ETHERS SIGNER] Signer address length:', address?.length);
-      console.log('🔍 [GET ETHERS SIGNER] Signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
-      console.log("Signer obtained via window.ethereum:", address);
+      // console.log(' [GET ETHERS SIGNER] Signer address (window.ethereum path):', address);
+      // console.log('🔍 [GET ETHERS SIGNER] Signer address length:', address?.length);
+      // console.log('🔍 [GET ETHERS SIGNER] Signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
+      console.info("Signer obtained via window.ethereum:", address);
       return signer;
     }
 
@@ -499,7 +499,7 @@ export function ActionsTab() {
         const url = `https://warpcast.com/~/compose?text=${encodeURIComponent(
           text
         )}`;
-        console.log("Sharing cast", url);
+        console.info("Sharing cast", url);
         window.open(url, "_blank");
       }
     } catch (err) {
@@ -766,9 +766,9 @@ export function ActionsTab() {
       // Determine if this is a plan creation request
       const isPlanRequest = isPlanCreationRequest(currentInput);
 
-      console.log('🔍 [ACTIONS TAB] Sending to DCA chat API with address:', address);
-      console.log('🔍 [ACTIONS TAB] Address length:', address?.length);
-      console.log('🔍 [ACTIONS TAB] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
+      console.info('[ACTIONS TAB] Sending to DCA chat API with address:', address);
+      // console.log('🔍 [ACTIONS TAB] Address length:', address?.length);
+      // console.log('🔍 [ACTIONS TAB] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
 
       // Call our DCA chat API endpoint
       const response = await fetch("/api/dca-chat", {
@@ -918,7 +918,7 @@ export function ActionsTab() {
           // Refresh TG balance
           try {
             const balance = await checkTgBalanceForUser(address);
-            console.log("Updated TG balance:", balance);
+            console.info("Updated TG balance:", balance);
           } catch (err) {
             console.warn("Could not refresh TG balance:", err);
           }
@@ -951,13 +951,13 @@ export function ActionsTab() {
       switch (action) {
         case "request_wallet_connection":
           // Could trigger wallet connection modal or guide user
-          console.log("Action: Request wallet connection");
+          console.info("Action: Request wallet connection");
           break;
 
         case "plan_confirmation_required":
           // This case is now handled directly in the API response processing
           // to prevent duplicate approval messages
-          console.log(
+          console.info(
             "Action: Plan confirmation required - handled in response processing"
           );
           break;
@@ -971,42 +971,42 @@ export function ActionsTab() {
         case "plan_created":
         case "plan_confirmed":
           // Plan was successfully created
-          console.log("Action: Plan created/confirmed successfully");
+          console.info("Action: Plan created/confirmed successfully");
           break;
 
         case "action_cancelled":
           // User cancelled the action
-          console.log("Action: Action cancelled by user");
+          console.info("Action: Action cancelled by user");
           break;
 
         case "approval_required":
           // Token approval required
-          console.log("Action: Token approval required", data);
+          console.info("Action: Token approval required", data);
           break;
 
         case "show_plans":
           // Could display plans in a structured format or table
-          console.log("Action: Show user plans", data);
+          console.info("Action: Show user plans", data);
           break;
 
         case "show_stats":
           // Could display stats in a chart or structured format
-          console.log("Action: Show platform stats", data);
+          console.info("Action: Show platform stats", data);
           break;
 
         case "execution_triggered":
           // Could show transaction status or redirect to transaction view
-          console.log("Action: DCA execution triggered");
+          console.info("Action: DCA execution triggered");
           break;
 
         case "plan_paused":
         case "plan_resumed":
           // Could show confirmation message
-          console.log("Action: Plan status changed");
+          console.info("Action: Plan status changed");
           break;
 
         default:
-          console.log("Unknown action:", action);
+          console.info("Unknown action:", action);
       }
     },
     []
@@ -1161,10 +1161,10 @@ export function ActionsTab() {
   const proceedWithPlanCreation = useCallback(
     async (confirmationId: string) => {
       try {
-        console.log(
-          "[Confirmation] Creating plan after approval:",
-          confirmationId
-        );
+        // console.log(
+        //   "[Confirmation] Creating plan after approval:",
+        //   confirmationId
+        // );
 
         startPlanCreationSimulation();
 
@@ -1195,7 +1195,7 @@ export function ActionsTab() {
 
         // Check if plan was created successfully
         if (result.success && result.data) {
-          console.log("Plan created successfully 1174:", result.data);
+          console.info("Plan created successfully:", result.data);
           const planId = result.data.agentResponse.id;
           // console.log("Plan created successfully:", planId);
 
@@ -1213,14 +1213,14 @@ export function ActionsTab() {
               ethersSigner = await getEthersSigner(walletClient, connector);
 
               const signerAddress = await ethersSigner.getAddress();
-              console.log('🔍 [ACTIONS TAB] Final signer address before TriggerX job:', signerAddress);
-              console.log('🔍 [ACTIONS TAB] Final signer address length:', signerAddress?.length);
-              console.log('🔍 [ACTIONS TAB] Final signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(signerAddress || ''));
-              console.log(
-                "✅ Signer obtained successfully:",
-                signerAddress
-              );
-              console.log("Signer value:", ethersSigner);
+              // console.log('🔍 [ACTIONS TAB] Final signer address before TriggerX job:', signerAddress);
+              // console.log('🔍 [ACTIONS TAB] Final signer address length:', signerAddress?.length);
+              // console.log('🔍 [ACTIONS TAB] Final signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(signerAddress || ''));
+              // console.log(
+              //   "✅ Signer obtained successfully:",
+              //   signerAddress
+              // );
+              console.info("Signer value:", ethersSigner);
 
               // Now you can use ethersSigner for your transactions
             } catch (walletErr) {
@@ -1319,8 +1319,8 @@ export function ActionsTab() {
                 );
 
                 // Check if this is a balance error
-                console.log('[ActionsTab] Checking error format:', triggerXResult.error);
-                console.log('[ActionsTab] Is INSUFFICIENT_BALANCE?', triggerXResult.error?.startsWith('INSUFFICIENT_BALANCE:'));
+                console.info('[ActionsTab] Checking error format:', triggerXResult.error);
+                console.info('[ActionsTab] Is INSUFFICIENT_BALANCE?', triggerXResult.error?.startsWith('INSUFFICIENT_BALANCE:'));
 
                 let errorContent = `⚠️ **Plan Created but Automation Failed**\n\nYour DCA plan was created successfully, but we couldn't set up automation:\n${triggerXResult.error}\n\nPlease try setting up automation again!`;
                 let requiresDeposit = false;
@@ -1332,7 +1332,7 @@ export function ActionsTab() {
                   errorContent = `⚠️ **Automation Setup Failed**\n\nWe received an invalid response when calculating fees. This might be a temporary server issue.\n\nPlease try creating your plan again.`;
                 } else if (triggerXResult.error && triggerXResult.error.startsWith('INSUFFICIENT_BALANCE:')) {
                   const ethAmount = triggerXResult.error.split(':')[1];
-                  console.log('[ActionsTab] Extracted ETH amount:', ethAmount);
+                  console.info('[ActionsTab] Extracted ETH amount:', ethAmount);
 
                   // Fetch current balance to show to user
                   let currentBalance = "0";
@@ -1344,12 +1344,12 @@ export function ActionsTab() {
                   }
 
                   if (ethAmount && ethAmount !== 'unknown') {
-                    console.log('[ActionsTab] Displaying deposit message with amount:', ethAmount);
+                    console.info('[ActionsTab] Displaying deposit message with amount:', ethAmount);
                     errorContent = `⚠️ **Automation Setup Failed**\n\nWe couldn't set up automation for your plan due to insufficient balance.\n\n💰 **Current Balance:** ${currentBalance} ETH\n💰 **Required Deposit:** ${ethAmount} ETH\n\n**Quick Deposit:**\nDeposit ETH below to fund your account. This balance will be used to cover transaction and network fees so you can successfully execute your plan. **After depositing, After depositing, please recreate the plan. .**`;
                     requiresDeposit = true;
                     depositAmount = ethAmount;
                   } else {
-                    console.log('[ActionsTab] Amount unknown, showing generic balance message');
+                    console.info('[ActionsTab] Amount unknown, showing generic balance message');
                     errorContent = `⚠️ **Automation Setup Failed**\n\nWe couldn't set up automation for your plan due to insufficient balance.\n\n💰 **Current Balance:** ${currentBalance} ETH\n\n**Quick Deposit:**\nDeposit ETH below to fund your account. This balance will be used to cover transaction and network fees so you can successfully execute your plan. **After depositing, After depositing, please recreate the plan. .**`;
                     requiresDeposit = true;
                     depositAmount = '';
@@ -1624,7 +1624,7 @@ export function ActionsTab() {
           // Calculate total approval amount (current allowance + required amount)
           const totalApprovalAmount = currentAllowance + requiredAmountWei;
 
-          console.log("[Approval] Allowance calculation:", {
+          console.info("[Approval] Allowance calculation:", {
             currentAllowance: currentAllowance.toString(),
             requiredAmount: requiredAmountWei.toString(),
             totalApproval: totalApprovalAmount.toString(),

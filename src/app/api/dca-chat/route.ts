@@ -42,8 +42,8 @@ interface DCABackendResponse {
 // Configuration for DCA backend connection
 const DCA_BACKEND_URL = process.env.DCA_BACKEND_URL;
 const DCA_API_URL = process.env.NEXT_PUBLIC_API_URL;
-console.log("DCA_API_URL", DCA_API_URL);
-console.log("DCA_BACKEND_URL", DCA_BACKEND_URL);
+// console.log("DCA_API_URL", DCA_API_URL);
+// console.log("DCA_BACKEND_URL", DCA_BACKEND_URL);
 
 /**
  * Chat API endpoint that interfaces with the DCA VibeKit Agent
@@ -59,9 +59,9 @@ export async function POST(request: NextRequest) {
     const { message, userAddress, conversationHistory, confirmationId, action, isPlanCreationRequest, fid } = ChatRequestSchema.parse(body);
 
     console.log('[DCA Chat API] Received:', { message, userAddress, confirmationId, action, isPlanCreationRequest });
-    console.log('🔍 [DCA CHAT API] Received userAddress:', userAddress);
-    console.log('🔍 [DCA CHAT API] Address length:', userAddress?.length);
-    console.log('🔍 [DCA CHAT API] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(userAddress || ''));
+    // console.log('🔍 [DCA CHAT API] Received userAddress:', userAddress);
+    // console.log('🔍 [DCA CHAT API] Address length:', userAddress?.length);
+    // console.log('🔍 [DCA CHAT API] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(userAddress || ''));
 
     const dollarIntent = detectDollarIntent(message || "");
 
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     const isPlanCreation = planSessionManager.isPlanCreationIntent(message, session.id) || isPlanCreationRequest;
 
     if (isPlanCreation) {
-      console.log('[Intelligent Plan Creation] Processing plan creation request');
+      console.info('[Intelligent Plan Creation] Processing plan creation request');
 
       // Add user message to conversation history
       planSessionManager.addToConversationHistory(session.id, 'user', message);
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
 
       // Check if plan is complete AND has no validation errors
       if (extractionResult.isComplete && (!extractionResult.validationErrors || extractionResult.validationErrors.length === 0)) {
-        console.log('[Plan Creation] Plan data complete, showing confirmation');
+        // console.log('[Plan Creation] Plan data complete, showing confirmation');
 
         const completePlanData = extractionResult.planData as DCAPlanData;
 
@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
           responseMessage += `❌ **Issues found:**\n${extractionResult.validationErrors.map(err => `• ${err}`).join('\n')}\n\n`;
         }
 
-        console.log('[Plan Creation] Extraction result:', extractionResult);
+        console.info('[Plan Creation] Extraction result:', extractionResult);
 
         // Clone plan data for display purposes to avoid modifying session state prematurely
         const displayPlanData = { ...extractionResult.planData } as DCAPlanData;
@@ -254,7 +254,7 @@ async function handleConfirmationAction(
   action?: string;
   data?: any;
 }> {
-  console.log('[Confirmation] Handling action:', { confirmationId, action, userAddress });
+  console.info('[Confirmation] Handling action:', { confirmationId, action, userAddress });
 
   if (action === 'cancel') {
     // Clear the session for this user
@@ -284,15 +284,15 @@ async function handleConfirmationAction(
       const [, , , encodedData] = confirmationId.split('-');
       const planData = JSON.parse(Buffer.from(encodedData, 'base64').toString());
 
-      console.log('[Confirmation] Creating confirmed plan:', planData);
+      console.info('[Confirmation] Creating confirmed plan:', planData);
 
       // Clear the session since plan creation is confirmed
       planSessionManager.clearSession(userAddress);
 
       // Create instruction for VibeKit agent
-      console.log('🔍 [DCA CHAT API CONFIRMATION] userAddress before VibeKit:', userAddress);
-      console.log('🔍 [DCA CHAT API CONFIRMATION] Address length:', userAddress?.length);
-      console.log('🔍 [DCA CHAT API CONFIRMATION] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(userAddress || ''));
+      // console.log('🔍 [DCA CHAT API CONFIRMATION] userAddress before VibeKit:', userAddress);
+      // console.log('🔍 [DCA CHAT API CONFIRMATION] Address length:', userAddress?.length);
+      // console.log('🔍 [DCA CHAT API CONFIRMATION] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(userAddress || ''));
       const createInstruction = `Create DCA plan: Invest ${planData.amount} ${planData.fromToken} into ${planData.toToken} every ${planData.interval} for ${planData.duration} with ${planData.slippage || 2}% slippage`;
       const vibekitResponse = await sendToVibeKitAgent(createInstruction, userAddress, [], fid);
 
@@ -334,7 +334,7 @@ async function checkTokenApproval(
 }> {
   try {
     // For now, simulate approval check (in real implementation, query blockchain)
-    console.log('[Token Approval] Checking approval for:', { token, amount, userAddress });
+    console.info('[Token Approval] Checking approval for:', { token, amount, userAddress });
 
     // TODO: Implement actual token approval checking
     // This would involve:
@@ -484,20 +484,20 @@ async function sendToVibeKitAgent(
   data?: any;
 }> {
   try {
-    console.log('[VibeKit Agent] Sending instruction:', message);
-    console.log('[VibeKit Agent] User address:', userAddress);
-    console.log('🔍 [SEND TO VIBEKIT] userAddress before sending:', userAddress);
-    console.log('🔍 [SEND TO VIBEKIT] Address length:', userAddress?.length);
-    console.log('🔍 [SEND TO VIBEKIT] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(userAddress || ''));
+    console.info('[VibeKit Agent] Sending instruction:', message);
+    // console.log('[VibeKit Agent] User address:', userAddress);
+    // console.log('🔍 [SEND TO VIBEKIT] userAddress before sending:', userAddress);
+    // console.log('🔍 [SEND TO VIBEKIT] Address length:', userAddress?.length);
+    // console.log('🔍 [SEND TO VIBEKIT] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(userAddress || ''));
 
     // Generate unique request ID to avoid conflicts
     const requestId = Date.now() + Math.floor(Math.random() * 1000);
-    console.log('[VibeKit Agent] Using request ID:', requestId);
+    // console.log('[VibeKit Agent] Using request ID:', requestId);
 
     // Step 1: First establish SSE connection to get session ID
-    console.log('[SSE] Opening SSE connection to get session ID...');
+    // console.log('[SSE] Opening SSE connection to get session ID...');
     const { sessionId, reader, response: sseResponse } = await establishSSEConnection();
-    console.log('[SSE] Session established:', sessionId);
+    console.info('[SSE] Session established:', sessionId);
 
     // Step 2: Send request with session ID
     const requestBody = {
@@ -514,8 +514,8 @@ async function sendToVibeKitAgent(
       }
     };
 
-    console.log('🔍 [SEND TO VIBEKIT] Request body arguments:', requestBody.params.arguments);
-    console.log('🔍 [SEND TO VIBEKIT] userAddress in request body:', requestBody.params.arguments.userAddress);
+    // console.log('🔍 [SEND TO VIBEKIT] Request body arguments:', requestBody.params.arguments);
+    // console.log('🔍 [SEND TO VIBEKIT] userAddress in request body:', requestBody.params.arguments.userAddress);
 
     // Send to DCA skill via MCP tool call format using the session ID
     const response = await fetch(`${DCA_BACKEND_URL}/messages?sessionId=${sessionId}`, {
@@ -536,7 +536,7 @@ async function sendToVibeKitAgent(
 
     // The /messages endpoint returns "Accepted" and the real response comes via SSE
     if (initialResponse === 'Accepted' || initialResponse.includes('Accepted')) {
-      console.log('[VibeKit Agent] Request accepted, waiting for SSE response...');
+      console.info('[VibeKit Agent] Request accepted, waiting for SSE response...');
 
       // Step 3: Wait for the actual response via the established SSE connection
       try {
@@ -550,12 +550,12 @@ async function sendToVibeKitAgent(
           responseText = `Error: ${sseResponse.error.message || 'Unknown MCP error'}`;
         } else if (sseResponse.result && sseResponse.result.content) {
           // Look for resource content with task result
-          console.log('[Response Parser] SSE result content:', sseResponse.result.content);
+          // console.log('[Response Parser] SSE result content:', sseResponse.result.content);
           const resourceContent = sseResponse.result.content.find((item: any) => item.type === 'resource');
           if (resourceContent && resourceContent.resource && resourceContent.resource.text) {
             try {
               const taskData = JSON.parse(resourceContent.resource.text);
-              console.log('[Response Parser] Parsed task data:', taskData);
+              console.info('[Response Parser] Parsed task data:', taskData);
 
               // Handle different response structures
               let textPart = null;
@@ -571,10 +571,10 @@ async function sendToVibeKitAgent(
               // Extract artifacts data if available
               if (taskData.artifacts && Array.isArray(taskData.artifacts) && taskData.artifacts.length > 0) {
                 artifactsData = taskData.artifacts[0];
-                console.log('[Response Parser] Found artifacts data:', artifactsData);
+                // console.log('[Response Parser] Found artifacts data:', artifactsData);
               }
 
-              console.log('[Response Parser] Found text part:', textPart);
+              // console.log('[Response Parser] Found text part:', textPart);
               if (textPart && textPart.text) {
                 responseText = textPart.text;
 
@@ -589,7 +589,7 @@ async function sendToVibeKitAgent(
           }
         }
 
-        console.log('[VibeKit Agent] Extracted response text:', responseText);
+        console.info('[VibeKit Agent] Extracted response text:', responseText);
 
         // For regular messages, show the actual VibeKit response
         // Plan creation confirmations are handled at the frontend level now
@@ -642,7 +642,7 @@ async function establishSSEConnection(): Promise<{
     }, 30000);
 
     try {
-      console.log('[SSE] Opening SSE connection...');
+      // console.log('[SSE] Opening SSE connection...');
       const response = await fetch(`${DCA_BACKEND_URL}/sse`, {
         method: 'GET',
         headers: {
@@ -685,7 +685,7 @@ async function establishSSEConnection(): Promise<{
             // Handle session ID from endpoint data
             if (line.startsWith('data: /messages?sessionId=')) {
               sessionId = line.split('sessionId=')[1].trim();
-              console.log('[SSE] Session established:', sessionId);
+              console.info('[SSE] Session established:', sessionId);
               clearTimeout(timeout);
               resolve({ sessionId, reader, response });
               return;
@@ -741,13 +741,13 @@ async function waitForSSEResponseWithReader(
               const eventData = line.slice(6).trim(); // Remove 'data: ' prefix
               if (eventData) {
                 const data = JSON.parse(eventData);
-                console.log('[SSE] Received message data:', {
-                  responseId: data.id,
-                  expectedId: requestId,
-                  sessionId: sessionId,
-                  hasResult: !!data.result,
-                  hasError: !!data.error
-                });
+                // console.log('[SSE] Received message data:', {
+                //   responseId: data.id,
+                //   expectedId: requestId,
+                //   sessionId: sessionId,
+                //   hasResult: !!data.result,
+                //   hasError: !!data.error
+                // });
 
                 // Check if this is the response to our request
                 if (data.id === requestId) {
@@ -856,152 +856,6 @@ function analyzeResponseForActions(responseText: string): { type: string; data?:
   return null;
 }
 
-/**
- * Analyze if the user's message suggests creating a DCA plan
- */
-// function analyzePlanCreationIntent(userMessage: string, agentResponse: string, isPlanCreationRequest?: boolean): {
-//   shouldConfirm: boolean;
-//   planData?: any;
-// } {
-//   const lowerUserMessage = userMessage.toLowerCase();
-
-//   // Check if user wants to create a plan
-//   const creationKeywords = ['create', 'make', 'set up', 'start', 'begin', 'invest'];
-//   const planKeywords = ['plan', 'strategy', 'dca', 'investment'];
-
-//   const hasCreationIntent = creationKeywords.some(keyword => lowerUserMessage.includes(keyword)) &&
-//     planKeywords.some(keyword => lowerUserMessage.includes(keyword));
-
-//   // If frontend flagged this as a plan creation request, be more lenient
-//   const shouldAnalyze = hasCreationIntent || isPlanCreationRequest;
-
-//   if (shouldAnalyze) {
-//     // Try to extract plan parameters from the user message
-//     const planData = extractPlanParameters(userMessage);
-//     console.log('[Plan Analysis] Extracted plan data:', planData);
-
-//     // Check if we have the minimum required data for a plan
-//     const hasRequiredData = planData.fromToken && planData.toToken && planData.amount;
-//     console.log('[Plan Analysis] Has required data:', hasRequiredData, {
-//       fromToken: planData.fromToken,
-//       toToken: planData.toToken,
-//       amount: planData.amount
-//     });
-
-//     if (hasRequiredData) {
-//       return {
-//         shouldConfirm: true,
-//         planData
-//       };
-//     } else if (isPlanCreationRequest) {
-//       // If frontend explicitly flagged this as plan creation but we don't have complete data,
-//       // still show confirmation with what we have and let user provide more details
-//       return {
-//         shouldConfirm: true,
-//         planData: {
-//           ...planData,
-//           // Set defaults for missing fields
-//           fromToken: planData.fromToken || 'USDC',
-//           toToken: planData.toToken || 'ETH',
-//           amount: planData.amount || '100',
-//           intervalMinutes: planData.intervalMinutes || 10080, // weekly
-//           durationWeeks: planData.durationWeeks || 4, // 1 month
-//           slippage: planData.slippage || 200 // 2%
-//         }
-//       };
-//     } else {
-//       console.log('[Plan Analysis] Missing required data, will let VibeKit handle incomplete request');
-//     }
-//   }
-
-//   return { shouldConfirm: false };
-// }
-
-/**
- * Extract plan parameters from user message
- */
-// function extractPlanParameters(message: string): any {
-//   // Common token mappings
-//   const tokenMap: { [key: string]: string } = {
-//     'usdc': 'USDC', 'usdt': 'USDT', 'dai': 'DAI',
-//     'eth': 'ETH', 'ethereum': 'ETH', 'weth': 'WETH',
-//     'btc': 'BTC', 'bitcoin': 'BTC', 'wbtc': 'WBTC',
-//     'arb': 'ARB', 'arbitrum': 'ARB'
-//   };
-
-//   const planData: any = {
-//     slippage: '200' // Default: 2%
-//   };
-
-//   const lowerMessage = message.toLowerCase();
-//   console.log('[Parameter Extraction] Processing message:', message);
-
-//   // Extract amount and tokens - multiple patterns
-//   let amountMatch = message.match(/(\d+(?:\.\d+)?)\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
-//   if (!amountMatch) {
-//     // Try alternative patterns
-//     amountMatch = message.match(/(\d+(?:\.\d+)?)\s*(?:usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
-//   }
-//   if (!amountMatch) {
-//     // Try $ amount pattern
-//     amountMatch = message.match(/\$(\d+(?:\.\d+)?)/i);
-//     if (amountMatch) {
-//       planData.amount = amountMatch[1];
-//       planData.fromToken = 'USDC'; // Assume USDC for $ amounts
-//     }
-//   } else {
-//     planData.amount = amountMatch[1];
-//     planData.fromToken = tokenMap[amountMatch[2].toLowerCase()] || amountMatch[2].toUpperCase();
-//   }
-
-//   // Extract target token - multiple patterns
-//   let intoMatch = message.match(/(?:into|to|buy|invest\s+in)\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
-//   if (!intoMatch) {
-//     // Try pattern like "USDC into ETH"
-//     intoMatch = message.match(/(?:usdc|usdt|dai|eth|btc|arb|weth|wbtc)\s+(?:into|to)\s*(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
-//   }
-//   if (!intoMatch) {
-//     // Try pattern like "invest in ETH"
-//     intoMatch = message.match(/invest\s+(?:in\s+)?(usdc|usdt|dai|eth|btc|arb|weth|wbtc)/i);
-//   }
-
-//   if (intoMatch) {
-//     planData.toToken = tokenMap[intoMatch[1].toLowerCase()] || intoMatch[1].toUpperCase();
-//   }
-
-//   // Extract frequency
-//   if (lowerMessage.includes('daily') || lowerMessage.includes('day')) {
-//     planData.intervalMinutes = 1440; // 24 hours
-//   } else if (lowerMessage.includes('weekly') || lowerMessage.includes('week')) {
-//     planData.intervalMinutes = 10080; // 7 days
-//   } else if (lowerMessage.includes('monthly') || lowerMessage.includes('month')) {
-//     planData.intervalMinutes = 43200; // 30 days
-//   } else if (lowerMessage.includes('hourly') || lowerMessage.includes('hour')) {
-//     planData.intervalMinutes = 60; // 1 hour
-//   }
-
-//   // Extract duration
-//   let durationMatch = message.match(/(?:for|over)\s*(\d+)\s*(week|month|day)/i);
-//   if (!durationMatch) {
-//     // Try alternative patterns
-//     durationMatch = message.match(/(\d+)\s*(week|month|day)/i);
-//   }
-
-//   if (durationMatch) {
-//     const duration = parseInt(durationMatch[1]);
-//     const unit = durationMatch[2].toLowerCase();
-//     if (unit.startsWith('week')) {
-//       planData.durationWeeks = duration;
-//     } else if (unit.startsWith('month')) {
-//       planData.durationWeeks = duration * 4;
-//     } else if (unit.startsWith('day')) {
-//       planData.durationWeeks = Math.ceil(duration / 7);
-//     }
-//   }
-
-//   console.log('[Parameter Extraction] Extracted plan data:', planData);
-//   return planData;
-// }
 
 /**
  * Generate confirmation ID for tracking
@@ -1012,34 +866,6 @@ function generateConfirmationId(planData: any): string {
   return `create-plan-${timestamp}-${encodedData}`;
 }
 
-/**
- * Generate confirmation message with plan summary
- */
-// function generateConfirmationMessage(planData: any): string {
-//   const frequencyText = planData.intervalMinutes === 1440 ? 'daily' :
-//     planData.intervalMinutes === 10080 ? 'weekly' :
-//       planData.intervalMinutes === 43200 ? 'monthly' :
-//         `every ${planData.intervalMinutes} minutes`;
-
-//   const durationText = planData.durationWeeks === 4 ? '1 month' :
-//     planData.durationWeeks === 52 ? '1 year' :
-//       `${planData.durationWeeks} weeks`;
-
-//   const totalExecutions = Math.floor((planData.durationWeeks * 7 * 24 * 60) / planData.intervalMinutes);
-//   const totalInvestment = (parseFloat(planData.amount) * totalExecutions).toFixed(2);
-
-//   return `🔐 **Token Approval Required**\n\n` +
-//     `📊 **Plan Summary:**\n` +
-//     `• **Investment:** ${planData.amount} ${planData.fromToken}\n` +
-//     `• **Target:** ${planData.toToken}\n` +
-//     `• **Duration:** ${durationText}\n` +
-//     `• **frequency:** ${frequencyText}\n` +
-//     `• **Total Investment:** ${totalInvestment} ${planData.fromToken}\n` +
-//     `• **Total Executions:** ${totalExecutions}\n` +
-//     `• **Slippage:** ${planData.slippage / 100}%\n\n` +
-//     `⚠️ **Approval Required:** To create this DCA plan, you need to approve spending of ${totalInvestment} ${planData.fromToken} tokens.\n\n` +
-//     `Ready to proceed with token approval?`;
-// }
 
 /**
  * Check if message is general conversation (not DCA related)

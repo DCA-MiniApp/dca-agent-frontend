@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = CreateTriggerXJobSchema.parse(body);
 
-    console.log('🚨 [Deprecated] TriggerX Job API called - use frontend service instead');
+    // console.log('🚨 [Deprecated] TriggerX Job API called - use frontend service instead');
 
     // API routes cannot access wallet signers directly
     // TriggerX job creation should be done on the frontend using triggerXService.ts

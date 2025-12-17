@@ -217,8 +217,6 @@ let previousStats: PreviousStats = getFromStorage(PREV_STATS_KEY) || {
 };
 
 
-
-
 export async function storeUser(payload: StoreUserPayload): Promise<boolean> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/dca/user`, {
@@ -236,46 +234,6 @@ export async function storeUser(payload: StoreUserPayload): Promise<boolean> {
     return false;
   }
 }
-/**
- * Fetch user's DCA plans from the backend
- */
-// export async function fetchUserDCAPlans(userAddress: string): Promise<DCAPlan[]> {
-//   if (!userAddress) return [];
-//   console.log("Fetching DCA plans for user:", process.env.API_ACCESS_KEY);
-
-//   try {
-//     // const response = await fetch(`${API_BASE_URL}/api/dca/plans/${userAddress}`)
-//     const response = await fetch(`${API_BASE_URL}/api/dca/plans/${userAddress}`, {
-//       headers: {
-//         "Accept": "application/json",
-//         "Access-Key": process.env.API_ACCESS_KEY || ""
-//       }
-//     });
-//     // console.log("response", await response.json());
-//     const result: ApiResponse<DCAPlan[]> = await response.json();
-
-//     if (result.success && result.data) {
-
-//       result.data.forEach((plan: any) => {
-//         // console.log("plan in fetchUserDCAPlans", plan?.jobData?.data?.taskData);
-//         // Get jobStatus from jobData.data.jobData.status
-//         plan.jobStatus = plan?.jobData?.data?.jobData?.status || plan?.jobData?.data?.status || null;
-//         const taskData = plan?.jobData?.data?.taskData;
-//         if (Array.isArray(taskData)) {
-//           plan.successCount = taskData.filter((t: any) => t.task_status === 'completed').length;
-//         }
-//       });
-//       // console.log("result.data in fetchUserDCAPlans", result.data);
-//       return result.data;
-//     } else {
-//       console.error('Failed to fetch DCA plans:', result.message);
-//       return [];
-//     }
-//   } catch (error) {
-//     console.error('Error fetching DCA plans:', error);
-//     return [];
-//   }
-// }
 
 export async function fetchUserDCAPlans(userAddress: string): Promise<DCAPlan[]> {
   if (!userAddress) return [];
@@ -308,27 +266,6 @@ export async function fetchUserDCAPlans(userAddress: string): Promise<DCAPlan[]>
 }
 
 
-/**
- * Fetch all execution history for a user (across all plans)
- */
-// export async function fetchUserExecutionHistory(userAddress: string, limit = 50, offset = 0): Promise<ExecutionHistory[]> {
-//   if (!userAddress) return [];
-
-//   try {
-//     const response = await fetch(`${API_BASE_URL}/api/dca/user/${userAddress}/history?limit=${limit}&offset=${offset}`);
-//     const result: ApiResponse<ExecutionHistory[]> = await response.json();
-
-//     if (result.success && result.data) {
-//       return result.data;
-//     } else {
-//       console.error('Failed to fetch user execution history:', result.message);
-//       return [];
-//     }
-//   } catch (error) {
-//     console.error('Error fetching user execution history:', error);
-//     return [];
-//   }
-// }
 
 export async function fetchUserExecutionHistory(
   userAddress: string,

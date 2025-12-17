@@ -121,21 +121,21 @@ export class GPTIntelligenceService {
     conversationHistory: Array<{ role: string; content: string }> = [],
     currentPlanData: Partial<DCAPlanData> = {}
   ): Promise<ExtractionResult> {
-    console.log("[GPT Intelligence] Starting extraction for message:", userMessage.substring(0, 100) + "...");
-    console.log("[GPT Intelligence] Has API key:", !!this.openaiApiKey);
-    console.log("[GPT Intelligence] Current plan data:", currentPlanData);
+    console.info("[GPT Intelligence] Starting extraction for message:", userMessage.substring(0, 100) + "...");
+    // console.log("[GPT Intelligence] Has API key:", !!this.openaiApiKey);
+    // console.log("[GPT Intelligence] Current plan data:", currentPlanData);
 
     try {
       // If we have OpenAI API key, use GPT for intelligent extraction
       if (this.openaiApiKey) {
-        console.log("[GPT Intelligence] Attempting GPT extraction...");
+        console.info("[GPT Intelligence] Attempting GPT extraction...");
         return await this.extractWithGPT(
           userMessage,
           conversationHistory,
           currentPlanData
         );
       } else {
-        console.log("[GPT Intelligence] No OpenAI API key, using rule-based extraction");
+        console.info("[GPT Intelligence] No OpenAI API key, using rule-based extraction");
         // Fallback to rule-based extraction
         return this.extractWithRules(userMessage, currentPlanData);
       }
@@ -157,7 +157,7 @@ export class GPTIntelligenceService {
       // Always fallback to rule-based on any error
       try {
         const fallbackResult = this.extractWithRules(userMessage, currentPlanData);
-        console.log("[GPT Intelligence] Fallback extraction completed successfully");
+        // console.log("[GPT Intelligence] Fallback extraction completed successfully");
         return fallbackResult;
       } catch (fallbackError) {
         console.error("[GPT Intelligence] Fallback extraction also failed:", fallbackError);
@@ -406,7 +406,7 @@ Extract any new DCA parameters from this message and provide the next question f
       // Always fallback to rule-based extraction on any GPT error
       try {
         const fallbackResult = this.extractWithRules(userMessage, currentPlanData);
-        console.log("[GPT Intelligence] Fallback extraction successful:", fallbackResult);
+        // console.log("[GPT Intelligence] Fallback extraction successful:", fallbackResult);
         return fallbackResult;
       } catch (fallbackError) {
         console.error("[GPT Intelligence] Fallback extraction also failed:", fallbackError);
@@ -423,11 +423,11 @@ Extract any new DCA parameters from this message and provide the next question f
     userMessage: string,
     currentPlanData: Partial<DCAPlanData>
   ): ExtractionResult {
-    console.log("[Rule-based Extraction] Starting extraction with current data:", currentPlanData);
+    console.info("[Rule-based Extraction] Starting extraction with current data:", currentPlanData);
 
     try {
       const extracted = this.extractParametersWithRules(userMessage, currentPlanData);
-      console.log("[Rule-based Extraction] Extracted parameters:", extracted);
+      console.info("[Rule-based Extraction] Extracted parameters:", extracted);
 
       const updatedPlanData = { ...currentPlanData, ...extracted };
 
@@ -436,10 +436,10 @@ Extract any new DCA parameters from this message and provide the next question f
         updatedPlanData.slippage = "2";
       }
 
-      console.log("[Rule-based Extraction] Updated plan data:", updatedPlanData);
+      // console.log("[Rule-based Extraction] Updated plan data:", updatedPlanData);
 
       const validation = this.validatePlanData(updatedPlanData);
-      console.log("[Rule-based Extraction] Validation result:", validation);
+      console.info("[Rule-based Extraction] Validation result:", validation);
 
       return {
         isComplete: validation.isComplete,
@@ -462,7 +462,7 @@ Extract any new DCA parameters from this message and provide the next question f
     userMessage: string,
     currentPlanData: Partial<DCAPlanData>
   ): ExtractionResult {
-    console.log("[Safe Extraction] Creating safe fallback result");
+    // console.log("[Safe Extraction] Creating safe fallback result");
 
     // Try to extract at least some basic information safely
     const safeExtracted: Partial<DCAPlanData> = {};
@@ -512,8 +512,8 @@ Extract any new DCA parameters from this message and provide the next question f
    * Rule-based parameter extraction
    */
   private extractParametersWithRules(message: string, currentPlanData: Partial<DCAPlanData> = {}): Partial<DCAPlanData> {
-    console.log("[Rule-based Extraction] Processing message:", message);
-    console.log("[Rule-based Extraction] Current plan data:", currentPlanData);
+    console.info("[Rule-based Extraction] Processing message:", message);
+    // console.log("[Rule-based Extraction] Current plan data:", currentPlanData);
     const lowerMessage = message.toLowerCase();
     const extracted: Partial<DCAPlanData> = {};
 
@@ -527,7 +527,7 @@ Extract any new DCA parameters from this message and provide the next question f
       // User wants X dollars worth of token - mark this for USD conversion
       extracted.amount = dollarAmountMatch[1];
       (extracted as any)._isDollarAmount = true; // Internal flag for USD conversion
-      console.log('[Rule-based Extraction] Detected dollar amount pattern:', dollarAmountMatch[0], 'Amount:', dollarAmountMatch[1]);
+      console.info('[Rule-based Extraction] Detected dollar amount pattern:', dollarAmountMatch[0], 'Amount:', dollarAmountMatch[1]);
     } else {
       // Check for regular token amount pattern - expanded token list
       const tokenAmountMatch = message.match(
@@ -536,14 +536,14 @@ Extract any new DCA parameters from this message and provide the next question f
       if (tokenAmountMatch) {
         extracted.amount = tokenAmountMatch[1];
         (extracted as any)._isDollarAmount = false;
-        console.log('[Rule-based Extraction] Detected token amount pattern:', tokenAmountMatch[0], 'Amount:', tokenAmountMatch[1]);
+        console.info('[Rule-based Extraction] Detected token amount pattern:', tokenAmountMatch[0], 'Amount:', tokenAmountMatch[1]);
       } else {
         // Try to extract just numbers if no token is specified
         const numberMatch = message.match(/(\d+(?:\.\d+)?)/);
         if (numberMatch) {
           extracted.amount = numberMatch[1];
           (extracted as any)._isDollarAmount = false;
-          console.log('[Rule-based Extraction] Detected number pattern:', numberMatch[0], 'Amount:', numberMatch[1]);
+          console.info('[Rule-based Extraction] Detected number pattern:', numberMatch[0], 'Amount:', numberMatch[1]);
         }
       }
     }
@@ -555,9 +555,9 @@ Extract any new DCA parameters from this message and provide the next question f
     // Filter out empty strings
     const foundTokens = matchedTokens.filter(token => token && token.trim() !== '');
 
-    console.log('[Rule-based Extraction] TOKEN EXTRACTION START');
-    console.log('[Rule-based Extraction] foundTokens:', foundTokens);
-    console.log('[Rule-based Extraction] foundTokens.length:', foundTokens.length);
+    // console.log('[Rule-based Extraction] TOKEN EXTRACTION START');
+    console.info('[Rule-based Extraction] foundTokens:', foundTokens);
+    // console.log('[Rule-based Extraction] foundTokens.length:', foundTokens.length);
 
     if (foundTokens.length >= 2) {
       extracted.fromToken = foundTokens[0]!.toUpperCase();
@@ -566,25 +566,25 @@ Extract any new DCA parameters from this message and provide the next question f
       const token = foundTokens[0]!.toUpperCase();
 
       // Simple logic: if fromToken exists, new token is toToken; otherwise it's fromToken
-      console.log('[Rule-based Extraction] Single token found:', token);
-      console.log('[Rule-based Extraction] currentPlanData.fromToken:', currentPlanData.fromToken);
-      console.log('[Rule-based Extraction] currentPlanData.fromToken type:', typeof currentPlanData.fromToken);
+      console.info('[Rule-based Extraction] Single token found:', token);
+      console.info('[Rule-based Extraction] currentPlanData.fromToken:', currentPlanData.fromToken);
+      // console.log('[Rule-based Extraction] currentPlanData.fromToken type:', typeof currentPlanData.fromToken);
 
       const hasFromToken = currentPlanData.fromToken && currentPlanData.fromToken.trim() !== '';
-      console.log('[Rule-based Extraction] hasFromToken:', hasFromToken);
+      // console.log('[Rule-based Extraction] hasFromToken:', hasFromToken);
 
       if (hasFromToken) {
         extracted.toToken = token;
-        console.log('[Rule-based Extraction] ✅ fromToken exists, setting as toToken:', token);
+        console.info('[Rule-based Extraction] ✅ fromToken exists, setting as toToken:', token);
       } else {
         extracted.fromToken = token;
-        console.log('[Rule-based Extraction] ❌ No fromToken, setting as fromToken:', token);
+        console.info('[Rule-based Extraction] ❌ No fromToken, setting as fromToken:', token);
       }
     } else {
-      console.log('[Rule-based Extraction] No tokens found or unexpected length:', foundTokens.length);
+      console.info('[Rule-based Extraction] No tokens found or unexpected length:', foundTokens.length);
     }
 
-    console.log('[Rule-based Extraction] Final extracted tokens:', {
+    console.info('[Rule-based Extraction] Final extracted tokens:', {
       fromToken: extracted.fromToken,
       toToken: extracted.toToken
     });
@@ -883,7 +883,7 @@ function sanitizeSymbol(symbol?: string): string | null {
 async function fetchTokenUsdPrice(
   tokenSymbol: string
 ): Promise<{ priceUsd: number; address: string } | null> {
-  console.log('🔍 [Token Price] Fetching USD price for:', tokenSymbol);
+  // console.log('🔍 [Token Price] Fetching USD price for:', tokenSymbol);
   const normalized = sanitizeSymbol(tokenSymbol);
   if (!normalized) return null;
   const tokenInfo = availableTokens[normalized]?.[0];
@@ -948,7 +948,7 @@ export function detectDollarIntent(message: string): DollarIntentResult {
   const dollarOfTokenMatch = normalized.match(dollarOfTokenPattern);
 
   if (dollarOfTokenMatch) {
-    console.log('🔍 [Dollar Intent] Found "dollar of token" pattern:', dollarOfTokenMatch[0]);
+    console.info('[Dollar Intent] Found "dollar of token" pattern:', dollarOfTokenMatch[0]);
     return {
       detected: true,
       usdAmount: parseFloat(dollarOfTokenMatch[1])
@@ -964,7 +964,7 @@ export function detectDollarIntent(message: string): DollarIntentResult {
     const match = normalized.match(/\$\s*(\d+(?:\.\d+)?)/);
     if (match) {
       usdAmount = parseFloat(match[1]);
-      console.log('🔍 [Dollar Intent] Found $ symbol pattern:', match[0]);
+      console.info('[Dollar Intent] Found $ symbol pattern:', match[0]);
     }
   }
 
@@ -972,12 +972,12 @@ export function detectDollarIntent(message: string): DollarIntentResult {
     const match = normalized.match(/(\d+(?:\.\d+)?)\s*(usd|dollars?)/i);
     if (match) {
       usdAmount = parseFloat(match[1]);
-      console.log('🔍 [Dollar Intent] Found USD word pattern:', match[0]);
+      console.info('[Dollar Intent] Found USD word pattern:', match[0]);
     }
   }
 
   const result = { detected: hasDollarSymbol || hasUsdWord, usdAmount };
-  console.log('🔍 [Dollar Intent] Final result:', result);
+  console.info('🔍 [Dollar Intent] Final result:', result);
   return result;
 }
 
@@ -985,15 +985,15 @@ export async function applyUsdIntelligence(
   planData: DCAPlanData,
   usdInputAmount?: number
 ): Promise<void> {
-  console.log('🔍 [USD Intelligence] Input:', { planData, usdInputAmount });
+  // console.log('🔍 [USD Intelligence] Input:', { planData, usdInputAmount });
 
   const priceInfo = await fetchTokenUsdPrice(planData.fromToken);
   if (!priceInfo) {
-    console.log('🔍 [USD Intelligence] No price info found for token:', planData.fromToken);
+    console.info('[USD Intelligence] No price info found for token:', planData.fromToken);
     return;
   }
 
-  console.log('🔍 [USD Intelligence] Price info:', priceInfo);
+  // console.log('🔍 [USD Intelligence] Price info:', priceInfo);
 
   // Check if the amount is specified in dollars
   // ONLY convert if explicitly marked as dollar amount OR if usdInputAmount is provided
@@ -1001,7 +1001,7 @@ export async function applyUsdIntelligence(
   const isDollarAmount = planData._isDollarAmount === true || (usdInputAmount && usdInputAmount > 0);
   const dollarAmount = usdInputAmount || (isDollarAmount ? Number(planData.amount) : 0);
 
-  console.log('🔍 [USD Intelligence] Analysis:', {
+  console.info('[USD Intelligence] Analysis:', {
     isDollarAmount,
     dollarAmount,
     _isDollarAmount: planData._isDollarAmount,
@@ -1033,7 +1033,7 @@ export async function applyUsdIntelligence(
     const tokenAmount = Number(planData.amount);
     if (!isFinite(tokenAmount) || tokenAmount <= 0) return;
 
-    console.log('🔍 [USD Intelligence] Calculating USD equivalent for token amount:', {
+    console.info('[USD Intelligence] Calculating USD equivalent for token amount:', {
       tokenAmount,
       tokenPrice: priceInfo.priceUsd,
       usdEquivalent: tokenAmount * priceInfo.priceUsd
@@ -1048,7 +1048,7 @@ export async function applyUsdIntelligence(
     delete planData._isDollarAmount;
   }
 
-  console.log('🔍 [USD Intelligence] Final planData:', planData);
+  console.info('🔍 [USD Intelligence] Final planData:', planData);
 }
 
 /**
