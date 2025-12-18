@@ -4,7 +4,8 @@ import { calculateStepState, createMessageId } from "../utils/helpers";
 import { PLAN_SIMULATION_DURATION_MS } from "../constants";
 
 export function usePlanSimulation() {
-  const [planSimulation, setPlanSimulation] = useState<PlanSimulationState | null>(null);
+  const [planSimulation, setPlanSimulation] =
+    useState<PlanSimulationState | null>(null);
   const [microTicker, setMicroTicker] = useState(0);
   const [isPlanCreationLoading, setIsPlanCreationLoading] = useState(false);
 
@@ -41,25 +42,47 @@ export function usePlanSimulation() {
   }, [isPlanCreationLoading, planSimulation]);
 
   // Update simulation progress
-  useEffect(() => {
-    if (!isPlanCreationLoading || !planSimulation) return;
-    const elapsed = Date.now() - planSimulation.startedAt;
-    const progress = Math.min(elapsed / PLAN_SIMULATION_DURATION_MS, 1);
-    const etaMs = Math.max(0, PLAN_SIMULATION_DURATION_MS - elapsed);
-    const stepState = calculateStepState(progress);
+  // useEffect(() => {
+  //   if (!isPlanCreationLoading || !planSimulation) return;
+  //   const elapsed = Date.now() - planSimulation.startedAt;
+  //   const progress = Math.min(elapsed / PLAN_SIMULATION_DURATION_MS, 1);
+  //   const etaMs = Math.max(0, PLAN_SIMULATION_DURATION_MS - elapsed);
+  //   const stepState = calculateStepState(progress);
 
-    setPlanSimulation((prev) =>
-      prev
-        ? {
-            ...prev,
-            progress,
-            etaMs,
-            activeStepIndex: stepState.activeIndex,
-            stepStatuses: stepState.statuses,
-          }
-        : null
-    );
-  }, [microTicker, isPlanCreationLoading, planSimulation]);
+  //   setPlanSimulation((prev) =>
+  //     prev
+  //       ? {
+  //           ...prev,
+  //           progress,
+  //           etaMs,
+  //           activeStepIndex: stepState.activeIndex,
+  //           stepStatuses: stepState.statuses,
+  //         }
+  //       : null
+  //   );
+  // }, [microTicker, isPlanCreationLoading, planSimulation]);
+
+  useEffect(() => {
+    if (!isPlanCreationLoading) return;
+
+    setPlanSimulation((prev) => {
+      if (!prev) return null;
+
+      const elapsed = Date.now() - prev.startedAt;
+      const progress = Math.min(elapsed / PLAN_SIMULATION_DURATION_MS, 1);
+      const etaMs = Math.max(0, PLAN_SIMULATION_DURATION_MS - elapsed);
+
+      const stepState = calculateStepState(progress);
+
+      return {
+        ...prev,
+        progress,
+        etaMs,
+        activeStepIndex: stepState.activeIndex,
+        stepStatuses: stepState.statuses,
+      };
+    });
+  }, [microTicker, isPlanCreationLoading]);
 
   return {
     planSimulation,

@@ -8,6 +8,10 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
   useWalletClient,
+  useConnect,
+  useSwitchChain,
+  useChainId,
+  type Connector,
 } from "wagmi";
 import { arbitrum } from "wagmi/chains";
 import {
@@ -24,7 +28,7 @@ import {
   MANUAL_DISCONNECT_EVENT,
   MANUAL_DISCONNECT_FLAG,
 } from "../../providers/WagmiProvider";
-import { checkTgBalanceForUser } from "../../../lib/triggerXIntegration";
+import { checkTgBalanceForUser, fetchETHBalanceForUser } from "../../../lib/triggerXIntegration";
 import { parseUnits } from "viem";
 
 // Import refactored utilities, types, constants, and hooks
@@ -50,15 +54,34 @@ import {
 
 // All types, constants, and utilities are now imported from the ActionsTab folder
 
+// Keep manual disconnect behaviour consistent with WalletTab
+function updateManualDisconnectFlag(value: boolean) {
+  if (typeof window === "undefined") return;
+  if (value) {
+    window.sessionStorage?.setItem(MANUAL_DISCONNECT_FLAG, "true");
+  } else {
+    window.sessionStorage?.removeItem(MANUAL_DISCONNECT_FLAG);
+  }
+  window.dispatchEvent(new Event(MANUAL_DISCONNECT_EVENT));
+}
+
 export function ActionsTab() {
   // --- Hooks ---
   const { notificationDetails, haptics, context } = useMiniApp();
 
   const { address, isConnected, connector, chainId } = useAccount();
   const { data: walletClient } = useWalletClient();
+  const { connect, connectors } = useConnect();
+  const {
+    switchChain,
+    switchChainAsync,
+    isPending: isChainSwitchPending,
+  } = useSwitchChain();
+  const effectiveChainId = useChainId();
 
   // Respect manual disconnect flag set from WalletTab / provider.
   const [hasManualDisconnect, setHasManualDisconnect] = useState(false);
+  const [showConnectOptions, setShowConnectOptions] = useState(false);
 
   useEffect(() => {
     const readFlag = () =>
@@ -88,6 +111,77 @@ export function ActionsTab() {
   }, []);
 
   const isWalletConnected = isConnected && !hasManualDisconnect;
+
+  const handleSwitchToArbitrum = useCallback(async () => {
+    try {
+      if (switchChainAsync) {
+        await switchChainAsync({ chainId: arbitrum.id });
+        return;
+      }
+      if (
+        typeof window !== "undefined" &&
+        (window as any).ethereum?.request
+      ) {
+        await (window as any).ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0xa4b1" }],
+        });
+        return;
+      }
+      switchChain({ chainId: arbitrum.id });
+    } catch (switchError: any) {
+      if (
+        switchError?.code === 4902 &&
+        typeof window !== "undefined" &&
+        (window as any).ethereum?.request
+      ) {
+        try {
+          await (window as any).ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [
+              {
+                chainId: "0xa4b1",
+                chainName: "Arbitrum One",
+                nativeCurrency: {
+                  name: "Ether",
+                  symbol: "ETH",
+                  decimals: 18,
+                },
+                rpcUrls: ["https://arb1.arbitrum.io/rpc"],
+                blockExplorerUrls: ["https://arbiscan.io"],
+              },
+            ],
+          });
+          if (switchChainAsync) {
+            await switchChainAsync({ chainId: arbitrum.id });
+          } else {
+            await (window as any).ethereum.request({
+              method: "wallet_switchEthereumChain",
+              params: [{ chainId: "0xa4b1" }],
+            });
+          }
+        } catch (addError) {
+          console.error("Failed to add Arbitrum network:", addError);
+        }
+      } else {
+        console.error("Error switching network:", switchError);
+      }
+    }
+  }, [switchChain, switchChainAsync]);
+
+  // Auto switch to Arbitrum from this tab as well
+  useEffect(() => {
+    if (
+      isConnected &&
+      effectiveChainId &&
+      effectiveChainId !== arbitrum.id &&
+      !isChainSwitchPending
+    ) {
+      handleSwitchToArbitrum().catch((error) => {
+        console.warn("Auto-switch to Arbitrum failed (ActionsTab):", error);
+      });
+    }
+  }, [isConnected, effectiveChainId, isChainSwitchPending, handleSwitchToArbitrum]);
 
   // --- State ---
   const [notificationState, setNotificationState] = useState({
@@ -520,7 +614,7 @@ export function ActionsTab() {
     if (approvalError) {
       setApprovalStatus("error");
       const currentPendingId = pendingConfirmationId;
-      console.log("hahaha currentPendingId",currentPendingId);
+      // console.log("hahaha currentPendingId",currentPendingId);
       setPendingConfirmationId(null);
       setIsApprovalLoading(false);
 
@@ -753,8 +847,7 @@ export function ActionsTab() {
                   // Fetch current balance to show to user
                   let currentBalance = "0";
                   try {
-                    const balance = await checkTgBalanceForUser(address || "");
-                    currentBalance = balance ? balance.data?.ethBalance || "0" : "0";
+                    currentBalance = await fetchETHBalanceForUser(address as `0x${string}`);
                   } catch (e) {
                     console.error("Failed to fetch balance", e);
                   }
@@ -920,28 +1013,28 @@ export function ActionsTab() {
       }
 
       function parseDurationToMinutes(duration: any): number {
-        console.log("[parseDurationToMinutes] ✅ NEW VERSION LOADED - Using improved regex");
+        // console.log("[parseDurationToMinutes] ✅ NEW VERSION LOADED - Using improved regex");
         const s = String(duration ?? planData.duration ?? "")
           .toLowerCase()
           .trim();
 
-        console.log("[parseDurationToMinutes] Input string:", s);
-        console.log("[parseDurationToMinutes] String length:", s.length);
-        console.log("[parseDurationToMinutes] String charCodes:", Array.from(s).map(c => c.charCodeAt(0)));
+        // console.log("[parseDurationToMinutes] Input string:", s);
+        // console.log("[parseDurationToMinutes] String length:", s.length);
+        // console.log("[parseDurationToMinutes] String charCodes:", Array.from(s).map(c => c.charCodeAt(0)));
 
         // More flexible regex that handles typos and optional spaces
         // Matches: "6 minutes", "6minutes", "6 minitues", "6minitues", etc.
         const m = s.match(/(\d+(?:\.\d+)?)\s*(minut\w*|hour\w*|day\w*|week\w*|month\w*)/i);
-        console.log("[parseDurationToMinutes] Regex match:", m);
+        // console.log("[parseDurationToMinutes] Regex match:", m);
         
         // Try a simpler test
         const testMatch = s.match(/minut/i);
-        console.log("[parseDurationToMinutes] Simple 'minut' test:", testMatch);
+        // console.log("[parseDurationToMinutes] Simple 'minut' test:", testMatch);
         
         if (m) {
           const value = parseFloat(m[1]);
           const unit = m[2].toLowerCase(); // Changed from m[3] to m[2] due to non-capturing group
-          console.log("[parseDurationToMinutes] Parsed value:", value, "unit:", unit);
+          // console.log("[parseDurationToMinutes] Parsed value:", value, "unit:", unit);
           if (unit.startsWith("minut")) return value; // Handles minute, minutes, minitues, minitus, etc.
           if (unit.startsWith("hour")) return value * 60;
           if (unit.startsWith("day")) return value * 24 * 60;
@@ -955,7 +1048,7 @@ export function ActionsTab() {
         if (s.includes("month") || s.includes("monthly")) return 30 * 24 * 60;
         if (s.includes("minut")) {
           const num = parseFloat(s);
-          console.log("[parseDurationToMinutes] Fallback extraction:", num);
+          console.warn("[parseDurationToMinutes] Fallback extraction:", num);
           return num || NaN;
         }
 
@@ -965,15 +1058,15 @@ export function ActionsTab() {
 
       try {
         const intervalMinutes = parseIntervalToMinutes(planData.interval);
-        console.log("[Approval] intervalMinutes:", intervalMinutes);
+        // console.log("[Approval] intervalMinutes:", intervalMinutes);
         const durationMinutes = parseDurationToMinutes(planData.duration);
-        console.log("[Approval] durationMinutes:", durationMinutes);
+        // console.log("[Approval] durationMinutes:", durationMinutes);
         const amountPerExecutionStr = String(planData.amount ?? "").trim();
-        console.log("[Approval] amountPerExecutionStr:", amountPerExecutionStr);
+        // console.log("[Approval] amountPerExecutionStr:", amountPerExecutionStr);
         const decimals =
           typeof tokenInfo.decimals === "number" ? tokenInfo.decimals : 18;
-        console.log("[Approval] decimals:", decimals);
-        console.log("[Approval] Full planData:", planData);
+        // console.log("[Approval] decimals:", decimals);
+        console.info("[Approval] Full planData:", planData);
         
         // Validate before proceeding
         if (
@@ -1401,8 +1494,15 @@ export function ActionsTab() {
       {/* Chat Container */}
       <div className="flex-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 overflow-hidden flex flex-col">
         {/* Address pill */}
-        <div className="flex-shrink-0 flex justify-end p-3 pb-2">
-          <div className="px-3 py-1.5 rounded-full bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 border border-[#c199e4]/30 text-xs font-mono text-white/90 shadow-sm flex items-center gap-2">
+        <div className="flex-shrink-0 flex justify-end p-3 pb-2 relative">
+          <button
+            type="button"
+            onClick={() => {
+              if (isWalletConnected) return;
+              setShowConnectOptions((prev) => !prev);
+            }}
+            className="px-3 py-1.5 rounded-full bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 border border-[#c199e4]/30 text-xs font-mono text-white/90 shadow-sm flex items-center gap-2 hover:border-[#c199e4]/60 transition-colors"
+          >
             {context?.user?.pfpUrl ? (
               <img
                 src={context.user.pfpUrl}
@@ -1426,7 +1526,86 @@ export function ActionsTab() {
               : isWalletConnected && !address
                 ? "Connecting..."
                 : formatAddress(address as `0x${string}`)}
-          </div>
+          </button>
+
+          {/* Inline wallet connect options (Farcaster / external) */}
+          {!isWalletConnected && showConnectOptions && (
+            <div className="absolute top-11 right-3 z-30 w-56 bg-[#050509]/95 border border-white/15 rounded-2xl shadow-xl p-3 space-y-2">
+              <div className="text-[11px] text-white/60 mb-1">
+                Connect wallet to use DCA Agent
+              </div>
+              {context?.user?.fid ? (
+                <>
+                  <button
+                    type="button"
+                    className="w-full h-9 rounded-xl text-xs font-semibold bg-gradient-to-br from-[#c199e4]/70 to-[#b380db]/70 hover:from-[#c199e4] hover:to-[#b380db] border border-white/20 text-white flex items-center justify-center transition-all duration-200"
+                    onClick={async () => {
+                      const farcasterConnector = connectors.find(
+                        (c: Connector) => c.id === "farcaster"
+                      );
+                      if (!farcasterConnector) return;
+                      updateManualDisconnectFlag(false);
+                      connect({ connector: farcasterConnector });
+                      setShowConnectOptions(false);
+                      setTimeout(() => {
+                        handleSwitchToArbitrum().catch(() => undefined);
+                      }, 500);
+                    }}
+                  >
+                    Connect Farcaster Wallet
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full h-9 rounded-xl text-xs font-semibold bg-gradient-to-br from-white/15 to-white/5 hover:from-white/25 hover:to-white/10 border border-white/30 text-white/90 flex items-center justify-center transition-all duration-200"
+                    onClick={() => {
+                      if (!connectors[2]) return;
+                      updateManualDisconnectFlag(false);
+                      connect({ connector: connectors[2] });
+                      setShowConnectOptions(false);
+                      setTimeout(() => {
+                        handleSwitchToArbitrum().catch(() => undefined);
+                      }, 500);
+                    }}
+                  >
+                    Connect MetaMask
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="w-full h-9 rounded-xl text-xs font-semibold bg-gradient-to-br from-[#c199e4]/70 to-[#b380db]/70 hover:from-[#c199e4] hover:to-[#b380db] border border-white/20 text-white flex items-center justify-center transition-all duration-200"
+                    onClick={() => {
+                      if (!connectors[1]) return;
+                      updateManualDisconnectFlag(false);
+                      connect({ connector: connectors[1] });
+                      setShowConnectOptions(false);
+                      setTimeout(() => {
+                        handleSwitchToArbitrum().catch(() => undefined);
+                      }, 500);
+                    }}
+                  >
+                    Connect Coinbase Wallet
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full h-9 rounded-xl text-xs font-semibold bg-gradient-to-br from-white/15 to-white/5 hover:from-white/25 hover:to-white/10 border border-white/30 text-white/90 flex items-center justify-center transition-all duration-200"
+                    onClick={() => {
+                      if (!connectors[2]) return;
+                      updateManualDisconnectFlag(false);
+                      connect({ connector: connectors[2] });
+                      setShowConnectOptions(false);
+                      setTimeout(() => {
+                        handleSwitchToArbitrum().catch(() => undefined);
+                      }, 500);
+                    }}
+                  >
+                    Connect MetaMask
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Chat Messages - Scrollable */}

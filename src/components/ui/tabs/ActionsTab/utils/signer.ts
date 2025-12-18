@@ -20,11 +20,11 @@ export async function getEthersSigner(
           ? "Detected Farcaster connector → trying Wagmi transport first"
           : "Using Wagmi walletClient transport path"
       );
-      console.log("Wallet Client:", walletClient);
-      console.log("Wallet Client chain ID:", walletClient?.chain?.id);
-      console.log('🔍 [GET ETHERS SIGNER] walletClient.account.address:', walletClient.account?.address);
-      console.log('🔍 [GET ETHERS SIGNER] Address length:', walletClient.account?.address?.length);
-      console.log('🔍 [GET ETHERS SIGNER] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(walletClient.account?.address || ''));
+      console.info("Wallet Client:", walletClient);
+      // console.log("Wallet Client chain ID:", walletClient?.chain?.id);
+      // console.log('🔍 [GET ETHERS SIGNER] walletClient.account.address:', walletClient.account?.address);
+      // console.log('🔍 [GET ETHERS SIGNER] Address length:', walletClient.account?.address?.length);
+      // console.log('🔍 [GET ETHERS SIGNER] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(walletClient.account?.address || ''));
 
       const requestFn = (walletClient.transport as any).request;
       if (typeof requestFn === "function") {
@@ -37,7 +37,7 @@ export async function getEthersSigner(
             ? new BrowserProvider(eip1193Provider, walletClient.chain.id)
             : new BrowserProvider(eip1193Provider);
 
-          console.log("Provider:", provider);
+          console.info("Provider:", provider);
 
           const signer = await Promise.race([
             provider.getSigner(walletClient.account.address),
@@ -46,22 +46,22 @@ export async function getEthersSigner(
             ),
           ]);
 
-          console.log("Signer:", signer);
+          // console.log("Signer:", signer);
 
           const address = await signer.getAddress();
-          console.log('🔍 [GET ETHERS SIGNER] Signer address (Wagmi path):', address);
-          console.log('🔍 [GET ETHERS SIGNER] Signer address length:', address?.length);
-          console.log('🔍 [GET ETHERS SIGNER] Signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
+          console.info('[GET ETHERS SIGNER] Signer address (Wagmi path):', address);
+          // console.log('🔍 [GET ETHERS SIGNER] Signer address length:', address?.length);
+          // console.log('🔍 [GET ETHERS SIGNER] Signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
           try {
             const balance = await provider.getBalance(address);
-            console.log(
-              "Balance of signer (Wagmi transport):",
-              balance.toString()
-            );
+            // console.log(
+            //   "Balance of signer (Wagmi transport):",
+            //   balance.toString()
+            // );
           } catch (balanceErr) {
             console.warn("Could not fetch signer balance:", balanceErr);
           }
-          console.log(
+          console.info(
             isFarcasterConnector
               ? "✅ Signer obtained via Wagmi transport (Farcaster connector)"
               : "✅ Signer obtained via Wagmi transport",
@@ -80,7 +80,7 @@ export async function getEthersSigner(
 
     // 2. Fallback: If Farcaster connector and Wagmi transport didn't work → use SDK provider
     if (isFarcasterConnector) {
-      console.log(
+      console.info(
         "Farcaster connector detected but Wagmi transport unavailable/unsuccessful → falling back to SDK provider"
       );
       const farcasterProvider = await sdk.wallet.getEthereumProvider();
@@ -98,22 +98,22 @@ export async function getEthersSigner(
       ]);
 
       const address = await signer.getAddress();
-      console.log('🔍 [GET ETHERS SIGNER] Signer address (Farcaster SDK path):', address);
-      console.log('🔍 [GET ETHERS SIGNER] Signer address length:', address?.length);
-      console.log('🔍 [GET ETHERS SIGNER] Signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
+      console.info('[GET ETHERS SIGNER] Signer address (Farcaster SDK path):', address);
+      // console.log('🔍 [GET ETHERS SIGNER] Signer address length:', address?.length);
+      // console.log('🔍 [GET ETHERS SIGNER] Signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
       try {
         const balance = await provider.getBalance(address);
-        console.log("Balance of signer (Farcaster SDK):", balance.toString());
+        // console.log("Balance of signer (Farcaster SDK):", balance.toString());
       } catch (balanceErr) {
         console.warn("Could not fetch signer balance:", balanceErr);
       }
-      console.log("✅ Signer obtained via Farcaster SDK (fallback):", address);
+      console.log("Signer obtained via Farcaster SDK (fallback):", address);
       return signer;
     }
 
     // 3. Fallback: window.ethereum
     if (typeof window !== "undefined" && (window as any).ethereum) {
-      console.log("Falling back to window.ethereum provider");
+      console.info("Falling back to window.ethereum provider");
       const provider = new BrowserProvider((window as any).ethereum as any);
 
       // Check accounts
@@ -150,9 +150,9 @@ export async function getEthersSigner(
       ]);
 
       const address = await signer.getAddress();
-      console.log('🔍 [GET ETHERS SIGNER] Signer address (window.ethereum path):', address);
-      console.log('🔍 [GET ETHERS SIGNER] Signer address length:', address?.length);
-      console.log('🔍 [GET ETHERS SIGNER] Signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
+      console.info('[GET ETHERS SIGNER] Signer address (window.ethereum path):', address);
+      // console.log('🔍 [GET ETHERS SIGNER] Signer address length:', address?.length);
+      // console.log('🔍 [GET ETHERS SIGNER] Signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
       console.log("Signer obtained via window.ethereum:", address);
       return signer;
     }
