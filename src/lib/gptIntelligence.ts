@@ -186,8 +186,8 @@ Extract these parameters:
 - fromToken: Source token symbol 
 - toToken: Target token symbol
 - amount: Investment amount per execution (IMPORTANT: extract the numeric value only, not currency)
-- interval: Frequency string ("2 minutes", "daily", "weekly", etc.)
-- duration: Duration string ("1 day", "3 weeks", "2 months", etc.)
+- interval: Frequency string ("5 minutes", "daily", "weekly", etc.)
+- duration: Duration string ("6 minutes", "1 day", "3 weeks", "2 months", etc.)
 - slippage: Optional slippage percentage
 - _isDollarAmount: true if user specified dollar amount (e.g., "$10 of ETH", "0.1 dollar of WETH"), false if token amount (e.g., "0.1 ETH", "10 USDC")
 
@@ -616,10 +616,11 @@ Extract any new DCA parameters from this message and provide the next question f
     }
 
     // Extract duration (keep as string format for backend parsing)
+    // Use normalizedMessage to handle "minitues" → "minutes" typo correction
     const durationMatch =
-      message.match(
+      normalizedMessage.match(
         /(?:for|over)\s*(\d+)\s*(minute|hour|day|week|month|year)/i
-      ) || message.match(/(\d+)\s*(minute|hour|day|week|month|year)/i);
+      ) || normalizedMessage.match(/(\d+)\s*(minute|hour|day|week|month|year)/i);
 
     if (durationMatch) {
       const duration = durationMatch[1];

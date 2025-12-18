@@ -2,343 +2,53 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMiniApp } from "@neynar/react";
-
-import { type Haptics } from "@farcaster/miniapp-sdk";
 import { APP_URL, QUICKSTART_PREFILL_KEY } from "~/lib/constants";
 import {
   useAccount,
   useWriteContract,
   useWaitForTransactionReceipt,
-  useReadContract,
   useWalletClient,
-  useConnectors,
 } from "wagmi";
-import { maxUint256 } from "viem";
 import { arbitrum } from "wagmi/chains";
 import {
   ERC20_ABI,
   getTokenInfo,
   EXECUTOR_ADDRESS,
 } from "../../../lib/tokenContracts";
-import { useRouter } from "next/navigation";
+
 import { IoPersonCircle } from "react-icons/io5";
 import { RiRobot2Fill } from "react-icons/ri";
-import { parseUnits } from "viem";
+
 import sdk from "@farcaster/miniapp-sdk";
 import {
   MANUAL_DISCONNECT_EVENT,
   MANUAL_DISCONNECT_FLAG,
 } from "../../providers/WagmiProvider";
-import { BrowserProvider, JsonRpcSigner, parseEther } from "ethers";
-import { depositTgBalanceForUser, checkTgBalanceForUser } from "../../../lib/triggerXIntegration";
+import { checkTgBalanceForUser } from "../../../lib/triggerXIntegration";
+import { parseUnits } from "viem";
 
-// Chat message interface
-interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: Date;
-  // Confirmation flow fields
-  requiresConfirmation?: boolean;
-  confirmationId?: string;
-  confirmationData?: any;
-  confirmationStatus?: "pending" | "proceeding" | "cancelled" | "completed";
-  // Transaction hash for copy functionality
-  transactionHash?: string;
-  // Loading state for plan creation
-  isCreatingPlan?: boolean;
-  // Optional share content to enable a "Share now" button
-  shareText?: string;
-  // Deposit UI fields
-  requiresDeposit?: boolean;
-  depositAmount?: string;
-  messageIdForDeposit?: string;
-}
+// Import refactored utilities, types, constants, and hooks
+import { getEthersSigner } from "./ActionsTab/utils/signer";
+import { renderMarkdownText } from "./ActionsTab/utils/markdown";
+import { 
+  formatAddress, 
+  createMessageId,
+  isPlanCreationRequest
+} from "./ActionsTab/utils/helpers";
+import type { 
+  ChatMessage, 
+} from "./ActionsTab/types";
+import { useScrollBehavior, usePlanSimulation, useDepositFlow } from "./ActionsTab/hooks";
+import { 
+  PlanCreationProgress, 
+  LoadingIndicator, 
+  ConfirmationButtons, 
+  DepositUI,
+  QuickActionButtons,
+  ChatInput
+} from "./ActionsTab/components";
 
-type StepStatus = "pending" | "active" | "complete";
-
-interface PlanSimulationStep {
-  id: string;
-  label: string;
-  description: string;
-  weight: number;
-}
-
-interface PlanSimulationState {
-  startedAt: number;
-  progress: number;
-  etaMs: number;
-  activeStepIndex: number;
-  stepStatuses: StepStatus[];
-}
-
-const PLAN_SIMULATION_DURATION_MS = 120000; // 2 minutes
-
-const PLAN_SIMULATION_STEPS: PlanSimulationStep[] = [
-  {
-    id: "validate",
-    label: "Validating strategy details",
-    description: "Double-checking token amounts & frequency",
-    weight: 0.15,
-  },
-  {
-    id: "triggerx-shape",
-    label: "Forming plan data for TriggerX",
-    description: "Passing automation-ready details to TriggerX",
-    weight: 0.14,
-  },
-  {
-    id: "automation-config",
-    label: "Configuring automation script content",
-    description: "Defining the instructions TriggerX will execute",
-    weight: 0.14,
-  },
-  {
-    id: "plan-validation",
-    label: "Checking plan data validation",
-    description: "Re-running guards on interval, duration & totals",
-    weight: 0.14,
-  },
-  {
-    id: "deposit-balance",
-    label: "Checking deposit balance",
-    description: "Verifying you have enough deposit to execute your plan",
-    weight: 0.14,
-  },
-  {
-    id: "create-job",
-    label: "Creating TriggerX job",
-    description: "Calling createJob function to register your automation",
-    weight: 0.14,
-  },
-  {
-    id: "finalize",
-    label: "Finalizing your plan",
-    description: "Locking everything to execute on time",
-    weight: 0.15,
-  },
-];
-
-const formatFastEta = (etaMs: number, ticker = 0): string => {
-  const totalMs = Math.max(0, Math.floor(etaMs));
-  const minutes = Math.floor(totalMs / 60000)
-    .toString()
-    .padStart(2, "0");
-  const seconds = Math.floor((totalMs % 60000) / 1000)
-    .toString()
-    .padStart(2, "0");
-  const centis = (ticker % 100).toString().padStart(2, "0");
-  return `${minutes}:${seconds}:${centis}`;
-};
-
-const calculateStepState = (
-  progress: number
-): { activeIndex: number; statuses: StepStatus[] } => {
-  const clampedProgress = Math.max(0, Math.min(1, progress));
-  let cumulative = 0;
-  let activeIndex = PLAN_SIMULATION_STEPS.length - 1;
-
-  for (let i = 0; i < PLAN_SIMULATION_STEPS.length; i++) {
-    cumulative += PLAN_SIMULATION_STEPS[i].weight;
-    if (clampedProgress <= cumulative) {
-      activeIndex = i;
-      break;
-    }
-  }
-
-  const statuses = PLAN_SIMULATION_STEPS.map((_, index) => {
-    if (index < activeIndex) return "complete";
-    if (index === activeIndex)
-      return clampedProgress >= 1 ? "complete" : "active";
-    return "pending";
-  });
-
-  return { activeIndex, statuses };
-};
-
-// Helper to format addresses nicely (e.g., 0x1234...ABCD)
-function formatAddress(
-  address: string,
-  prefixLength = 6,
-  suffixLength = 4
-): string {
-  if (!address) return "";
-  if (address.length <= prefixLength + suffixLength) return address;
-  return `${address.slice(0, prefixLength)}...${address.slice(-suffixLength)}`;
-}
-
-// Helper to format long text for mobile display
-function formatLongText(text: string, maxLength = 20): string {
-  if (!text) return "";
-  if (text.length <= maxLength) return text;
-  return `${text.slice(0, 8)}...${text.slice(-6)}`;
-}
-
-const createMessageId = (prefix = "msg"): string =>
-  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-export async function getEthersSigner(
-  walletClient: any,
-  connector: any
-): Promise<JsonRpcSigner> {
-  try {
-    const isFarcasterConnector =
-      connector?.id === "farcaster" || connector?.name === "Farcaster";
-
-    // 1. Try Wagmi walletClient transport first (works for Farcaster and other connectors)
-    if (
-      walletClient &&
-      walletClient.account?.address &&
-      walletClient.transport
-    ) {
-      console.log(
-        isFarcasterConnector
-          ? "Detected Farcaster connector → trying Wagmi transport first"
-          : "Using Wagmi walletClient transport path"
-      );
-      console.info("Wallet Client:", walletClient);
-      console.info("Wallet Client chain ID:", walletClient?.chain?.id);
-      // console.log('🔍 [GET ETHERS SIGNER] walletClient.account.address:', walletClient.account?.address);
-      // console.log('🔍 [GET ETHERS SIGNER] Address length:', walletClient.account?.address?.length);
-      // console.log('🔍 [GET ETHERS SIGNER] Address regex test:', /^0x[a-fA-F0-9]{40}$/.test(walletClient.account?.address || ''));
-
-      const requestFn = (walletClient.transport as any).request;
-      if (typeof requestFn === "function") {
-        try {
-          const eip1193Provider = {
-            request: requestFn.bind(walletClient.transport),
-          };
-
-          const provider = walletClient.chain
-            ? new BrowserProvider(eip1193Provider, walletClient.chain.id)
-            : new BrowserProvider(eip1193Provider);
-
-          console.info("Provider:", provider);
-
-          const signer = await Promise.race([
-            provider.getSigner(walletClient.account.address),
-            new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error("Wagmi signer timeout")), 30000)
-            ),
-          ]);
-
-          // console.log("Signer:", signer);
-
-          const address = await signer.getAddress();
-          console.info('[GET ETHERS SIGNER] Signer address (Wagmi path):', address);
-          // console.log('🔍 [GET ETHERS SIGNER] Signer address length:', address?.length);
-          // console.log('🔍 [GET ETHERS SIGNER] Signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
-          try {
-            const balance = await provider.getBalance(address);
-            // console.log(
-            //   "Balance of signer (Wagmi transport):",
-            //   balance.toString()
-            // );
-          } catch (balanceErr) {
-            console.warn("Could not fetch signer balance:", balanceErr);
-          }
-          console.info(
-            isFarcasterConnector
-              ? "✅ Signer obtained via Wagmi transport (Farcaster connector)"
-              : "✅ Signer obtained via Wagmi transport",
-            address
-          );
-          return signer;
-        } catch (wagmiError) {
-          console.warn("⚠️ Wagmi transport failed:", wagmiError);
-          // If Farcaster connector and Wagmi transport failed, fall through to SDK provider
-          if (!isFarcasterConnector) {
-            throw wagmiError;
-          }
-        }
-      }
-    }
-
-    // 2. Fallback: If Farcaster connector and Wagmi transport didn't work → use SDK provider
-    if (isFarcasterConnector) {
-      console.info(
-        "Farcaster connector detected but Wagmi transport unavailable/unsuccessful → falling back to SDK provider"
-      );
-      const farcasterProvider = await sdk.wallet.getEthereumProvider();
-      if (!farcasterProvider) {
-        throw new Error("Farcaster SDK did not return a provider");
-      }
-
-      // Wrap with Ethers provider
-      const provider = new BrowserProvider(farcasterProvider);
-      const signer = await Promise.race([
-        provider.getSigner(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Farcaster signer timeout")), 30000)
-        ),
-      ]);
-
-      const address = await signer.getAddress();
-      console.info('[GET ETHERS SIGNER] Signer address (Farcaster SDK path):', address);
-      // console.log('🔍 [GET ETHERS SIGNER] Signer address length:', address?.length);
-      // console.log('🔍 [GET ETHERS SIGNER] Signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
-      try {
-        const balance = await provider.getBalance(address);
-        // console.log("Balance of signer (Farcaster SDK):", balance.toString());
-      } catch (balanceErr) {
-        console.warn("Could not fetch signer balance:", balanceErr);
-      }
-      console.log("✅ Signer obtained via Farcaster SDK (fallback):", address);
-      return signer;
-    }
-
-    // 3. Fallback: window.ethereum
-    if (typeof window !== "undefined" && (window as any).ethereum) {
-      console.info("Falling back to window.ethereum provider");
-      const provider = new BrowserProvider((window as any).ethereum as any);
-
-      // Check accounts
-      let accounts: string[] = [];
-      try {
-        accounts = (await Promise.race([
-          provider.send("eth_accounts", []),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("eth_accounts timeout")), 8000)
-          ),
-        ])) as string[];
-      } catch (err) {
-        console.warn("eth_accounts call failed:", err);
-        // We can attempt requestAccounts
-      }
-
-      if (!accounts || accounts.length === 0) {
-        await Promise.race([
-          provider.send("eth_requestAccounts", []),
-          new Promise<never>((_, reject) =>
-            setTimeout(
-              () => reject(new Error("User did not connect wallet")),
-              60000
-            )
-          ),
-        ]);
-      }
-
-      const signer = await Promise.race([
-        provider.getSigner(0),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("getSigner timeout")), 30000)
-        ),
-      ]);
-
-      const address = await signer.getAddress();
-      // console.log(' [GET ETHERS SIGNER] Signer address (window.ethereum path):', address);
-      // console.log('🔍 [GET ETHERS SIGNER] Signer address length:', address?.length);
-      // console.log('🔍 [GET ETHERS SIGNER] Signer address regex test:', /^0x[a-fA-F0-9]{40}$/.test(address || ''));
-      console.info("Signer obtained via window.ethereum:", address);
-      return signer;
-    }
-
-    throw new Error("Could not obtain signer from any source");
-  } catch (err) {
-    console.error("getEthersSigner failure:", err);
-    throw err;
-  }
-}
+// All types, constants, and utilities are now imported from the ActionsTab folder
 
 export function ActionsTab() {
   // --- Hooks ---
@@ -400,17 +110,23 @@ export function ActionsTab() {
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isApprovalLoading, setIsApprovalLoading] = useState(false); // Separate loading state for approval
-  const [isPlanCreationLoading, setIsPlanCreationLoading] = useState(false); // Separate loading state for plan creation
   const [connectionStatus, setConnectionStatus] = useState<
     "connecting" | "connected" | "error" | null
   >(null);
 
   // --- Layout/Refs for better UX ---
-  const endOfMessagesRef = useRef<HTMLDivElement | null>(null);
-  const quickStartInputRef = useRef<HTMLTextAreaElement | null>(null);
-  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const quickStartInputRef = useRef<HTMLTextAreaElement>(null);
   const inputContainerRef = useRef<HTMLDivElement | null>(null);
   const [inputContainerHeight, setInputContainerHeight] = useState<number>(72);
+  
+  // Use scroll behavior hook
+  const {
+    endOfMessagesRef,
+    messagesContainerRef,
+    showScrollToLatest,
+    scrollToBottom,
+    handleJumpToLatest,
+  } = useScrollBehavior(messages, isLoading);
 
   // Token approval state
   const [approvalStatus, setApprovalStatus] = useState<
@@ -427,17 +143,26 @@ export function ActionsTab() {
   const [completedConfirmations, setCompletedConfirmations] = useState<
     Set<string>
   >(new Set());
-  const [planSimulation, setPlanSimulation] =
-    useState<PlanSimulationState | null>(null);
-  const [microTicker, setMicroTicker] = useState(0);
-  const [showScrollToLatest, setShowScrollToLatest] = useState(false);
-  const messagesPinnedRef = useRef(true);
   const [showCreatePlanTokens, setShowCreatePlanTokens] = useState(false);
 
-  // Deposit state
-  const [depositAmounts, setDepositAmounts] = useState<Record<string, string>>({});
-  const [depositStatuses, setDepositStatuses] = useState<Record<string, string>>({});
-  const [isDepositLoading, setIsDepositLoading] = useState<Record<string, boolean>>({});
+  // Use plan simulation hook
+  const {
+    planSimulation,
+    microTicker,
+    isPlanCreationLoading,
+    setIsPlanCreationLoading,
+    startPlanCreationSimulation,
+    stopPlanCreationSimulation,
+  } = usePlanSimulation();
+
+  // Use deposit flow hook
+  const {
+    depositAmounts,
+    depositStatuses,
+    isDepositLoading,
+    setDepositAmounts,
+    handleDeposit: handleDepositFlow,
+  } = useDepositFlow();
 
   // Contract interactions for token approval
   const {
@@ -451,44 +176,7 @@ export function ActionsTab() {
       hash: approvalTxHash,
     });
 
-  // Render markdown text with basic formatting
-  const renderMarkdownText = useCallback((text: string): React.ReactNode => {
-    if (!text) return null;
-
-    // Split by lines to handle line breaks
-    const lines = text.split("\n");
-
-    return lines.map((line, lineIndex) => {
-      if (line.trim() === "") {
-        return <br key={lineIndex} />;
-      }
-
-      // Handle bold text (**text**)
-      const parts = line.split(/(\*\*.*?\*\*)/g);
-
-      return (
-        <span key={lineIndex} className="block break-words">
-          {parts.map((part, partIndex) => {
-            if (part.startsWith("**") && part.endsWith("**")) {
-              // Bold text
-              const boldText = part.slice(2, -2);
-              return (
-                <strong key={partIndex} className="font-bold break-words">
-                  {boldText}
-                </strong>
-              );
-            }
-            return (
-              <span key={partIndex} className="break-words">
-                {part}
-              </span>
-            );
-          })}
-          {lineIndex < lines.length - 1 && <br />}
-        </span>
-      );
-    });
-  }, []);
+  // Markdown rendering is now imported from utils
 
   // Share handler using Farcaster Miniapp SDK
   const handleShareNow = useCallback(async (text: string) => {
@@ -507,57 +195,7 @@ export function ActionsTab() {
     }
   }, []);
 
-  // Helper to detect if user is requesting plan creation
-  const isPlanCreationRequest = useCallback((message: string): boolean => {
-    const lowerMessage = message.toLowerCase();
-
-    // Keywords that indicate plan creation intent
-    const planCreationKeywords = [
-      "create",
-      "start",
-      "set up",
-      "begin",
-      "initiate",
-      "establish",
-      "dca plan",
-      "investment plan",
-      "strategy",
-      "automated",
-      "buy",
-      "invest",
-      "purchase",
-      "dollar cost average",
-    ];
-
-    // Check if message contains plan creation keywords
-    const hasPlanKeywords = planCreationKeywords.some((keyword) =>
-      lowerMessage.includes(keyword)
-    );
-
-    // Also check for specific tokens and amounts (indicating concrete plan)
-    const hasTokenMentions = /(usdc|usdt|dai|eth|btc|arb|link|uni)\s+\d+/.test(
-      lowerMessage
-    );
-    const hasAmountMentions =
-      /\$\d+|\d+\s*(usdc|usdt|dai|eth|btc|arb|link|uni)/i.test(lowerMessage);
-
-    // Check for frequency indicators
-    const hasFrequencyIndicators =
-      /(daily|weekly|monthly|hourly|every\s+\d+)/i.test(lowerMessage);
-
-    // Check for duration indicators
-    const hasDurationIndicators =
-      /(for\s+\d+|over\s+\d+|weeks?|months?|days?)/i.test(lowerMessage);
-
-    // Return true if we have plan keywords AND either specific details OR frequency/duration indicators
-    return (
-      hasPlanKeywords &&
-      (hasTokenMentions ||
-        hasAmountMentions ||
-        hasFrequencyIndicators ||
-        hasDurationIndicators)
-    );
-  }, []);
+  // isPlanCreationRequest is now imported from utils
 
   useEffect(() => {
     // Keep input height in sync (handles textarea growth and device rotations)
@@ -573,35 +211,6 @@ export function ActionsTab() {
     }
   }, []);
 
-  const scrollToBottom = useCallback(
-    (smooth = true) => {
-      const container = messagesContainerRef.current;
-      if (container) {
-        container.scrollTo({
-          top: container.scrollHeight,
-          behavior: smooth ? "smooth" : "auto",
-        });
-      } else {
-        endOfMessagesRef.current?.scrollIntoView({
-          behavior: smooth ? "smooth" : "auto",
-          block: "end",
-        });
-      }
-    },
-    []
-  );
-
-  const handleMessagesScroll = useCallback(() => {
-    const container = messagesContainerRef.current;
-    if (!container) return;
-    const distanceFromBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
-    const threshold = 120;
-    const isPinned = distanceFromBottom <= threshold;
-    messagesPinnedRef.current = isPinned;
-    setShowScrollToLatest(!isPinned);
-  }, []);
-
   const triggerHaptic = useCallback(() => {
     try {
       const result = haptics?.impactOccurred?.("light");
@@ -613,64 +222,9 @@ export function ActionsTab() {
     }
   }, [haptics]);
 
-
-  useEffect(() => {
-    const container = messagesContainerRef.current;
-    if (!container) return;
-    container.addEventListener("scroll", handleMessagesScroll, {
-      passive: true,
-    });
-    handleMessagesScroll();
-    return () => container.removeEventListener("scroll", handleMessagesScroll);
-  }, [handleMessagesScroll]);
-
-  useEffect(() => {
-    if (messagesPinnedRef.current) {
-      scrollToBottom(messages.length < 4);
-    }
-  }, [messages, scrollToBottom]);
-
-  useEffect(() => {
-    if (isLoading && messagesPinnedRef.current) {
-      scrollToBottom(true);
-    }
-  }, [isLoading, scrollToBottom]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.visualViewport) return;
-    const handler = () => {
-      if (messagesPinnedRef.current) {
-        setTimeout(() => scrollToBottom(false), 60);
-      }
-    };
-    window.visualViewport.addEventListener("resize", handler);
-    return () => {
-      window.visualViewport?.removeEventListener("resize", handler);
-    };
-  }, [scrollToBottom]);
-
-  const handleJumpToLatest = useCallback(() => {
-    messagesPinnedRef.current = true;
-    scrollToBottom(true);
-  }, [scrollToBottom]);
-
-  // Ensure the plan creation simulation UI starts reliably once we begin the
-  // creation flow (after approval tx confirms).
-  const startPlanCreationSimulation = useCallback(() => {
-    setIsPlanCreationLoading(true);
-
-    // Prime simulation progress immediately so the UI shows without delay.
-    setPlanSimulation((prev) => {
-      if (prev) return prev;
-      const initial = calculateStepState(0);
-      return {
-        startedAt: Date.now(),
-        progress: 0,
-        etaMs: PLAN_SIMULATION_DURATION_MS,
-        activeStepIndex: initial.activeIndex,
-        stepStatuses: initial.statuses,
-      };
-    });
+  // Wrapper to start plan simulation and add loading message
+  const handleStartPlanSimulation = useCallback(() => {
+    startPlanCreationSimulation();
 
     // Ensure a loading message exists to host the simulation panel.
     setMessages((prev) => {
@@ -685,7 +239,7 @@ export function ActionsTab() {
       };
       return [...prev, loadingMessage];
     });
-  }, []);
+  }, [startPlanCreationSimulation]);
 
   useEffect(() => {
     // Update chat context when wallet connection changes
@@ -853,94 +407,12 @@ export function ActionsTab() {
     }
   }, [inputMessage, isLoading, address, messages]);
 
-  // --- Deposit Handler ---
+  // --- Deposit Handler (using hook) ---
   const handleDeposit = useCallback(
     async (messageId: string, amount: string) => {
-      if (!walletClient || !address || !connector) {
-        setDepositStatuses((prev) => ({
-          ...prev,
-          [messageId]: "Please connect your wallet first.",
-        }));
-        return;
-      }
-
-      const amountNumber = Number(amount);
-      if (!amount || isNaN(amountNumber) || amountNumber <= 0) {
-        setDepositStatuses((prev) => ({
-          ...prev,
-          [messageId]: "Enter a valid ETH amount greater than 0.",
-        }));
-        return;
-      }
-
-      setIsDepositLoading((prev) => ({ ...prev, [messageId]: true }));
-      setDepositStatuses((prev) => ({ ...prev, [messageId]: "" }));
-
-      try {
-
-        const { BrowserProvider } = await import("ethers");
-        let signer: any = null;
-
-        if (
-          walletClient.transport &&
-          (walletClient.transport as any).request
-        ) {
-          const provider = new BrowserProvider(
-            walletClient.transport as any
-          );
-          const addr = walletClient.account?.address;
-          signer = addr
-            ? await provider.getSigner(addr)
-            : await provider.getSigner();
-        } else if (typeof window !== "undefined" && (window as any).ethereum) {
-          const provider = new BrowserProvider((window as any).ethereum);
-          try {
-            const accounts = await provider.send("eth_accounts", []);
-            if (!accounts || accounts.length === 0) {
-              await provider.send("eth_requestAccounts", []);
-            }
-          } catch {
-            // ignore account fetch errors
-          }
-          signer = await provider.getSigner();
-        }
-
-        const amountInWei = parseEther(amount);
-        const result = await depositTgBalanceForUser(amountInWei, signer);
-
-        if (result.success) {
-          setDepositStatuses((prev) => ({
-            ...prev,
-            [messageId]: `✅ Successfully deposited ${amount} ETH! You can now retry creating your plan.`,
-          }));
-          setDepositAmounts((prev) => ({ ...prev, [messageId]: "" }));
-
-          // Refresh TG balance
-          try {
-            const balance = await checkTgBalanceForUser(address);
-            console.info("Updated TG balance:", balance);
-          } catch (err) {
-            console.warn("Could not refresh TG balance:", err);
-          }
-        } else {
-          setDepositStatuses((prev) => ({
-            ...prev,
-            [messageId]:
-              result.error || "Deposit failed. Please try again in a moment.",
-          }));
-        }
-      } catch (error: any) {
-        setDepositStatuses((prev) => ({
-          ...prev,
-          [messageId]: error?.message
-            ? `Deposit failed: ${error.message}`
-            : "Deposit failed due to an unexpected error.",
-        }));
-      } finally {
-        setIsDepositLoading((prev) => ({ ...prev, [messageId]: false }));
-      }
+      await handleDepositFlow(messageId, amount, walletClient, connector, address);
     },
-    [walletClient, address, connector]
+    [handleDepositFlow, walletClient, connector, address]
   );
 
   // --- Chat Action Handlers ---
@@ -1047,6 +519,8 @@ export function ActionsTab() {
   useEffect(() => {
     if (approvalError) {
       setApprovalStatus("error");
+      const currentPendingId = pendingConfirmationId;
+      console.log("hahaha currentPendingId",currentPendingId);
       setPendingConfirmationId(null);
       setIsApprovalLoading(false);
 
@@ -1073,6 +547,17 @@ export function ActionsTab() {
         errorContent = `❌ Token approval failed: ${approvalError.message}\n\nYou need to approve token spending to create the DCA plan. Please try again.`;
       }
 
+      // Update the confirmation message status to 'cancelled' if user rejected
+      if (currentPendingId && isUserRejection) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.confirmationId === `approve-${currentPendingId}`
+              ? { ...msg, confirmationStatus: "cancelled" as const }
+              : msg
+          )
+        );
+      }
+
       const errorMessage: ChatMessage = {
         id: createMessageId("assistant"),
         role: "assistant",
@@ -1087,76 +572,7 @@ export function ActionsTab() {
     }
   }, [approvalError]);
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    let finalizeTimeout: NodeJS.Timeout | null = null;
-
-    if (isPlanCreationLoading) {
-      const startedAt = Date.now();
-      const initialState = calculateStepState(0);
-      setPlanSimulation({
-        startedAt,
-        progress: 0,
-        etaMs: PLAN_SIMULATION_DURATION_MS,
-        activeStepIndex: initialState.activeIndex,
-        stepStatuses: initialState.statuses,
-      });
-
-      interval = setInterval(() => {
-        const elapsed = Date.now() - startedAt;
-        const rawProgress = Math.min(
-          elapsed / PLAN_SIMULATION_DURATION_MS,
-          0.98
-        );
-        const etaMs = Math.max(PLAN_SIMULATION_DURATION_MS - elapsed, 0);
-        const { activeIndex, statuses } = calculateStepState(rawProgress);
-
-        setPlanSimulation((prev) =>
-          prev
-            ? {
-              ...prev,
-              progress: rawProgress,
-              etaMs,
-              activeStepIndex: activeIndex,
-              stepStatuses: statuses,
-            }
-            : prev
-        );
-      }, 900);
-    } else {
-      setPlanSimulation((prev) =>
-        prev
-          ? {
-            ...prev,
-            progress: 1,
-            etaMs: 0,
-            activeStepIndex: PLAN_SIMULATION_STEPS.length - 1,
-            stepStatuses: PLAN_SIMULATION_STEPS.map(() => "complete"),
-          }
-          : prev
-      );
-      finalizeTimeout = setTimeout(() => setPlanSimulation(null), 600);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-      if (finalizeTimeout) clearTimeout(finalizeTimeout);
-    };
-  }, [isPlanCreationLoading]);
-
-  useEffect(() => {
-    let microInterval: NodeJS.Timeout | null = null;
-    if (isPlanCreationLoading) {
-      microInterval = setInterval(() => {
-        setMicroTicker((prev) => (prev + Math.floor(Math.random() * 7) + 1) % 100);
-      }, 40);
-    } else {
-      setMicroTicker(0);
-    }
-    return () => {
-      if (microInterval) clearInterval(microInterval);
-    };
-  }, [isPlanCreationLoading]);
+  // Plan simulation is now handled by the usePlanSimulation hook
 
   const proceedWithPlanCreation = useCallback(
     async (confirmationId: string) => {
@@ -1166,7 +582,7 @@ export function ActionsTab() {
         //   confirmationId
         // );
 
-        startPlanCreationSimulation();
+        handleStartPlanSimulation();
 
         // Call the API with confirmation
         const response = await fetch("/api/dca-chat", {
@@ -1479,11 +895,13 @@ export function ActionsTab() {
         const s = String(raw).toLowerCase().trim();
         if (!s) return NaN;
 
-        const match = s.match(/(\d+(\.\d+)?)\s*(minute|hour|day|week|month)/i);
+        // More flexible regex that handles typos and optional spaces
+        // Matches: "5 minutes", "5minutes", "5 minitus", "5minitus", etc.
+        const match = s.match(/(\d+(?:\.\d+)?)\s*(minut\w*|hour\w*|day\w*|week\w*|month\w*)/i);
         if (match) {
           const value = parseFloat(match[1]);
-          const unit = match[3].toLowerCase();
-          if (unit.startsWith("minute")) return value;
+          const unit = match[2].toLowerCase(); // Changed from match[3] to match[2] due to non-capturing group
+          if (unit.startsWith("minut")) return value; // Handles minute, minutes, minitus, minitues, etc.
           if (unit.startsWith("hour")) return value * 60;
           if (unit.startsWith("day")) return value * 24 * 60;
           if (unit.startsWith("week")) return value * 7 * 24 * 60;
@@ -1502,39 +920,61 @@ export function ActionsTab() {
       }
 
       function parseDurationToMinutes(duration: any): number {
+        console.log("[parseDurationToMinutes] ✅ NEW VERSION LOADED - Using improved regex");
         const s = String(duration ?? planData.duration ?? "")
           .toLowerCase()
           .trim();
 
-        const m = s.match(/(\d+(\.\d+)?)\s*(minute|hour|day|week|month)/i);
+        console.log("[parseDurationToMinutes] Input string:", s);
+        console.log("[parseDurationToMinutes] String length:", s.length);
+        console.log("[parseDurationToMinutes] String charCodes:", Array.from(s).map(c => c.charCodeAt(0)));
+
+        // More flexible regex that handles typos and optional spaces
+        // Matches: "6 minutes", "6minutes", "6 minitues", "6minitues", etc.
+        const m = s.match(/(\d+(?:\.\d+)?)\s*(minut\w*|hour\w*|day\w*|week\w*|month\w*)/i);
+        console.log("[parseDurationToMinutes] Regex match:", m);
+        
+        // Try a simpler test
+        const testMatch = s.match(/minut/i);
+        console.log("[parseDurationToMinutes] Simple 'minut' test:", testMatch);
+        
         if (m) {
           const value = parseFloat(m[1]);
-          const unit = m[3].toLowerCase();
-          if (unit.startsWith("minute")) return value;
+          const unit = m[2].toLowerCase(); // Changed from m[3] to m[2] due to non-capturing group
+          console.log("[parseDurationToMinutes] Parsed value:", value, "unit:", unit);
+          if (unit.startsWith("minut")) return value; // Handles minute, minutes, minitues, minitus, etc.
           if (unit.startsWith("hour")) return value * 60;
           if (unit.startsWith("day")) return value * 24 * 60;
           if (unit.startsWith("week")) return value * 7 * 24 * 60;
           if (unit.startsWith("month")) return value * 30 * 24 * 60;
         }
 
-        // keywords fallback
+        // keywords fallback - also handle common typos
         if (s.includes("day") || s.includes("daily")) return 24 * 60;
         if (s.includes("week") || s.includes("weekly")) return 7 * 24 * 60;
         if (s.includes("month") || s.includes("monthly")) return 30 * 24 * 60;
+        if (s.includes("minut")) {
+          const num = parseFloat(s);
+          console.log("[parseDurationToMinutes] Fallback extraction:", num);
+          return num || NaN;
+        }
 
+        console.log("[parseDurationToMinutes] No match found, returning NaN");
         return NaN;
       }
 
       try {
         const intervalMinutes = parseIntervalToMinutes(planData.interval);
-        // console.log("intervalMinutes", intervalMinutes);
+        console.log("[Approval] intervalMinutes:", intervalMinutes);
         const durationMinutes = parseDurationToMinutes(planData.duration);
-        // console.log("durationMinutes", durationMinutes);
+        console.log("[Approval] durationMinutes:", durationMinutes);
         const amountPerExecutionStr = String(planData.amount ?? "").trim();
-        // console.log("amountPerExecutionStr", amountPerExecutionStr);
+        console.log("[Approval] amountPerExecutionStr:", amountPerExecutionStr);
         const decimals =
           typeof tokenInfo.decimals === "number" ? tokenInfo.decimals : 18;
-        // console.log("decimals", decimals);
+        console.log("[Approval] decimals:", decimals);
+        console.log("[Approval] Full planData:", planData);
+        
         // Validate before proceeding
         if (
           !amountPerExecutionStr ||
@@ -1544,10 +984,14 @@ export function ActionsTab() {
           intervalMinutes <= 0 ||
           durationMinutes <= 0
         ) {
-          console.error("Invalid planData for approval:", {
-            amount: planData.amount,
-            interval: planData.interval,
-            duration: planData.duration,
+          console.error("[Approval] Validation failed:", {
+            amountPerExecutionStr,
+            isAmountNaN: isNaN(Number(amountPerExecutionStr)),
+            intervalMinutes,
+            isIntervalFinite: Number.isFinite(intervalMinutes),
+            durationMinutes,
+            isDurationFinite: Number.isFinite(durationMinutes),
+            fullPlanData: planData,
           });
 
           const errMsg: ChatMessage = {
@@ -1558,6 +1002,8 @@ export function ActionsTab() {
             timestamp: new Date(),
           };
           setMessages((prev) => [...prev, errMsg]);
+          setIsApprovalLoading(false);
+          setApprovalStatus("idle");
           return;
         }
 
@@ -1705,7 +1151,26 @@ export function ActionsTab() {
 
       if (planData) {
         setIsApprovalLoading(true);
+        try {
         await startApprovalProcess(originalConfirmationId, planData);
+        } catch (error) {
+          console.error("Error in handleApproveConfirm:", error);
+          // Reset states on error
+          setIsApprovalLoading(false);
+          setApprovalStatus("idle");
+          
+          const errorMsg: ChatMessage = {
+            id: createMessageId("assistant"),
+            role: "assistant",
+            content: "❌ Failed to process approval. Please try again.",
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, errorMsg]);
+        }
+      } else {
+        // No plan data found, reset loading state
+        setIsApprovalLoading(false);
+        console.error("No plan data found for confirmation:", confirmationId);
       }
     },
     [messages, startApprovalProcess]
@@ -1920,24 +1385,6 @@ export function ActionsTab() {
     }
   }, [context, notificationDetails]);
 
-  /**
-   * Copies the share URL for the current user to the clipboard.
-   *
-   * This function generates a share URL using the user's FID and copies it
-   * to the clipboard. It shows a temporary "Copied!" message for 2 seconds.
-   */
-  const copyUserShareUrl = useCallback(async () => {
-    if (context?.user?.fid) {
-      const userShareUrl = `${APP_URL}/share/${context.user.fid}`;
-      await navigator.clipboard.writeText(userShareUrl);
-      setNotificationState((prev) => ({ ...prev, shareUrlCopied: true }));
-      setTimeout(
-        () =>
-          setNotificationState((prev) => ({ ...prev, shareUrlCopied: false })),
-        2000
-      );
-    }
-  }, [context?.user?.fid]);
 
   /**
    * Triggers haptic feedback with the selected intensity.
@@ -1949,24 +1396,7 @@ export function ActionsTab() {
   // --- Render ---
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      {/* <div className="flex-shrink-0 bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20 mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 rounded-2xl flex items-center justify-center border border-[#c199e4]/20">
-            <svg className="w-6 h-6 text-[#c199e4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-white">
-              DCA Chat Assistant
-            </h2>
-            <p className="text-sm text-white/70">
-              Get help with your dollar cost averaging strategies
-            </p>
-          </div>
-        </div>
-      </div> */}
+  
 
       {/* Chat Container */}
       <div className="flex-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 overflow-hidden flex flex-col">
@@ -2064,101 +1494,12 @@ export function ActionsTab() {
                   )}
                   {message.isCreatingPlan &&
                     (planSimulation ? (
-                      <div className="mt-3 space-y-4 rounded-2xl border border-white/15 bg-gradient-to-b from-black/50 to-black/10 p-4 shadow-[0_15px_40px_rgba(0,0,0,0.35)]">
-                        <div className="flex items-center justify-between text-[13px] font-semibold text-white">
-                          <span className="tracking-wide">
-                            Step{" "}
-                            <span className="text-[#c199e4]">
-                              {planSimulation.activeStepIndex + 1}
-                            </span>{" "}
-                            of {PLAN_SIMULATION_STEPS.length}
-                          </span>
-                          <span className="text-sm font-bold text-[#c199e4]">
-                            ETA {formatFastEta(planSimulation.etaMs, microTicker)}
-                          </span>
-                        </div>
-                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
-                          <div
-                            className="h-full rounded-full bg-gradient-to-r from-[#c199e4] via-[#b380db] to-[#8c6fd5] transition-all duration-500"
-                            style={{
-                              width: `${Math.max(
-                                planSimulation.progress * 100,
-                                4
-                              ).toFixed(1)}%`,
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-3">
-                          {PLAN_SIMULATION_STEPS.map((step, index) => {
-                            const status =
-                              planSimulation.stepStatuses[index] || "pending";
-                            const statusClasses =
-                              status === "complete"
-                                ? "border-emerald-400/50 bg-emerald-400/10 text-emerald-200"
-                                : status === "active"
-                                  ? "border-[#c199e4] bg-[#c199e4]/10 text-white"
-                                  : "border-white/15 bg-white/5 text-white/50";
-
-                            return (
-                              <div
-                                key={step.id}
-                                className={`flex items-start gap-3 rounded-2xl border px-3 py-2 transition-colors ${statusClasses}`}
-                              >
-                                <span className="mt-0.5 flex size-6 items-center justify-center rounded-full border border-white/20 bg-black/30">
-                                  {status === "complete" ? (
-                                    <svg
-                                      className="size-3.5"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      viewBox="0 0 24 24"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={3}
-                                        d="M5 13l4 4L19 7"
-                                      />
-                                    </svg>
-                                  ) : status === "active" ? (
-                                    <span className="size-2.5 rounded-full bg-current animate-ping" />
-                                  ) : (
-                                    <span className="size-1.5 rounded-full bg-current/60" />
-                                  )}
-                                </span>
-                                <div className="flex-1">
-                                  <div
-                                    className={`text-sm font-semibold ${status === "pending"
-                                      ? "text-white/70"
-                                      : "text-white"
-                                      }`}
-                                  >
-                                    {step.label}
-                                  </div>
-                                  <div className="text-[12px] text-white/70 leading-snug">
-                                    {step.description}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <div className="text-[12px] text-white/60">
-                          Almost there,we&apos;re running deep checks so your
-                          automation launches safely.
-                        </div>
-                      </div>
+                      <PlanCreationProgress
+                        planSimulation={planSimulation}
+                        microTicker={microTicker}
+                      />
                     ) : (
-                      <div className="mt-2 flex space-x-1">
-                        <div className="h-2 w-2 animate-bounce rounded-full bg-[#c199e4]"></div>
-                        <div
-                          className="h-2 w-2 animate-bounce rounded-full bg-[#c199e4]"
-                          style={{ animationDelay: "0.1s" }}
-                        ></div>
-                        <div
-                          className="h-2 w-2 animate-bounce rounded-full bg-[#c199e4]"
-                          style={{ animationDelay: "0.2s" }}
-                        ></div>
-                      </div>
+                      <LoadingIndicator />
                     ))}
                 </div>
 
@@ -2191,206 +1532,41 @@ export function ActionsTab() {
                 )}
 
                 {/* Confirmation Buttons */}
-                {message.requiresConfirmation &&
-                  message.confirmationId && (
-                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                      {/* Show status badge if user has clicked a button */}
-                      {message.confirmationStatus === "proceeding" ? (
-                        <div className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-500/20 text-blue-200 border border-blue-500/30 rounded-lg">
-                          <div className="w-4 h-4 border-2 border-blue-200 border-t-transparent rounded-full animate-spin" />
-                          <span className="text-sm font-medium">Processing...</span>
-                        </div>
-                      ) : message.confirmationStatus === "cancelled" ? (
-                        <div className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-500/20 text-gray-200 border border-gray-500/30 rounded-lg">
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
-                          <span className="text-sm font-medium">Cancelled</span>
-                        </div>
-                      ) : message.confirmationStatus === "completed" ? (
-                        <div className="flex items-center justify-center gap-2 px-4 py-2 bg-green-500/20 text-green-200 border border-green-500/30 rounded-lg">
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                          <span className="text-sm font-medium">Completed</span>
-                        </div>
-                      ) : (
-                        /* Show buttons only when status is pending or undefined */
-                        <div className="flex gap-2 justify-center">
-                          <button
-                            onClick={() => {
-                              if (
-                                message.confirmationId?.startsWith("approve-")
-                              ) {
-                                handleApproveConfirm(message.confirmationId);
+                {message.requiresConfirmation && message.confirmationId && (
+                  <ConfirmationButtons
+                    confirmationId={message.confirmationId}
+                    confirmationStatus={message.confirmationStatus}
+                    isPlanCreationLoading={isPlanCreationLoading}
+                    isApprovalLoading={isApprovalLoading}
+                    isApprovePending={isApprovePending}
+                    isApprovalConfirming={isApprovalConfirming}
+                    onApprove={(confirmationId) => {
+                      if (confirmationId.startsWith("approve-")) {
+                        handleApproveConfirm(confirmationId);
                               } else {
-                                // This case should ideally not be reached for plan creation requests
-                                // but as a fallback, we can call handleConfirmPlan if it were still here
-                                // For now, we'll just show the cancel button
-                                handleCancelPlan(
-                                  message.confirmationId as string
-                                );
-                              }
-                            }}
-                            disabled={
-                              isPlanCreationLoading ||
-                              isApprovalLoading ||
-                              isApprovePending ||
-                              isApprovalConfirming
-                            }
-                            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-                          >
-                            {isApprovePending || isApprovalConfirming ? (
-                              <>
-                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                {isApprovePending
-                                  ? "Wallet Approval..."
-                                  : "Confirming Approval..."}
-                              </>
-                            ) : isApprovalLoading ? (
-                              <>
-                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                {message.confirmationId?.startsWith("approve-")
-                                  ? "Starting Approval..."
-                                  : "Creating Plan..."}
-                              </>
-                            ) : isPlanCreationLoading ? (
-                              <>
-                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                &apos;Processing...&apos;
-                              </>
-                            ) : (
-                              <>
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M5 13l4 4L19 7"
-                                  />
-                                </svg>
-                                {message.confirmationId?.startsWith("approve-")
-                                  ? "Proceed with Approval"
-                                  : "Review Plan Details"}
-                              </>
-                            )}
-                          </button>
-                          <button
-                            onClick={() =>
-                              handleCancelPlan(message.confirmationId!)
-                            }
-                            disabled={
-                              isPlanCreationLoading ||
-                              isApprovalLoading ||
-                              isApprovePending ||
-                              isApprovalConfirming
-                            }
-                            className="flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-                          >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M6 18L18 6M6 6l12 12"
-                              />
-                            </svg>
-                            Cancel
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                        handleCancelPlan(confirmationId);
+                      }
+                    }}
+                    onCancel={handleCancelPlan}
+                  />
                   )}
 
                 {/* Deposit UI */}
                 {message.requiresDeposit && message.messageIdForDeposit && (
-                  <div className="mt-3 pt-3 border-t border-white/20">
-                    <div className="space-y-2">
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <input
-                          type="number"
-                          placeholder={message.depositAmount || "Amount in ETH"}
-                          value={depositAmounts[message.messageIdForDeposit] || message.depositAmount || ''}
-                          onChange={(e) => setDepositAmounts(prev => ({
+                  <DepositUI
+                    messageIdForDeposit={message.messageIdForDeposit}
+                    depositAmount={message.depositAmount}
+                    depositAmounts={depositAmounts}
+                    depositStatuses={depositStatuses}
+                    isDepositLoading={isDepositLoading}
+                    onDepositAmountChange={(messageId, amount) =>
+                      setDepositAmounts((prev) => ({
                             ...prev,
-                            [message.messageIdForDeposit!]: e.target.value
-                          }))}
-                          disabled={isDepositLoading[message.messageIdForDeposit]}
-                          className="w-full sm:flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#c199e4] disabled:opacity-50 disabled:cursor-not-allowed"
-                        />
-                        <button
-                          onClick={() => handleDeposit(
-                            message.messageIdForDeposit!,
-                            depositAmounts[message.messageIdForDeposit!] || message.depositAmount || ''
-                          )}
-                          disabled={isDepositLoading[message.messageIdForDeposit]}
-                          className="w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#c199e4] to-[#b380db] hover:from-[#b380db] hover:to-[#a56fcf] disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-all duration-300 shadow-lg"
-                        >
-                          {isDepositLoading[message.messageIdForDeposit] ? (
-                            <>
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              Depositing...
-                            </>
-                          ) : (
-                            <>
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                />
-                              </svg>
-                              Deposit
-                            </>
-                          )}
-                        </button>
-                      </div>
-                      {depositStatuses[message.messageIdForDeposit] && (
-                        <div className={`text-xs px-3 py-2 rounded-lg ${depositStatuses[message.messageIdForDeposit].startsWith('✅')
-                          ? 'bg-green-500/20 text-green-200 border border-green-500/30'
-                          : 'bg-red-500/20 text-red-200 border border-red-500/30'
-                          }`}>
-                          {depositStatuses[message.messageIdForDeposit]}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                        [messageId]: amount,
+                      }))
+                    }
+                    onDeposit={handleDeposit}
+                  />
                 )}
 
 
@@ -2464,161 +1640,32 @@ export function ActionsTab() {
         // style={{ paddingBottom: Math.max(12, 12 + safeBottom) }}
         >
           {/* Quick Action Buttons */}
-          <div className="flex flex-wrap gap-2 mb-2">
-            {!showCreatePlanTokens ? (
-              <>
-                <button
-                  onClick={() => setInputMessage("Show my DCA plans")}
-                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
-                >
-                  My Plans
-                </button>
-                <button
-                  onClick={() => setShowCreatePlanTokens(true)}
-                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
-                >
-                  Create Plan
-                </button>
-                <button
-                  onClick={() => setInputMessage("Platform statistics")}
-                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
-                >
-                  Stats
-                </button>
-                <button
-                  onClick={() => setInputMessage("Help me understand DCA")}
-                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/20 to-[#c199e4]/10 text-white/90 border border-[#c199e4]/30 rounded-full hover:from-[#c199e4]/30 hover:to-[#c199e4]/20 transition-all duration-300"
-                >
-                  Help
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => setShowCreatePlanTokens(false)}
-                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-white/10 to-white/5 text-white/80 border border-white/25 rounded-full hover:from-white/20 hover:to-white/10 transition-all duration-300"
-                >
-                  ← Back
-                </button>
-                <button
-                  onClick={() => handleQuickCreateToken("WETH")}
-                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/25 to-[#c199e4]/15 text-white/90 border border-[#c199e4]/40 rounded-full hover:from-[#c199e4]/35 hover:to-[#c199e4]/25 transition-all duration-300"
-                >
-                  WETH plan
-                </button>
-                <button
-                  onClick={() => handleQuickCreateToken("ARB")}
-                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/25 to-[#c199e4]/15 text-white/90 border border-[#c199e4]/40 rounded-full hover:from-[#c199e4]/35 hover:to-[#c199e4]/25 transition-all duration-300"
-                >
-                  ARB plan
-                </button>
-                <button
-                  onClick={() => handleQuickCreateToken("WBTC")}
-                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/25 to-[#c199e4]/15 text-white/90 border border-[#c199e4]/40 rounded-full hover:from-[#c199e4]/35 hover:to-[#c199e4]/25 transition-all duration-300"
-                >
-                  WBTC plan
-                </button>
-                <button
-                  onClick={() => handleQuickCreateToken("GMX")}
-                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/25 to-[#c199e4]/15 text-white/90 border border-[#c199e4]/40 rounded-full hover:from-[#c199e4]/35 hover:to-[#c199e4]/25 transition-all duration-300"
-                >
-                  GMX plan
-                </button>
-                <button
-                  onClick={() => handleQuickCreateToken("AAVE")}
-                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/25 to-[#c199e4]/15 text-white/90 border border-[#c199e4]/40 rounded-full hover:from-[#c199e4]/35 hover:to-[#c199e4]/25 transition-all duration-300"
-                >
-                  AAVE plan
-                </button>
-                <button
-                  onClick={() => handleQuickCreateToken("wstETH")}
-                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-[#c199e4]/25 to-[#c199e4]/15 text-white/90 border border-[#c199e4]/40 rounded-full hover:from-[#c199e4]/35 hover:to-[#c199e4]/25 transition-all duration-300"
-                >
-                  wstETH plan
-                </button>
-              </>
-            )}
-          </div>
+          <QuickActionButtons
+            showCreatePlanTokens={showCreatePlanTokens}
+            onShowMyPlans={() => setInputMessage("Show my DCA plans")}
+            onToggleCreatePlan={setShowCreatePlanTokens}
+            onShowStats={() => setInputMessage("Platform statistics")}
+            onShowHelp={() => setInputMessage("Help me understand DCA")}
+            onQuickCreateToken={handleQuickCreateToken}
+          />
 
-          {/* Plan Creation Mode Indicator */}
-          {isInPlanCreationFlow && (
-            <div className="flex items-center gap-2 mb-1 text-xs">
-              <div className="w-2 h-2 rounded-full bg-[#c199e4] animate-pulse" />
-              <span className="text-[#c199e4]/80">
-                Plan Creation Mode - Review your investment details
-              </span>
-            </div>
-          )}
-
-          <div className="flex items-center space-x-3">
-            <div className="flex-1 relative">
-              <textarea
-                ref={quickStartInputRef}
-                value={inputMessage}
-                onChange={(e) => {
-                  setInputMessage(e.target.value);
-                  adjustInputHeight();
-                }}
-                onKeyDown={(e) => {
-                  const canSend =
-                    isWalletConnected &&
-                    !isLoading &&
-                    !isApprovalLoading &&
-                    !isApprovePending &&
-                    !isApprovalConfirming &&
-                    !isPlanCreationLoading &&
-                    inputMessage.trim().length > 0;
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    if (canSend) handleSendMessage();
-                  }
-                }}
-                onFocus={handleInputFocus}
-                placeholder={
-                  isInPlanCreationFlow
-                    ? "Review the plan details above and click 'Review Plan Details' to proceed..."
-                    : isConnected
-                      ? "Ask me anything about DCA investing..."
-                      : "Connect wallet first, then ask about DCA strategies"
-                }
-                className="w-full px-4 py-2 border border-white/30 rounded-2xl bg-white/10 backdrop-blur-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-[#c199e4]/50 focus:border-[#c199e4]/50 transition-all duration-300 resize-none leading-relaxed"
-                rows={1}
-                style={{ minHeight: 44, maxHeight: 180, overflowY: "auto" }}
-              />
-            </div>
-            <button
-              onClick={handleSendMessage}
-              disabled={
-                !isConnected ||
-                !inputMessage.trim() ||
-                isLoading ||
-                isApprovalLoading ||
-                isApprovePending ||
-                isApprovalConfirming ||
-                isPlanCreationLoading
-              }
-              className="h-11 w-11 p-0 bg-gradient-to-br from-[#c199e4] to-[#b380db] hover:from-[#d9b3ed] hover:to-[#c199e4] disabled:from-white/20 disabled:to-white/10 disabled:cursor-not-allowed text-white rounded-2xl transition-all duration-300 flex items-center justify-center shadow-lg backdrop-blur-sm"
-              aria-label="Send message"
-            >
-              {isLoading || isApprovalLoading || isPlanCreationLoading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 19V5m0 0l-7 7m7-7l7 7"
-                  />
-                </svg>
-              )}
-            </button>
-          </div>
+          {/* Chat Input */}
+          <ChatInput
+            inputMessage={inputMessage}
+            isWalletConnected={isWalletConnected}
+            isConnected={isConnected}
+            isLoading={isLoading}
+            isApprovalLoading={isApprovalLoading}
+            isApprovePending={isApprovePending}
+            isApprovalConfirming={isApprovalConfirming}
+            isPlanCreationLoading={isPlanCreationLoading}
+            isInPlanCreationFlow={isInPlanCreationFlow}
+            quickStartInputRef={quickStartInputRef}
+            onInputChange={setInputMessage}
+            onSendMessage={handleSendMessage}
+            onInputFocus={handleInputFocus}
+            onAdjustHeight={adjustInputHeight}
+          />
         </div>
       </div>
     </div>
