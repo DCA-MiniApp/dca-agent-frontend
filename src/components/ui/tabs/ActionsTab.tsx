@@ -340,12 +340,11 @@ export function ActionsTab() {
     if (isWalletConnected && address) {
       setConnectionStatus("connected");
       // Add a system message about wallet connection
+      const formattedAddress = formatAddress(address);
       const connectionMessage: ChatMessage = {
         id: createMessageId("wallet"),
         role: "assistant",
-        content: `✅ Great! Your wallet (${formatAddress(
-          address
-        )}) is now connected. I can now help you with:\n\n• Creating DCA investment plans\n• Viewing your existing strategies\n• Managing plan status (pause/resume)\n• Tracking your portfolio performance\n\nWhat would you like to do first?`,
+        content: `✅ Great! Your wallet (${formattedAddress}) is now connected. I can now help you with:\n\n• Creating DCA investment plans\n• Viewing your existing strategies\n• Managing plan status (pause/resume)\n• Tracking your portfolio performance\n\nWhat would you like to do first?`,
         timestamp: new Date(),
       };
 
@@ -370,7 +369,7 @@ export function ActionsTab() {
       };
       setMessages((prev) => [...prev, disconnectionMessage]);
     }
-  }, [isConnected, address, connectionStatus]);
+  }, [isConnected, address, connectionStatus,isWalletConnected]);
 
   // --- Chat Handlers ---
   const handleSendMessage = useCallback(async () => {
