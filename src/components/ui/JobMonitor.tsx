@@ -19,7 +19,11 @@ import {
   IoFilter,
   IoCheckmarkDone,
 } from "react-icons/io5";
-import { fetchPlatformStatsForMonitor, type JobMonitorData, type JobMonitorUser } from "~/lib/api";
+import {
+  fetchPlatformStatsForMonitor,
+  type JobMonitorData,
+  type JobMonitorUser,
+} from "~/lib/api";
 
 // Security key from environment variable
 const MONITOR_SECURITY_KEY = process.env.NEXT_PUBLIC_MONITOR_SECURITY_KEY || "";
@@ -30,7 +34,6 @@ const truncateAddressShort = (address: string) => {
   if (!address) return "";
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 };
-
 
 interface JobMonitorProps {
   data?: JobMonitorData;
@@ -48,7 +51,9 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortField, setSortField] = useState<"latest" | "jobid" | "address">("latest");
+  const [sortField, setSortField] = useState<"latest" | "jobid" | "address">(
+    "latest"
+  );
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [selectedUser, setSelectedUser] = useState<JobMonitorUser | null>(null);
   const [copiedAddressKey, setCopiedAddressKey] = useState<string | null>(null);
@@ -61,7 +66,10 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
   // Check authentication on mount
   useEffect(() => {
     // Check if user is already authenticated (stored in localStorage)
-    const storedAuth = typeof window !== "undefined" ? localStorage.getItem(AUTH_STORAGE_KEY) : null;
+    const storedAuth =
+      typeof window !== "undefined"
+        ? localStorage.getItem(AUTH_STORAGE_KEY)
+        : null;
     if (storedAuth === "true" && MONITOR_SECURITY_KEY) {
       setIsAuthenticated(true);
     }
@@ -74,7 +82,9 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
     setAuthError(null);
 
     if (!MONITOR_SECURITY_KEY) {
-      setAuthError("Security key is not configured. Please contact administrator.");
+      setAuthError(
+        "Security key is not configured. Please contact administrator."
+      );
       return;
     }
 
@@ -117,13 +127,15 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
     }
   }, [initialData, fetchData, isAuthenticated]);
 
-
   // Get latest execution timestamp from task_data
   const getLatestExecutionTime = (user: JobMonitorUser): number => {
     if (!user.task_data || user.task_data.length === 0) return 0;
     const timestamps = user.task_data
       .map((task) => {
-        if (task.execution_timestamp && task.execution_timestamp !== "0001-01-01T00:00:00Z") {
+        if (
+          task.execution_timestamp &&
+          task.execution_timestamp !== "0001-01-01T00:00:00Z"
+        ) {
           return new Date(task.execution_timestamp).getTime();
         }
         return 0;
@@ -277,7 +289,9 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
             <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-500/30">
               <IoLockClosed className="w-8 h-8 text-blue-400" />
             </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Secure Access Required</h2>
+            <h2 className="text-2xl font-bold text-white mb-2">
+              Secure Access Required
+            </h2>
             <p className="text-gray-400 text-sm">
               Please enter the security key to access the Job Monitor dashboard
             </p>
@@ -285,7 +299,10 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
 
           <form onSubmit={handleSecurityKeySubmit} className="space-y-4">
             <div>
-              <label htmlFor="securityKey" className="block text-sm font-medium text-gray-300 mb-2">
+              <label
+                htmlFor="securityKey"
+                className="block text-sm font-medium text-gray-300 mb-2"
+              >
                 Security Key
               </label>
               <input
@@ -366,9 +383,14 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
     );
   }
 
-  const failedRate = data.total_job_failed > 0
-    ? ((data.total_job_failed / (data.total_job_live_count + data.total_job_failed)) * 100).toFixed(0)
-    : "0";
+  const failedRate =
+    data.total_job_failed > 0
+      ? (
+          (data.total_job_failed /
+            (data.total_job_live_count + data.total_job_failed)) *
+          100
+        ).toFixed(0)
+      : "0";
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white p-4 md:p-6">
@@ -394,7 +416,8 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
             <h1 className="text-3xl font-bold text-white">Job Monitor</h1>
           </div>
           <p className="text-sm text-gray-400 ml-[52px]">
-            Tracking of all jobs and user plans running on the platform (DCA x TriggerX)
+            Tracking of all jobs and user plans running on the platform (DCA x
+            TriggerX)
           </p>
         </div>
 
@@ -403,12 +426,17 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
           <div className="flex items-center gap-2 text-gray-300">
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
             <span className="text-sm">
-              Last updated: {data.last_update ? formatTime(new Date(data.last_update)) : formatTime(lastUpdated)}
+              Last updated:{" "}
+              {data.last_update
+                ? formatTime(new Date(data.last_update))
+                : formatTime(lastUpdated)}
             </span>
           </div>
           <div className="flex items-center gap-2 text-blue-400">
             <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
-            <span className="text-sm">Next refresh in: {formatCountdown(refreshCountdown)}</span>
+            <span className="text-sm">
+              Next refresh in: {formatCountdown(refreshCountdown)}
+            </span>
           </div>
         </div>
 
@@ -449,7 +477,6 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
             <div className="text-sm text-gray-400">Completed Job</div>
           </motion.div>
 
-
           {/* Succesful task count */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -467,7 +494,6 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
             </div>
             <div className="text-sm text-gray-400">Succesful Task</div>
           </motion.div>
-
 
           {/* Processing */}
           <motion.div
@@ -524,7 +550,8 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
               {data.total_value_swapped.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
-              })} USD
+              })}{" "}
+              USD
             </div>
           </motion.div>
         </div>
@@ -534,7 +561,9 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-3">
               <IoArrowUp className="w-5 h-5 text-green-400" />
-              <h2 className="text-xl font-bold text-white">Recent Transactions</h2>
+              <h2 className="text-xl font-bold text-white">
+                Recent Transactions
+              </h2>
             </div>
             <div className="flex items-center gap-3 w-full md:w-auto">
               <div className="relative flex-1 md:w-64">
@@ -551,7 +580,9 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                 <IoFilter className="w-5 h-5 text-gray-400" />
                 <select
                   value={sortField}
-                  onChange={(e) => setSortField(e.target.value as typeof sortField)}
+                  onChange={(e) =>
+                    setSortField(e.target.value as typeof sortField)
+                  }
                   className="px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
                 >
                   <option value="latest">Latest</option>
@@ -559,16 +590,22 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                   <option value="address">Address</option>
                 </select>
                 <button
-                  onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                  onClick={() =>
+                    setSortOrder(sortOrder === "asc" ? "desc" : "asc")
+                  }
                   className="px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white hover:bg-gray-800/70 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 flex items-center gap-1"
-                  title={`Sort ${sortOrder === "asc" ? "Ascending" : "Descending"}`}
+                  title={`Sort ${
+                    sortOrder === "asc" ? "Ascending" : "Descending"
+                  }`}
                 >
                   {sortOrder === "asc" ? (
                     <IoArrowUp className="w-4 h-4" />
                   ) : (
                     <IoArrowDown className="w-4 h-4" />
                   )}
-                  <span className="text-xs">{sortOrder === "asc" ? "ASC" : "DESC"}</span>
+                  <span className="text-xs">
+                    {sortOrder === "asc" ? "ASC" : "DESC"}
+                  </span>
                 </button>
               </div>
             </div>
@@ -635,7 +672,9 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                               className="text-gray-400 hover:text-white transition-colors"
                             >
                               {copiedAddressKey === addressCopyKey ? (
-                                <span className="text-green-400 text-xs">Copied!</span>
+                                <span className="text-green-400 text-xs">
+                                  Copied!
+                                </span>
                               ) : (
                                 <IoCopyOutline className="w-4 h-4" />
                               )}
@@ -660,7 +699,8 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-2">
                             <span className="text-sm text-white font-semibold">
-                              #{String(user.jobid).slice(0, 7)}...{String(user.jobid).slice(-5)}
+                              #{String(user.jobid).slice(0, 7)}...
+                              {String(user.jobid).slice(-5)}
                             </span>
                             <button
                               onClick={(e) => {
@@ -671,7 +711,9 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                               title="Copy Job ID"
                             >
                               {copiedJobId === String(user.jobid) ? (
-                                <span className="text-green-400 text-xs">Copied!</span>
+                                <span className="text-green-400 text-xs">
+                                  Copied!
+                                </span>
                               ) : (
                                 <IoCopyOutline className="w-4 h-4" />
                               )}
@@ -686,20 +728,21 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                             }}
                             className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 text-purple-300 rounded-full text-sm font-medium border border-purple-500/30 hover:bg-purple-500/30 transition-all"
                           >
-                            {user.tasks_id.length} tasks
+                            {user?.task_data?.length ?? 0} tasks
                             <span className="text-xs">&gt;</span>
                           </button>
                         </td>
                         <td className="py-4 px-4">
                           <span className="text-sm text-white">
-                            {typeof user.Cost_of_TG === 'string'
+                            {typeof user.Cost_of_TG === "string"
                               ? user.Cost_of_TG
                               : `$${Number(user.Cost_of_TG).toFixed(6)}`}
                           </span>
                         </td>
                         <td className="py-4 px-4">
                           <span className="text-sm text-green-400 font-semibold">
-                            ${user.total_swapped.toLocaleString(undefined, {
+                            $
+                            {user.total_swapped.toLocaleString(undefined, {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,
                             })}
@@ -717,30 +760,36 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-700/50">
               <div className="text-sm text-gray-400">
-                Showing {startIndex + 1}-{Math.min(endIndex, filteredUsers.length)} of{" "}
+                Showing {startIndex + 1}-
+                {Math.min(endIndex, filteredUsers.length)} of{" "}
                 {filteredUsers.length} transactions
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(1, prev - 1))
+                  }
                   disabled={currentPage === 1}
                   className="p-2 bg-gray-700/50 rounded-lg border border-gray-600 hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <IoChevronBack className="w-5 h-5 text-white" />
                 </button>
                 <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${currentPage === page
-                        ? "bg-blue-500 text-white"
-                        : "bg-gray-700/50 text-gray-300 hover:bg-gray-700"
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    (page) => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                          currentPage === page
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-700/50 text-gray-300 hover:bg-gray-700"
                         }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
+                      >
+                        {page}
+                      </button>
+                    )
+                  )}
                 </div>
                 <button
                   onClick={() =>
@@ -787,18 +836,24 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
               <div className="space-y-4">
                 {/* User Info */}
                 <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-700/50">
-                  <h4 className="text-sm font-semibold text-gray-400 mb-3">User Information</h4>
+                  <h4 className="text-sm font-semibold text-gray-400 mb-3">
+                    User Information
+                  </h4>
                   <div className="space-y-2">
                     {selectedUser.username && (
                       <div className="flex justify-between">
                         <span className="text-gray-400">Username:</span>
-                        <span className="text-white font-medium">{selectedUser.username}</span>
+                        <span className="text-white font-medium">
+                          {selectedUser.username}
+                        </span>
                       </div>
                     )}
                     {selectedUser.fid !== null && (
                       <div className="flex justify-between">
                         <span className="text-gray-400">FID:</span>
-                        <span className="text-white font-medium">{selectedUser.fid}</span>
+                        <span className="text-white font-medium">
+                          {selectedUser.fid}
+                        </span>
                       </div>
                     )}
                     <div className="flex justify-between">
@@ -811,13 +866,20 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                           onClick={() =>
                             handleCopyAddress(
                               selectedUser.Address,
-                              `${selectedUser.Address}-${selectedUser.jobid ?? "modal"}`
+                              `${selectedUser.Address}-${
+                                selectedUser.jobid ?? "modal"
+                              }`
                             )
                           }
                           className="text-gray-400 hover:text-white"
                         >
-                          {copiedAddressKey === `${selectedUser.Address}-${selectedUser.jobid ?? "modal"}` ? (
-                            <span className="text-green-400 text-xs">Copied!</span>
+                          {copiedAddressKey ===
+                          `${selectedUser.Address}-${
+                            selectedUser.jobid ?? "modal"
+                          }` ? (
+                            <span className="text-green-400 text-xs">
+                              Copied!
+                            </span>
                           ) : (
                             <IoCopyOutline className="w-4 h-4" />
                           )}
@@ -829,21 +891,28 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
 
                 {/* Job Info */}
                 <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-700/50">
-                  <h4 className="text-sm font-semibold text-gray-400 mb-3">Job Information</h4>
+                  <h4 className="text-sm font-semibold text-gray-400 mb-3">
+                    Job Information
+                  </h4>
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-gray-400">Job ID:</span>
                       <div className="flex items-center gap-2">
                         <span className="text-white font-mono text-sm">
-                          {String(selectedUser.jobid).slice(0, 7)}...{String(selectedUser.jobid).slice(-5)}
+                          {String(selectedUser.jobid).slice(0, 7)}...
+                          {String(selectedUser.jobid).slice(-5)}
                         </span>
                         <button
-                          onClick={() => handleCopyJobId(String(selectedUser.jobid))}
+                          onClick={() =>
+                            handleCopyJobId(String(selectedUser.jobid))
+                          }
                           className="text-gray-400 hover:text-white transition-colors"
                           title="Copy Job ID"
                         >
                           {copiedJobId === String(selectedUser.jobid) ? (
-                            <span className="text-green-400 text-xs">Copied!</span>
+                            <span className="text-green-400 text-xs">
+                              Copied!
+                            </span>
                           ) : (
                             <IoCopyOutline className="w-4 h-4" />
                           )}
@@ -853,31 +922,39 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                     {selectedUser.fromToken && (
                       <div className="flex justify-between">
                         <span className="text-gray-400">From Token:</span>
-                        <span className="text-white font-medium">{selectedUser.fromToken}</span>
+                        <span className="text-white font-medium">
+                          {selectedUser.fromToken}
+                        </span>
                       </div>
                     )}
                     {selectedUser.toToken && (
                       <div className="flex justify-between">
                         <span className="text-gray-400">To Token:</span>
-                        <span className="text-white font-medium">{selectedUser.toToken}</span>
+                        <span className="text-white font-medium">
+                          {selectedUser.toToken}
+                        </span>
                       </div>
                     )}
                     {selectedUser.amount && (
                       <div className="flex justify-between">
                         <span className="text-gray-400">Amount:</span>
-                        <span className="text-white font-medium">{selectedUser.amount}</span>
+                        <span className="text-white font-medium">
+                          {selectedUser.amount}
+                        </span>
                       </div>
                     )}
                     {selectedUser.successCount !== undefined && (
                       <div className="flex justify-between">
                         <span className="text-gray-400">Success Count:</span>
-                        <span className="text-white font-medium">{selectedUser.successCount}</span>
+                        <span className="text-white font-medium">
+                          {selectedUser.successCount}
+                        </span>
                       </div>
                     )}
                     <div className="flex justify-between">
                       <span className="text-gray-400">Cost (TG):</span>
                       <span className="text-white font-medium">
-                        {typeof selectedUser.Cost_of_TG === 'string'
+                        {typeof selectedUser.Cost_of_TG === "string"
                           ? selectedUser.Cost_of_TG
                           : `$${Number(selectedUser.Cost_of_TG).toFixed(6)}`}
                       </span>
@@ -885,7 +962,8 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                     <div className="flex justify-between">
                       <span className="text-gray-400">Total Swapped:</span>
                       <span className="text-green-400 font-semibold">
-                        ${selectedUser.total_swapped.toLocaleString(undefined, {
+                        $
+                        {selectedUser.total_swapped.toLocaleString(undefined, {
                           minimumFractionDigits: 4,
                           maximumFractionDigits: 4,
                         })}
@@ -908,31 +986,36 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                 {/* Tasks */}
                 <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-700/50">
                   <h4 className="text-sm font-semibold text-gray-400 mb-3">
-                    Tasks ({selectedUser.tasks_id.length})
+                    Tasks ({selectedUser?.task_data?.length ?? 0})
                   </h4>
                   <div className="space-y-3">
-                    {selectedUser.task_data && selectedUser.task_data.length > 0 ? (
+                    {selectedUser.task_data &&
+                    selectedUser.task_data.length > 0 ? (
                       selectedUser.task_data.map((task) => (
                         <div
                           key={task.task_id}
                           className="bg-purple-500/10 rounded-lg p-3 border border-purple-500/30"
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-purple-300 font-medium">Task #{task.task_id}</span>
+                            <span className="text-purple-300 font-medium">
+                              Task #{task.task_id}
+                            </span>
                             <span
-                              className={`text-xs px-2 py-1 rounded-full ${task.task_status === "completed"
-                                ? "bg-green-500/20 text-green-300 border border-green-500/30"
-                                : task.task_status === "failed"
+                              className={`text-xs px-2 py-1 rounded-full ${
+                                task.task_status === "completed"
+                                  ? "bg-green-500/20 text-green-300 border border-green-500/30"
+                                  : task.task_status === "failed"
                                   ? "bg-red-500/20 text-red-300 border border-red-500/30"
                                   : "bg-yellow-500/20 text-yellow-300 border border-yellow-500/30"
-                                }`}
+                              }`}
                             >
                               {task.task_status}
                             </span>
                           </div>
                           {task.execution_tx_hash && (
                             <div className="text-xs text-gray-400 mb-1">
-                              TX: {task.execution_tx_hash.slice(0, 10)}...{task.execution_tx_hash.slice(-8)}
+                              TX: {task.execution_tx_hash.slice(0, 10)}...
+                              {task.execution_tx_hash.slice(-8)}
                             </div>
                           )}
                           {task.tx_url && task.tx_url.trim() !== "" && (
@@ -961,11 +1044,15 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
                               </a>
                             </div>
                           )}
-                          {task.execution_timestamp && task.execution_timestamp !== "0001-01-01T00:00:00Z" && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              {new Date(task.execution_timestamp).toLocaleString()}
-                            </div>
-                          )}
+                          {task.execution_timestamp &&
+                            task.execution_timestamp !==
+                              "0001-01-01T00:00:00Z" && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                {new Date(
+                                  task.execution_timestamp
+                                ).toLocaleString()}
+                              </div>
+                            )}
                         </div>
                       ))
                     ) : (
@@ -990,4 +1077,3 @@ export function JobMonitor({ data: initialData }: JobMonitorProps) {
     </div>
   );
 }
-
