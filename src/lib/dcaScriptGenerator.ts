@@ -114,7 +114,7 @@ func getTransactionData() (string, error) {
         return "0x", err
     }
     
-    client := &http.Client{Timeout: 60 * time.Second}
+    client := &http.Client{Timeout: 30 * time.Second}
     req, err := http.NewRequest("POST", "https://dca-backend.udonswap.org/api/dca/prepare-swap", bytes.NewBuffer(jsonPayload))
     if err != nil {
         return "0x", err

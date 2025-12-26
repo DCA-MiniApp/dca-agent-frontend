@@ -22,12 +22,16 @@ export function WalletBalanceCard({
   ethPrice = null,
 }: WalletBalanceCardProps) {
   // Calculate USD value of TriggerX balance
-  const tgBalanceUsd = tgBalance && ethPrice 
+  // Check if balance is loaded (not null) and ethPrice is available
+  const tgBalanceUsd = tgBalance !== null && ethPrice !== null
     ? (tgBalance * ethPrice).toLocaleString(undefined, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })
     : null;
+  
+  // Determine if we're still loading (balance is null or ethPrice is null)
+  const isLoadingUsd = tgBalance === null || ethPrice === null;
 
   // // Debug logging
   // console.log('WalletBalanceCard Debug:', {
@@ -144,13 +148,13 @@ export function WalletBalanceCard({
               <p className="text-2xl font-bold text-white group-hover:text-emerald-400 transition-colors duration-300 font-mono">
                 {formatTgBalance()}
               </p>
-              {tgBalanceUsd ? (
-                <p className="text-lg font-semibold text-emerald-300 mt-2">
-                  ≈ ${tgBalanceUsd} USD
-                </p>
-              ) : (
+              {isLoadingUsd ? (
                 <p className="text-sm text-emerald-300/60 mt-2">
                   Loading USD value...
+                </p>
+              ) : (
+                <p className="text-lg font-semibold text-emerald-300 mt-2">
+                  ≈ ${tgBalanceUsd} USD
                 </p>
               )}
             </div>
