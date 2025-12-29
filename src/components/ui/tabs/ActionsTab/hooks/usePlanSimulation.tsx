@@ -13,16 +13,14 @@ export function usePlanSimulation() {
     setIsPlanCreationLoading(true);
 
     // Prime simulation progress immediately so the UI shows without delay.
-    setPlanSimulation((prev) => {
-      if (prev) return prev;
-      const initial = calculateStepState(0);
-      return {
-        startedAt: Date.now(),
-        progress: 0,
-        etaMs: PLAN_SIMULATION_DURATION_MS,
-        activeStepIndex: initial.activeIndex,
-        stepStatuses: initial.statuses,
-      };
+    // Always create fresh simulation state for new plan creation
+    const initial = calculateStepState(0);
+    setPlanSimulation({
+      startedAt: Date.now(),
+      progress: 0,
+      etaMs: PLAN_SIMULATION_DURATION_MS,
+      activeStepIndex: initial.activeIndex,
+      stepStatuses: initial.statuses,
     });
   }, []);
 

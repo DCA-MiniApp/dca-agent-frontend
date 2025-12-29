@@ -34,19 +34,19 @@ import { parseUnits } from "viem";
 // Import refactored utilities, types, constants, and hooks
 import { getEthersSigner } from "./ActionsTab/utils/signer";
 import { renderMarkdownText } from "./ActionsTab/utils/markdown";
-import { 
-  formatAddress, 
+import {
+  formatAddress,
   createMessageId,
   isPlanCreationRequest
 } from "./ActionsTab/utils/helpers";
-import type { 
-  ChatMessage, 
+import type {
+  ChatMessage,
 } from "./ActionsTab/types";
 import { useScrollBehavior, usePlanSimulation, useDepositFlow } from "./ActionsTab/hooks";
-import { 
-  PlanCreationProgress, 
-  LoadingIndicator, 
-  ConfirmationButtons, 
+import {
+  PlanCreationProgress,
+  LoadingIndicator,
+  ConfirmationButtons,
   DepositUI,
   QuickActionButtons,
   ChatInput
@@ -212,7 +212,7 @@ export function ActionsTab() {
   const quickStartInputRef = useRef<HTMLTextAreaElement>(null);
   const inputContainerRef = useRef<HTMLDivElement | null>(null);
   const [inputContainerHeight, setInputContainerHeight] = useState<number>(72);
-  
+
   // Use scroll behavior hook
   const {
     endOfMessagesRef,
@@ -264,6 +264,7 @@ export function ActionsTab() {
     data: approvalTxHash,
     error: approvalError,
     isPending: isApprovePending,
+    reset: resetApprovalContract,
   } = useWriteContract();
   const { isLoading: isApprovalConfirming, isSuccess: isApprovalConfirmed } =
     useWaitForTransactionReceipt({
@@ -369,7 +370,7 @@ export function ActionsTab() {
       };
       setMessages((prev) => [...prev, disconnectionMessage]);
     }
-  }, [isConnected, address, connectionStatus,isWalletConnected]);
+  }, [isConnected, address, connectionStatus, isWalletConnected]);
 
   // --- Chat Handlers ---
   const handleSendMessage = useCallback(async () => {
@@ -404,6 +405,7 @@ export function ActionsTab() {
     setIsApprovalLoading(false);
     setIsPlanCreationLoading(false);
     setCompletedConfirmations(new Set());
+    resetApprovalContract(); // Clear previous approval transaction hash
 
     try {
       setIsPlanCreationLoading(isInPlanCreationFlow);
@@ -498,7 +500,7 @@ export function ActionsTab() {
       setIsPlanCreationLoading(false);
       scrollToBottom(true);
     }
-  }, [inputMessage, isLoading, address, messages]);
+  }, [inputMessage, isLoading, address, messages, resetApprovalContract]);
 
   // --- Deposit Handler (using hook) ---
   const handleDeposit = useCallback(
@@ -966,9 +968,10 @@ export function ActionsTab() {
         setIsInPlanCreationFlow(false);
         setPendingConfirmationId(null);
         setConfirmationStep("summary");
+        resetApprovalContract(); // Clear approval transaction hash
       }
     },
-    [address, handleChatAction, startPlanCreationSimulation, walletClient]
+    [address, handleChatAction, startPlanCreationSimulation, walletClient, resetApprovalContract]
   );
 
   const startApprovalProcess = useCallback(
@@ -1025,11 +1028,11 @@ export function ActionsTab() {
         // Matches: "6 minutes", "6minutes", "6 minitues", "6minitues", etc.
         const m = s.match(/(\d+(?:\.\d+)?)\s*(minut\w*|hour\w*|day\w*|week\w*|month\w*)/i);
         // console.log("[parseDurationToMinutes] Regex match:", m);
-        
+
         // Try a simpler test
         const testMatch = s.match(/minut/i);
         // console.log("[parseDurationToMinutes] Simple 'minut' test:", testMatch);
-        
+
         if (m) {
           const value = parseFloat(m[1]);
           const unit = m[2].toLowerCase(); // Changed from m[3] to m[2] due to non-capturing group
@@ -1066,7 +1069,7 @@ export function ActionsTab() {
           typeof tokenInfo.decimals === "number" ? tokenInfo.decimals : 18;
         // console.log("[Approval] decimals:", decimals);
         console.info("[Approval] Full planData:", planData);
-        
+
         // Validate before proceeding
         if (
           !amountPerExecutionStr ||
@@ -1244,13 +1247,13 @@ export function ActionsTab() {
       if (planData) {
         setIsApprovalLoading(true);
         try {
-        await startApprovalProcess(originalConfirmationId, planData);
+          await startApprovalProcess(originalConfirmationId, planData);
         } catch (error) {
           console.error("Error in handleApproveConfirm:", error);
           // Reset states on error
           setIsApprovalLoading(false);
           setApprovalStatus("idle");
-          
+
           const errorMsg: ChatMessage = {
             id: createMessageId("assistant"),
             role: "assistant",
@@ -1346,9 +1349,10 @@ export function ActionsTab() {
         setIsInPlanCreationFlow(false);
         setPendingConfirmationId(null);
         setConfirmationStep("summary");
+        resetApprovalContract(); // Clear approval transaction hash
       }
     },
-    [address, handleChatAction]
+    [address, handleChatAction, resetApprovalContract]
   );
 
   const generateAssistantResponse = (userInput: string): string => {
@@ -1488,7 +1492,7 @@ export function ActionsTab() {
   // --- Render ---
   return (
     <div className="flex flex-col h-full overflow-hidden">
-  
+
 
       {/* Chat Container */}
       <div className="flex-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-3xl border border-white/20 hover:border-[#c199e4]/40 transition-all duration-500 overflow-hidden flex flex-col">
@@ -1721,13 +1725,13 @@ export function ActionsTab() {
                     onApprove={(confirmationId) => {
                       if (confirmationId.startsWith("approve-")) {
                         handleApproveConfirm(confirmationId);
-                              } else {
+                      } else {
                         handleCancelPlan(confirmationId);
                       }
                     }}
                     onCancel={handleCancelPlan}
                   />
-                  )}
+                )}
 
                 {/* Deposit UI */}
                 {message.requiresDeposit && message.messageIdForDeposit && (
@@ -1739,7 +1743,7 @@ export function ActionsTab() {
                     isDepositLoading={isDepositLoading}
                     onDepositAmountChange={(messageId, amount) =>
                       setDepositAmounts((prev) => ({
-                            ...prev,
+                        ...prev,
                         [messageId]: amount,
                       }))
                     }
